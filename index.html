@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Our Welcome Home — سجل الغسيل</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root {
   --bg: #f9f0f0;
@@ -589,6 +590,45 @@ body {
   </div>
 </div>
 
+<!-- RECEIPT MODAL -->
+<div class="modal-overlay" id="receiptModal">
+  <div class="modal" style="max-height:95vh">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title">معاينة الطلب</div>
+      <button onclick="closeReceiptModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+
+    <!-- THE RECEIPT — this gets exported as image -->
+    <div id="receiptCard" style="background:white;border-radius:16px;padding:20px;font-family:'Cairo',sans-serif;direction:rtl;border:2px solid #e8d8d8;">
+      <div style="text-align:center;margin-bottom:16px;padding-bottom:16px;border-bottom:2px dashed #e8d8d8">
+        <div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:4px">Our Welcome Home</div>
+        <div style="font-size:20px;font-weight:900;color:#1a1a1a" id="rcptApt"></div>
+        <div style="font-size:12px;color:#999;margin-top:4px" id="rcptDate"></div>
+      </div>
+
+      <div id="rcptItems" style="margin-bottom:16px"></div>
+
+      <div style="border-top:2px dashed #e8d8d8;padding-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:15px;font-weight:700;color:#1a1a1a">الإجمالي</span>
+          <span style="font-size:22px;font-weight:900;color:#cc5f5f" id="rcptTotal"></span>
+        </div>
+        <div style="font-size:11px;color:#999;margin-top:6px;text-align:center">الأسعار المتفق عليها — برجاء المراجعة قبل الاستلام</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+      <button class="btn btn-outline" onclick="shareReceipt()" style="justify-content:center">
+        📤 مشاركة
+      </button>
+      <button class="btn btn-primary" onclick="downloadReceipt()" style="justify-content:center">
+        💾 حفظ صورة
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // CONFIG — your real credentials
@@ -741,20 +781,26 @@ function renderSubmissionCard(s, clickable=false) {
   ).join('');
 
   return `
-    <div class="submission-card" onclick="${clickable ? `openReviewModal('${s.id}')` : ''}">
-      <div class="sub-top">
-        <div>
-          <div class="sub-apt">${s.apt}</div>
-          <div class="sub-date">📅 ${date} — ${s.submittedBy||''}</div>
+    <div class="submission-card">
+      <div onclick="${clickable ? `openReviewModal('${s.id}')` : ''}" style="cursor:${clickable?'pointer':'default'}">
+        <div class="sub-top">
+          <div>
+            <div class="sub-apt">${s.apt}</div>
+            <div class="sub-date">📅 ${date} — ${s.submittedBy||''}</div>
+          </div>
+          <div>${statusBadge}</div>
         </div>
-        <div>${statusBadge}</div>
+        <div class="sub-meta">
+          <div class="sub-stat"><strong>${itemCount}</strong> قطعة</div>
+          <div class="sub-stat">•</div>
+          <div class="sub-stat"><strong>$${total.toFixed(0)}</strong></div>
+        </div>
+        <div class="sub-items-preview">${chips}</div>
       </div>
-      <div class="sub-meta">
-        <div class="sub-stat"><strong>${itemCount}</strong> قطعة</div>
-        <div class="sub-stat">•</div>
-        <div class="sub-stat"><strong>$${total.toFixed(0)}</strong></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px">
+        ${clickable ? `<button class="btn btn-outline btn-sm" onclick="openReviewModal('${s.id}')" style="flex:1;justify-content:center">📋 مراجعة</button>` : ''}
+        <button class="btn btn-sm" style="flex:1;justify-content:center;background:var(--surface3);border:1px solid var(--border);color:var(--text2)" onclick="openReceiptModal('${s.id}')">📤 إرسال للغسيل</button>
       </div>
-      <div class="sub-items-preview">${chips}</div>
     </div>
   `;
 }
@@ -1259,6 +1305,121 @@ async function updateSheetCell(range, value) {
 document.getElementById('reviewModal').addEventListener('click', function(e) {
   if(e.target === this) closeModal();
 });
+
+document.getElementById('receiptModal').addEventListener('click', function(e) {
+  if(e.target === this) closeReceiptModal();
+});
+
+// ============================================================
+// RECEIPT EXPORT
+// ============================================================
+function openReceiptModal(subId) {
+  const sub = allSubmissions.find(s => s.id === subId);
+  if(!sub) return;
+
+  const items = allItems.filter(i => i.submissionId === subId);
+  const total = items.reduce((s,i) => s+(i.total||0), 0);
+  const d = sub.timestamp ? excelDateToJS(sub.timestamp) : null;
+  const dateStr = d ? formatDate(d) : new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
+
+  document.getElementById('rcptApt').textContent = sub.apt;
+  document.getElementById('rcptDate').textContent = '📅 ' + dateStr;
+  document.getElementById('rcptTotal').textContent = '$' + total.toFixed(0);
+
+  // Group by type
+  const groups = {};
+  items.forEach(item => {
+    if(!groups[item.type]) groups[item.type] = [];
+    groups[item.type].push(item);
+  });
+
+  let html = '';
+  Object.entries(groups).forEach(([type, typeItems]) => {
+    const typeTotal = typeItems.reduce((s,i) => s+i.total, 0);
+    const unitPrice = typeItems[0]?.unitPrice || itemPrices[type] || 0;
+    const totalQty = typeItems.reduce((s,i) => s+i.qty, 0);
+
+    html += `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #f5eaea">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <span style="font-size:14px;font-weight:900;color:#1a1a1a">${type}</span>
+        <span style="font-size:14px;font-weight:900;color:#cc5f5f">$${typeTotal}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#555">
+        <span>العدد الإجمالي: <strong>${totalQty}</strong></span>
+        <span>السعر: <strong>$${unitPrice}/قطعة</strong></span>
+      </div>`;
+
+    // Color breakdown
+    const colorGroups = {};
+    typeItems.forEach(i => {
+      const c = i.color || 'بدون لون';
+      if(!colorGroups[c]) colorGroups[c] = 0;
+      colorGroups[c] += i.qty;
+    });
+
+    const colorList = Object.entries(colorGroups).map(([c,q]) => `${c} ×${q}`).join(' — ');
+    html += `<div style="font-size:11px;color:#999;margin-top:4px">${colorList}</div>`;
+    html += `</div>`;
+  });
+
+  document.getElementById('rcptItems').innerHTML = html;
+  document.getElementById('receiptModal').classList.add('open');
+}
+
+function closeReceiptModal() {
+  document.getElementById('receiptModal').classList.remove('open');
+}
+
+async function downloadReceipt() {
+  const card = document.getElementById('receiptCard');
+  try {
+    showToast('⏳ جاري إنشاء الصورة...');
+    const canvas = await html2canvas(card, {
+      scale: 3,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
+    });
+    const link = document.createElement('a');
+    link.download = 'dry-clean-order.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('✅ تم حفظ الصورة!');
+  } catch(e) {
+    showToast('❌ خطأ: ' + e.message);
+  }
+}
+
+async function shareReceipt() {
+  const card = document.getElementById('receiptCard');
+  try {
+    showToast('⏳ جاري إنشاء الصورة...');
+    const canvas = await html2canvas(card, {
+      scale: 3,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
+    });
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], 'dry-clean-order.png', { type: 'image/png' });
+      if(navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'طلب غسيل جاف',
+        });
+      } else {
+        // Fallback: download
+        const link = document.createElement('a');
+        link.download = 'dry-clean-order.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('✅ تم حفظ الصورة — شاركها من معرض الصور');
+      }
+    }, 'image/png');
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  }
+}
 </script>
 </body>
 </html>
