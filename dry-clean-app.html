@@ -590,6 +590,7 @@ body {
 const SHEET_ID = '18053VBWoCoEqkBGJfUP2nB1nX3IGRBQ3qEDiR2sf35U';
 const API_KEY  = 'AIzaSyCHqfBKYYE2qpjmNlzgposZrHtVchEpAmo';
 const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEdfR6mgRzuwMVRZiccxoi7pmaJ29OoG4k0GkwZ0HTSZhEsxcjQPgv_klwHL6yi0LaEg/exec';
 
 // ============================================================
 // STATE
@@ -1191,30 +1192,22 @@ function showToast(msg) {
 // GOOGLE SHEETS WRITE
 // ============================================================
 async function appendToSheet(sheetName, rows) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${API_KEY}`;
-  const res = await fetch(url, {
+  const res = await fetch(SCRIPT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: rows })
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'append', sheet: sheetName, rows: rows })
   });
-  if(!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Write failed');
-  }
+  if(!res.ok) throw new Error('Write failed: ' + res.status);
   return res.json();
 }
 
 async function updateSheetCell(range, value) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${API_KEY}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [[value]] })
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'update', sheet: 'Submissions', range: range, value: value })
   });
-  if(!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Update failed');
-  }
+  if(!res.ok) throw new Error('Update failed: ' + res.status);
   return res.json();
 }
 
