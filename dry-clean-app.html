@@ -688,9 +688,8 @@ function renderHome() {
 
   const monthSubs = allSubmissions.filter(s => {
     if(!s.timestamp) return false;
-    const num = parseFloat(s.timestamp);
-    if(isNaN(num) || num < 1000) return false;
-    const d = excelDateToJS(num);
+    const d = excelDateToJS(s.timestamp);
+    if(!d) return false;
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
   const monthCost = monthSubs.reduce((sum, s) => {
@@ -727,7 +726,8 @@ function renderSubmissionCard(s, clickable=false) {
   const items = allItems.filter(i => i.submissionId === s.id);
   const total = items.reduce((sum,i) => sum + (i.total||0), 0);
   const itemCount = items.reduce((sum,i) => sum + (i.qty||0), 0);
-  const date = s.timestamp ? formatDate(excelDateToJS(parseFloat(s.timestamp))) : '—';
+  const d = s.timestamp ? excelDateToJS(parseFloat(s.timestamp)) : null;
+  const date = d ? formatDate(d) : '—';
   const statusBadge = getStatusBadge(s.status||'sent');
 
   // Group items summary
@@ -938,7 +938,8 @@ function openReviewModal(subId) {
 
   const items = allItems.filter(i => i.submissionId === subId);
   const total = items.reduce((s,i) => s+(i.total||0), 0);
-  const date = sub.timestamp ? formatDate(excelDateToJS(parseFloat(sub.timestamp))) : '—';
+  const dModal = sub.timestamp ? excelDateToJS(parseFloat(sub.timestamp)) : null;
+  const date = dModal ? formatDate(dModal) : '—';
 
   document.getElementById('modalTitle').textContent = `${sub.apt} — ${date}`;
 
@@ -1052,14 +1053,9 @@ function renderStats() {
   const months = new Set();
   allSubmissions.forEach(s => {
     if(!s.timestamp) return;
-    const num = parseFloat(String(s.timestamp).trim());
-    if(isNaN(num) || num < 1000) return;
-    const d = excelDateToJS(num);
-    const yr = d.getFullYear();
-    const mo = d.getMonth()+1;
-    if(yr > 2000 && yr < 2100) { // sanity check
-      months.add(`${yr}-${String(mo).padStart(2,'0')}`);
-    }
+    const d = excelDateToJS(s.timestamp);
+    if(!d) return;
+    months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
   });
   const monthList = [...months].sort().reverse();
 
@@ -1091,9 +1087,8 @@ function updateStatsForMonth(month) {
   const [y, mo] = month.split('-').map(Number);
   const subs = allSubmissions.filter(s => {
     if(!s.timestamp) return false;
-    const num = parseFloat(String(s.timestamp).trim());
-    if(isNaN(num) || num < 1000) return false;
-    const d = excelDateToJS(num);
+    const d = excelDateToJS(s.timestamp);
+    if(!d) return false;
     return d.getFullYear() === y && d.getMonth()+1 === mo;
   });
 
@@ -1129,9 +1124,8 @@ function updateStatsForMonth(month) {
   const monthItems = allItems.filter(i => {
     const sub = allSubmissions.find(s => s.id === i.submissionId);
     if(!sub || !sub.timestamp) return false;
-    const num = parseFloat(sub.timestamp);
-    if(isNaN(num) || num < 1000) return false;
-    const d = excelDateToJS(num);
+    const d = excelDateToJS(sub.timestamp);
+    if(!d) return false;
     return d.getFullYear() === y && d.getMonth()+1 === mo;
   });
 
@@ -1164,11 +1158,11 @@ function getSubmissionTotal(subId) {
 }
 
 function excelDateToJS(serial) {
-  // Handle both numeric serial and already-parsed float
-  const num = parseFloat(serial);
-  if (isNaN(num) || num < 1000) return new Date(); // fallback
-  // Excel serial: days since Dec 30 1899
-  // 25569 = days between Dec 30 1899 and Jan 1 1970
+  const num = parseFloat(String(serial).trim());
+  if (isNaN(num) || num < 40000 || num > 60000) {
+    // Not a valid Excel date serial (valid range: ~2009 to ~2064)
+    return null;
+  }
   const ms = (Math.floor(num) - 25569) * 86400 * 1000;
   return new Date(ms);
 }
