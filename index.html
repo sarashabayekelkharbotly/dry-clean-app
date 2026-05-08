@@ -1137,17 +1137,21 @@ function updateStatsForMonth(month) {
   const sorted = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxQty = sorted[0]?.[1] || 1;
 
-  document.getElementById('topItems').innerHTML = sorted.length ? sorted.map(([type, qty]) => `
-    <div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:13px;font-weight:600">${type}</span>
+  // Show ALL item types for the selected month, sorted by quantity
+  const allSorted = Object.entries(typeCounts).sort((a,b) => b[1]-a[1]);
+  const maxQtyAll = allSorted[0]?.[1] || 1;
+
+  document.getElementById('topItems').innerHTML = allSorted.length ? allSorted.map(([type, qty]) => `
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:700">${type}</span>
         <span style="font-size:13px;font-weight:700;color:var(--primary)">${qty} قطعة</span>
       </div>
-      <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${(qty/maxQty*100).toFixed(0)}%;background:var(--primary);border-radius:3px;transition:width 0.6s"></div>
+      <div style="height:7px;background:var(--bg);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${(qty/maxQtyAll*100).toFixed(0)}%;background:var(--primary);border-radius:4px;transition:width 0.6s"></div>
       </div>
     </div>
-  `).join('') : '<div class="empty-text" style="text-align:center;color:var(--text3)">لا توجد بيانات</div>';
+  `).join('') : '<div style="text-align:center;color:var(--text3);padding:20px">لا توجد بيانات لهذا الشهر</div>';
 }
 
 // ============================================================
