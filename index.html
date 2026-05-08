@@ -726,7 +726,7 @@ function renderSubmissionCard(s, clickable=false) {
   const items = allItems.filter(i => i.submissionId === s.id);
   const total = items.reduce((sum,i) => sum + (i.total||0), 0);
   const itemCount = items.reduce((sum,i) => sum + (i.qty||0), 0);
-  const d = s.timestamp ? excelDateToJS(parseFloat(s.timestamp)) : null;
+  const d = s.timestamp ? excelDateToJS(s.timestamp) : null;
   const date = d ? formatDate(d) : '—';
   const statusBadge = getStatusBadge(s.status||'sent');
 
@@ -938,7 +938,7 @@ function openReviewModal(subId) {
 
   const items = allItems.filter(i => i.submissionId === subId);
   const total = items.reduce((s,i) => s+(i.total||0), 0);
-  const dModal = sub.timestamp ? excelDateToJS(parseFloat(sub.timestamp)) : null;
+  const dModal = sub.timestamp ? excelDateToJS(sub.timestamp) : null;
   const date = dModal ? formatDate(dModal) : '—';
 
   document.getElementById('modalTitle').textContent = `${sub.apt} — ${date}`;
