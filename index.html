@@ -953,34 +953,49 @@ function openReviewModal(subId) {
     groups[item.type][key].items.push(item);
   });
 
+  const totalQty = items.reduce((s,i)=>s+i.qty,0);
   let html = `
-    <div style="display:flex;gap:10px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;margin-bottom:12px">
       <div class="stat-card" style="flex:1;padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:900;color:var(--primary)">$${total.toFixed(0)}</div>
-        <div style="font-size:11px;color:var(--text3)">الإجمالي</div>
+        <div style="font-size:11px;color:var(--text3)">سعرنا المتفق</div>
       </div>
       <div class="stat-card" style="flex:1;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:900;color:var(--primary)">${items.reduce((s,i)=>s+i.qty,0)}</div>
-        <div style="font-size:11px;color:var(--text3)">قطعة</div>
+        <div style="font-size:20px;font-weight:900;color:var(--primary)">${totalQty}</div>
+        <div style="font-size:11px;color:var(--text3)">إجمالي القطع</div>
       </div>
     </div>
-    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">القطع حسب النوع والإلوان</div>
+    <div style="background:#fff9ee;border:1.5px solid var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#b07700;font-weight:600;text-align:center">
+      ⚠️ تأكد أن الفاتورة تطابق <strong>أسعارنا المتفق عليها</strong> أدناه
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">القطع حسب النوع والسعر</div>
   `;
 
   Object.entries(groups).forEach(([type, colors]) => {
     const typeTotal = Object.values(colors).reduce((s,c) => s+c.qty, 0);
+    const typeUnitPrice = Object.values(colors)[0]?.items[0]?.unitPrice || itemPrices[type] || 0;
+    const typeTotalCost = typeUnitPrice * typeTotal;
     html += `<div class="review-item-group">
       <div class="review-item-header">
         <div class="review-item-type">${type}</div>
-        <div class="review-item-count">${typeTotal} قطعة</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:rgba(255,255,255,0.75)">$${typeUnitPrice}/قطعة</span>
+          <div class="review-item-count">${typeTotal} قطعة = $${typeTotalCost}</div>
+        </div>
       </div>`;
     Object.entries(colors).forEach(([color, data]) => {
+      const unitPrice = data.items[0]?.unitPrice || itemPrices[type] || 0;
+      const lineTotal = unitPrice * data.qty;
       html += `<div class="review-color-row">
         <div class="review-color-info">
           <div class="color-dot ${getColorDotClass(color)}"></div>
           <div>
             <div class="review-color-name">${color}</div>
-            <div class="review-color-qty">الكمية: ${data.qty}</div>
+            <div style="display:flex;gap:10px;margin-top:2px;align-items:center">
+              <span style="font-size:12px;font-weight:700;color:var(--text)">×${data.qty}</span>
+              <span style="font-size:11px;color:var(--text3)">@$${unitPrice}</span>
+              <span style="font-size:12px;font-weight:900;color:var(--primary)">= $${lineTotal}</span>
+            </div>
           </div>
         </div>
         <div class="review-status-btns">
