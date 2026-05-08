@@ -1157,14 +1157,23 @@ function getSubmissionTotal(subId) {
   return allItems.filter(i => i.submissionId === subId).reduce((s,i) => s+(i.total||0), 0);
 }
 
-function excelDateToJS(serial) {
-  const num = parseFloat(String(serial).trim());
-  if (isNaN(num) || num < 40000 || num > 60000) {
-    // Not a valid Excel date serial (valid range: ~2009 to ~2064)
-    return null;
+function excelDateToJS(val) {
+  if(!val) return null;
+  const str = String(val).trim();
+
+  // Format: "7/26/2025 16:32:39" or "7/26/2025" (M/D/YYYY)
+  const mdyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(mdyMatch) {
+    return new Date(parseInt(mdyMatch[3]), parseInt(mdyMatch[1])-1, parseInt(mdyMatch[2]));
   }
-  const ms = (Math.floor(num) - 25569) * 86400 * 1000;
-  return new Date(ms);
+
+  // Excel serial number like 45864.70863
+  const num = parseFloat(str);
+  if(!isNaN(num) && num > 40000 && num < 60000) {
+    return new Date((Math.floor(num) - 25569) * 86400 * 1000);
+  }
+
+  return null;
 }
 
 function jsDateToExcel(date) {
