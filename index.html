@@ -681,7 +681,9 @@ function renderHome() {
 
   const monthSubs = allSubmissions.filter(s => {
     if(!s.timestamp) return false;
-    const d = excelDateToJS(parseFloat(s.timestamp));
+    const num = parseFloat(s.timestamp);
+    if(isNaN(num) || num < 1000) return false;
+    const d = excelDateToJS(num);
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
   const monthCost = monthSubs.reduce((sum, s) => {
@@ -1031,7 +1033,9 @@ function renderStats() {
   const months = new Set();
   allSubmissions.forEach(s => {
     if(!s.timestamp) return;
-    const d = excelDateToJS(parseFloat(s.timestamp));
+    const num = parseFloat(s.timestamp);
+    if(isNaN(num) || num < 1000) return;
+    const d = excelDateToJS(num);
     months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
   });
   const monthList = [...months].sort().reverse();
@@ -1064,7 +1068,9 @@ function updateStatsForMonth(month) {
   const [y, mo] = month.split('-').map(Number);
   const subs = allSubmissions.filter(s => {
     if(!s.timestamp) return false;
-    const d = excelDateToJS(parseFloat(s.timestamp));
+    const num = parseFloat(s.timestamp);
+    if(isNaN(num) || num < 1000) return false;
+    const d = excelDateToJS(num);
     return d.getFullYear() === y && d.getMonth()+1 === mo;
   });
 
@@ -1100,7 +1106,9 @@ function updateStatsForMonth(month) {
   const monthItems = allItems.filter(i => {
     const sub = allSubmissions.find(s => s.id === i.submissionId);
     if(!sub || !sub.timestamp) return false;
-    const d = excelDateToJS(parseFloat(sub.timestamp));
+    const num = parseFloat(sub.timestamp);
+    if(isNaN(num) || num < 1000) return false;
+    const d = excelDateToJS(num);
     return d.getFullYear() === y && d.getMonth()+1 === mo;
   });
 
