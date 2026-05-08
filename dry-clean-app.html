@@ -541,6 +541,12 @@ body {
     <button class="apt-pill" onclick="filterReview('28A', this)">28A</button>
     <button class="apt-pill" onclick="filterReview('Zayed 2000', this)">Zayed 2000</button>
   </div>
+  <div class="apt-pills" id="reviewStatusFilter">
+    <button class="apt-pill active" onclick="filterReviewStatus('all', this)">كل الحالات</button>
+    <button class="apt-pill" onclick="filterReviewStatus('sent', this)">⏳ عند الغسيل</button>
+    <button class="apt-pill" onclick="filterReviewStatus('returned', this)">✅ مُسترجع</button>
+    <button class="apt-pill" onclick="filterReviewStatus('issue', this)">⚠️ مشكلة</button>
+  </div>
 
   <div id="reviewList">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
@@ -887,9 +893,18 @@ async function submitNew() {
 // ============================================================
 // REVIEW PAGE
 // ============================================================
+let currentStatusFilter = 'all';
+
 function filterReview(apt, btn) {
   currentReviewFilter = apt;
   document.querySelectorAll('#reviewAptFilter .apt-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderReview();
+}
+
+function filterReviewStatus(status, btn) {
+  currentStatusFilter = status;
+  document.querySelectorAll('#reviewStatusFilter .apt-pill').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   renderReview();
 }
@@ -899,8 +914,11 @@ function renderReview() {
   let subs = [...allSubmissions];
   if(currentReviewFilter !== 'all') subs = subs.filter(s => s.apt === currentReviewFilter);
 
-  // Only show "sent" or "partial"
-  subs = subs.filter(s => !s.status || s.status === 'sent' || s.status === 'partial' || s.status === 'issue');
+  // Apply status filter
+  if(currentStatusFilter !== 'all') {
+    subs = subs.filter(s => (s.status||'sent') === currentStatusFilter);
+  }
+  // Sort by date desc
   subs.sort((a,b) => parseFloat(b.timestamp||0) - parseFloat(a.timestamp||0));
 
   if(subs.length === 0) {
@@ -1034,10 +1052,14 @@ function renderStats() {
   const months = new Set();
   allSubmissions.forEach(s => {
     if(!s.timestamp) return;
-    const num = parseFloat(s.timestamp);
+    const num = parseFloat(String(s.timestamp).trim());
     if(isNaN(num) || num < 1000) return;
     const d = excelDateToJS(num);
-    months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    const yr = d.getFullYear();
+    const mo = d.getMonth()+1;
+    if(yr > 2000 && yr < 2100) { // sanity check
+      months.add(`${yr}-${String(mo).padStart(2,'0')}`);
+    }
   });
   const monthList = [...months].sort().reverse();
 
@@ -1069,7 +1091,7 @@ function updateStatsForMonth(month) {
   const [y, mo] = month.split('-').map(Number);
   const subs = allSubmissions.filter(s => {
     if(!s.timestamp) return false;
-    const num = parseFloat(s.timestamp);
+    const num = parseFloat(String(s.timestamp).trim());
     if(isNaN(num) || num < 1000) return false;
     const d = excelDateToJS(num);
     return d.getFullYear() === y && d.getMonth()+1 === mo;
