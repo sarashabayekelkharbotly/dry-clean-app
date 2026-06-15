@@ -817,24 +817,24 @@ function closeDeleteModal() {
   document.getElementById('deleteModal').classList.remove('open');
 }
 async function confirmDelete() {
-  if (!pendingDeleteId) return;
-  closeDeleteModal();
+  const idToDelete = pendingDeleteId; // capture before closing modal
+  if (!idToDelete) return;
 
-  // Find row in allSubmissions
-  const subIdx = allSubmissions.findIndex(s => s.id === pendingDeleteId);
-  if (subIdx === -1) { showToast('لم يتم العثور على الطلب'); return; }
+  // Close modal without resetting pendingDeleteId yet
+  document.getElementById('deleteModal').classList.remove('open');
+
+  const subIdx = allSubmissions.findIndex(s => s.id === idToDelete);
+  if (subIdx === -1) { showToast('لم يتم العثور على الطلب'); pendingDeleteId = null; return; }
 
   showToast('⏳ جاري الحذف...');
   try {
     const rowNum = subIdx + 2;
-    // Mark as deleted by clearing the row via update
     await callScript({ action: 'delete_submission', rowNum });
     allSubmissions.splice(subIdx, 1);
     renderHome();
     renderReview();
     showToast('✅ تم حذف الطلب');
   } catch(e) {
-    // Even if sheet fails, remove from local view
     allSubmissions.splice(subIdx, 1);
     renderHome();
     renderReview();
