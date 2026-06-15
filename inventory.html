@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Our Welcome Home — المخزون</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f9f0f0;
+  --surface: #ffffff;
+  --surface2: #fdf6f6;
+  --surface3: #f5eaea;
+  --primary: #cc5f5f;
+  --primary-dark: #a84545;
+  --text: #1a1a1a;
+  --text2: #555555;
+  --text3: #999999;
+  --border: #e8d8d8;
+  --ok: #5caa7f;
+  --warn: #e8a838;
+  --danger: #cc5f5f;
+  --blue: #5b80cc;
+  --radius: 18px;
+  --radius-sm: 10px;
+  --shadow: 0 2px 12px rgba(204,95,95,0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* HEADER */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow);
+}
+.header-title { font-size: 17px; font-weight: 900; }
+.user-pill {
+  background: var(--surface3); border: 1.5px solid var(--border);
+  border-radius: 20px; padding: 5px 12px;
+  font-size: 12px; font-weight: 700; color: var(--text2);
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+}
+.user-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* NAV */
+.nav {
+  display: flex; background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  position: sticky; top: 65px; z-index: 99;
+  overflow-x: auto; scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+.nav-tab {
+  flex: 1; min-width: 70px; padding: 10px 6px;
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--text3); border: none; background: none;
+  cursor: pointer; border-bottom: 3px solid transparent;
+  transition: all 0.2s; font-family: 'Cairo', sans-serif;
+  white-space: nowrap;
+}
+.nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.nav-tab .tab-icon { font-size: 18px; display: block; margin-bottom: 1px; }
+
+/* PAGES */
+.page { display: none; padding: 16px; padding-bottom: 80px; animation: fadeIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* STATS GRID */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 8px;
+  box-shadow: var(--shadow); text-align: center;
+}
+.stat-value { font-size: 22px; font-weight: 900; }
+.stat-label { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+/* SECTION TITLE */
+.section-title {
+  font-size: 12px; font-weight: 700; color: var(--text3);
+  letter-spacing: 0.8px; margin-bottom: 10px; margin-top: 4px;
+}
+
+/* NAWAQES CARD */
+.nawaqes-card {
+  background: var(--surface); border: 1.5px solid rgba(204,95,95,0.25);
+  border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow); margin-bottom: 12px;
+}
+.nawaqes-card.transit { border-color: rgba(91,128,204,0.3); }
+.nawaqes-header {
+  background: linear-gradient(135deg, #fff0f0, #fde8e8);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(204,95,95,0.12);
+}
+.nawaqes-header.transit-hdr { background: linear-gradient(135deg,#eef2ff,#e8edff); }
+.nawaqes-header h3 { font-size: 14px; font-weight: 900; color: var(--danger); }
+.nawaqes-header.transit-hdr h3 { color: var(--blue); }
+.nawaqes-badge {
+  background: var(--danger); color: white;
+  border-radius: 12px; padding: 2px 10px;
+  font-size: 11px; font-weight: 700;
+}
+.nawaqes-badge.blue { background: var(--blue); }
+
+.nawaqes-row {
+  display: flex; align-items: center;
+  padding: 12px 16px; border-top: 1px solid var(--border); gap: 12px;
+}
+.nawaqes-emoji { font-size: 22px; width: 36px; text-align: center; flex-shrink: 0; }
+.nawaqes-info { flex: 1; min-width: 0; }
+.nawaqes-name { font-size: 14px; font-weight: 700; }
+.nawaqes-meta { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.nawaqes-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.gap-chip {
+  background: #ffeaea; border: 1px solid rgba(204,95,95,0.2);
+  border-radius: 8px; padding: 3px 9px;
+  font-size: 12px; font-weight: 900; color: var(--danger);
+}
+.counts-text { font-size: 12px; color: var(--text2); font-weight: 700; }
+
+/* ORDER ACTION ROW */
+.order-action-row { padding: 10px 16px 14px; }
+
+/* ITEM CARDS */
+.item-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 8px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.item-card.low  { border-color: rgba(204,95,95,0.4); }
+.item-card.warn { border-color: rgba(232,168,56,0.45); }
+
+.item-body { display: flex; align-items: center; padding: 12px 14px; gap: 12px; }
+.item-icon {
+  font-size: 22px; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface3); border-radius: 10px; flex-shrink: 0;
+}
+.item-text { flex: 1; min-width: 0; }
+.item-name { font-size: 14px; font-weight: 700; }
+.item-en   { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.item-brand { font-size: 10px; color: var(--primary); font-weight: 700; margin-top: 2px; }
+.transit-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #e8edff; color: var(--blue);
+  border-radius: 10px; padding: 2px 7px;
+  font-size: 10px; font-weight: 700; margin-top: 3px;
+}
+
+.item-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.ctrl-row { display: flex; align-items: center; gap: 6px; }
+.ctrl-lbl { font-size: 10px; color: var(--text3); min-width: 26px; text-align: right; }
+.qty-ctrl {
+  display: flex; align-items: center;
+  border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.qty-btn {
+  width: 30px; height: 30px; border: none; background: var(--surface3);
+  cursor: pointer; font-size: 16px; font-weight: 700; color: var(--primary);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background 0.12s;
+}
+.qty-btn:active { background: var(--primary); color: white; }
+.qty-btn.disabled { pointer-events: none; opacity: 0.35; }
+.qty-val { min-width: 30px; text-align: center; font-size: 14px; font-weight: 900; }
+.qty-val.low  { color: var(--danger); }
+.qty-val.warn { color: var(--warn); }
+.qty-val.ok   { color: var(--ok); }
+
+.progress-bar { height: 3px; background: var(--border); }
+.progress-fill { height: 100%; border-radius: 0 2px 2px 0; transition: width 0.4s; }
+.pf-ok   { background: var(--ok); }
+.pf-warn { background: var(--warn); }
+.pf-low  { background: var(--danger); }
+
+/* HISTORY / STATS */
+.event-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px; border-top: 1px solid var(--border);
+}
+.event-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+.event-info { flex: 1; }
+.event-name { font-size: 13px; font-weight: 700; }
+.event-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.event-qty  { font-size: 13px; font-weight: 900; flex-shrink: 0; }
+.event-qty.consume { color: var(--danger); }
+.event-qty.purchase { color: var(--ok); }
+.event-qty.adjust { color: var(--warn); }
+
+/* STATS BAR */
+.stats-bar-row { margin-bottom: 14px; }
+.stats-bar-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.stats-bar-name { font-size: 13px; font-weight: 700; }
+.stats-bar-val  { font-size: 13px; font-weight: 700; color: var(--primary); }
+.bar-wrap { height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.6s; }
+
+/* BUTTONS */
+.btn {
+  padding: 12px 20px; border-radius: var(--radius-sm);
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700;
+  border: none; cursor: pointer; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--primary); color: white; width: 100%; justify-content: center; box-shadow: 0 4px 14px rgba(204,95,95,0.3); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-success { background: #e8f5e9; color: var(--ok); border: none; width: 100%; justify-content: center; }
+.btn-outline { background: none; border: 1.5px solid var(--border); color: var(--text2); width: 100%; justify-content: center; }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+.btn-ghost { background: none; border: none; color: var(--primary); font-family: 'Cairo', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; padding: 4px 8px; }
+
+/* FORM */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 6px; display: block; }
+.form-input, .form-select {
+  width: 100%; padding: 12px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Cairo', sans-serif; font-size: 14px; color: var(--text);
+  background: var(--surface); outline: none; transition: border-color 0.2s; appearance: none;
+}
+.form-input:focus, .form-select:focus { border-color: var(--primary); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* MODAL */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 200;
+  align-items: flex-end; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 24px 24px 0 0;
+  width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+  padding: 20px; animation: slideUp 0.3s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.modal-title { font-size: 17px; font-weight: 900; margin-bottom: 16px; }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.badge-low     { background: #ffeaea; color: var(--danger); }
+.badge-ok      { background: #e8f5e9; color: var(--ok); }
+.badge-transit { background: #e8edff; color: var(--blue); }
+.badge-warn    { background: #fff3e0; color: var(--warn); }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--text); color: white; padding: 12px 20px;
+  border-radius: 12px; font-size: 13px; font-weight: 600;
+  z-index: 300; transition: transform 0.3s ease;
+  white-space: nowrap; pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 76px; left: 20px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--primary); color: white; border: none; font-size: 26px;
+  box-shadow: 0 4px 16px rgba(204,95,95,0.45);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  z-index: 50; transition: transform 0.15s;
+}
+.fab:active { transform: scale(0.93); }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  max-width: 480px; margin: 0 auto; height: 60px;
+  background: var(--surface); border-top: 1.5px solid var(--border);
+  display: flex; z-index: 100; box-shadow: 0 -2px 12px rgba(204,95,95,0.06);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; cursor: pointer; color: var(--text3); font-size: 10px; font-weight: 700;
+  text-decoration: none; transition: color 0.15s; font-family: 'Cairo', sans-serif;
+}
+.nav-item.active { color: var(--primary); }
+.nav-item .ni { font-size: 20px; }
+
+/* LOADING / EMPTY */
+.loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; color: var(--text3); gap: 12px; }
+.spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+.divider { height: 1px; background: var(--border); margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">🗂️ المخزون</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="btn-ghost" onclick="syncData()" title="تحديث">🔄</button>
+    <div class="user-pill" onclick="openModal('user-modal')">
+      <div class="user-dot" id="user-dot"></div>
+      <span id="user-label">عماد</span> ▾
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-tab active" onclick="showPage('nawaqes',this)">
+    <span class="tab-icon">⚠️</span>النواقص
+  </button>
+  <button class="nav-tab" onclick="showPage('cleaning',this)">
+    <span class="tab-icon">🧹</span>مستلزمات
+  </button>
+  <button class="nav-tab" onclick="showPage('snacks',this)">
+    <span class="tab-icon">🍪</span>سلة ترحيب
+  </button>
+  <button class="nav-tab" onclick="showPage('orders',this)">
+    <span class="tab-icon">🛒</span>طلبات
+  </button>
+  <button class="nav-tab" onclick="showPage('stats',this)">
+    <span class="tab-icon">📊</span>إحصائيات
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- NAWAQES -->
+<div class="page active" id="page-nawaqes">
+  <div class="stats-grid" id="summary-stats">
+    <div class="stat-card"><div class="spinner" style="margin:0 auto"></div></div>
+    <div class="stat-card"></div><div class="stat-card"></div>
+  </div>
+  <div id="nawaqes-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- CLEANING -->
+<div class="page" id="page-cleaning">
+  <div id="list-cleaning"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- SNACKS -->
+<div class="page" id="page-snacks">
+  <div id="list-snacks"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- ORDERS -->
+<div class="page" id="page-orders">
+  <div id="orders-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- STATS -->
+<div class="page" id="page-stats">
+  <div id="stats-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab-add" onclick="openModal('add-modal')" style="display:none">＋</button>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="ni">🏠</span>الرئيسية</a>
+  <a class="nav-item" href="index.html"><span class="ni">➕</span>إرسال</a>
+  <a class="nav-item" href="index.html"><span class="ni">📦</span>مراجعة</a>
+  <a class="nav-item active" href="inventory.html"><span class="ni">🗂️</span>المخزون</a>
+  <a class="nav-item" href="index.html"><span class="ni">📊</span>إحصائيات</a>
+</nav>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- USER -->
+<div class="modal-overlay" id="user-modal" onclick="overlayClose(event,'user-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">اختر المستخدم</div>
+    <div onclick="switchUser('emad','عماد')" class="item-card" style="cursor:pointer;margin-bottom:8px">
+      <div class="item-body"><div class="item-icon">👷</div><div class="item-text"><div class="item-name">عماد</div><div class="item-en">مسؤول العمليات</div></div><div class="user-dot" id="dot-emad"></div></div>
+    </div>
+    <div onclick="switchUser('sarah','سارة')" class="item-card" style="cursor:pointer;margin-bottom:8px">
+      <div class="item-body"><div class="item-icon">👩‍💼</div><div class="item-text"><div class="item-name">سارة</div><div class="item-en">الإدارة</div></div><div id="dot-sarah" style="width:7px;height:7px;border-radius:50%;background:var(--border)"></div></div>
+    </div>
+    <div onclick="switchUser('khaled','خالد')" class="item-card" style="cursor:pointer">
+      <div class="item-body"><div class="item-icon">👨‍💼</div><div class="item-text"><div class="item-name">خالد</div><div class="item-en">الإدارة</div></div><div id="dot-khaled" style="width:7px;height:7px;border-radius:50%;background:var(--border)"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ITEM -->
+<div class="modal-overlay" id="add-modal" onclick="overlayClose(event,'add-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ إضافة صنف جديد</div>
+    <div class="form-group"><label class="form-label">الاسم بالعربية</label><input class="form-input" id="n-ar" type="text" placeholder="مثال: مناديل حمام"></div>
+    <div class="form-group"><label class="form-label">الاسم بالإنجليزية (اختياري)</label><input class="form-input" id="n-en" type="text"></div>
+    <div class="form-group"><label class="form-label">البراند (اختياري)</label><input class="form-input" id="n-brand" type="text"></div>
+    <div class="form-group"><label class="form-label">الفئة</label>
+      <select class="form-select" id="n-cat"><option value="cleaning">🧹 مستلزمات</option><option value="snacks">🍪 سلة ترحيب</option></select>
+    </div>
+    <div class="form-group"><label class="form-label">الإيموجي</label><input class="form-input" id="n-emoji" type="text" placeholder="🧴" maxlength="2"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">الرصيد الثابت</label><input class="form-input" id="n-par" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">المخزون الحالي</label><input class="form-input" id="n-cur" type="number" min="0" placeholder="0"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addItem()">حفظ الصنف</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('add-modal')">إلغاء</button>
+  </div>
+</div>
+
+<!-- CONSUME MODAL (Emad uses when item is consumed) -->
+<div class="modal-overlay" id="consume-modal" onclick="overlayClose(event,'consume-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="consume-title">تسجيل استهلاك</div>
+    <div class="form-group"><label class="form-label">الكمية المستهلكة</label>
+      <input class="form-input" id="consume-qty" type="number" min="1" value="1">
+    </div>
+    <div class="form-group"><label class="form-label">ملاحظة (اختياري)</label>
+      <input class="form-input" id="consume-note" type="text" placeholder="مثال: شقة 8A">
+    </div>
+    <button class="btn btn-primary" onclick="confirmConsume()">✅ تأكيد الاستهلاك</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('consume-modal')">إلغاء</button>
+  </div>
+</div>
+
+<!-- ORDER MODAL -->
+<div class="modal-overlay" id="order-modal" onclick="overlayClose(event,'order-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🛒 تأكيد طلب الشراء</div>
+    <div id="order-modal-body"></div>
+    <button class="btn btn-primary" onclick="confirmOrder()">✅ تأكيد — تم الطلب</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('order-modal')">إلغاء</button>
+  </div>
+</div>
+
+<!-- RECEIVE MODAL -->
+<div class="modal-overlay" id="receive-modal" onclick="overlayClose(event,'receive-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📦 تأكيد الاستلام</div>
+    <div id="receive-modal-body"></div>
+    <div class="form-group" style="margin-top:12px"><label class="form-label">الكمية المستلمة فعلاً</label>
+      <input class="form-input" id="recv-qty" type="number" min="0">
+    </div>
+    <button class="btn btn-success" onclick="confirmReceive()">✅ تم الاستلام — إضافة للمخزون</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('receive-modal')">إلغاء</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwq4F1gpNoPr5Yn7BnqqWukuE9zJsbsEl2l9cXV1plM-tKvK154lOLRDGmilANAPBoqJg/exec';
+
+const DEFAULT_ITEMS = [
+  {id:1,  cat:'cleaning',emoji:'🧻',ar:'مناديل حمام',         en:'Toilet paper',               brand:'',             par:24,cur:4 },
+  {id:2,  cat:'cleaning',emoji:'🧻',ar:'مناديل مطبخ',         en:'Kitchen paper',              brand:'',             par:6, cur:6 },
+  {id:3,  cat:'cleaning',emoji:'🤧',ar:'مناديل سفرة',         en:'Napkins / tissues',          brand:'',             par:5, cur:4 },
+  {id:4,  cat:'cleaning',emoji:'💧',ar:'حياة',                 en:'Hayah water',                brand:'Hayah',        par:8, cur:0 },
+  {id:5,  cat:'cleaning',emoji:'🌸',ar:'معطر جو',              en:'Air freshener',              brand:'Frida',        par:4, cur:2 },
+  {id:6,  cat:'cleaning',emoji:'🚬',ar:'مزيل رائحة سجاير',    en:'Cigarette air freshener',    brand:'Maxell Magic', par:4, cur:2 },
+  {id:7,  cat:'cleaning',emoji:'🧴',ar:'منظف أرضيات',         en:'Floor cleaner',              brand:'Frisa Floor',  par:1, cur:1 },
+  {id:8,  cat:'cleaning',emoji:'🧼',ar:'ديتول',               en:'Dettol',                     brand:'Dettol',       par:1, cur:2 },
+  {id:9,  cat:'cleaning',emoji:'🍳',ar:'مزيل دهون',           en:'Degreaser',                  brand:'Maxell',       par:2, cur:1 },
+  {id:10, cat:'cleaning',emoji:'🪟',ar:'جلا نس',              en:'Glass / window cleaner',     brand:'',             par:4, cur:7 },
+  {id:11, cat:'cleaning',emoji:'🛋️',ar:'منظف فرش',           en:'Carpet & upholstery shampoo',brand:'Astonish',     par:2, cur:3 },
+  {id:12, cat:'cleaning',emoji:'🫧',ar:'مزيل البقع',          en:'Stain remover',              brand:'Clean Spray',  par:2, cur:1 },
+  {id:13, cat:'cleaning',emoji:'🌼',ar:'مزيل رائحة الفرش',    en:'Fabric freshener',           brand:'Astonish',     par:1, cur:1 },
+  {id:14, cat:'cleaning',emoji:'✨',ar:'بلدج أرضيات',         en:'Pledge for floors',          brand:'Pledge',       par:2, cur:2 },
+  {id:15, cat:'cleaning',emoji:'✨',ar:'بلدج مسطحات',         en:'Pledge for surfaces',        brand:'Pledge',       par:2, cur:0 },
+  {id:16, cat:'cleaning',emoji:'🚽',ar:'هاربيك',              en:'Toilet cleaner',             brand:'Harpic',       par:4, cur:5 },
+  {id:17, cat:'cleaning',emoji:'🍽️',ar:'مسحوق أطباق',        en:'Dish washing powder',        brand:'Pril',         par:1, cur:1 },
+  {id:18, cat:'cleaning',emoji:'🟩',ar:'ليفة مطبخ',           en:'Dish sponge',                brand:'',             par:10,cur:11},
+  {id:19, cat:'cleaning',emoji:'🗑️',ar:'أكياس زبالة كبيرة',  en:'Large garbage bags',         brand:'',             par:4, cur:6 },
+  {id:20, cat:'cleaning',emoji:'🗑️',ar:'أكياس زبالة صغيرة',  en:'Small garbage bags',         brand:'',             par:4, cur:9 },
+  {id:21, cat:'cleaning',emoji:'👕',ar:'مسحوق ملابس',         en:'Laundry detergent',          brand:'Ariel',        par:1, cur:1 },
+  {id:22, cat:'cleaning',emoji:'💙',ar:'كومفورت',             en:'Fabric softener',            brand:'Comfort',      par:1, cur:1 },
+  {id:23, cat:'cleaning',emoji:'🧴',ar:'شامبو',               en:'Shampoo',                    brand:'',             par:2, cur:5 },
+  {id:24, cat:'cleaning',emoji:'🧴',ar:'بلسم',                en:'Conditioner',                brand:'',             par:2, cur:0 },
+  {id:25, cat:'cleaning',emoji:'🚿',ar:'شاور',                en:'Shower gel',                 brand:'',             par:2, cur:0 },
+  {id:26, cat:'cleaning',emoji:'🍬',ar:'سكر',                 en:'Sugar',                      brand:'',             par:2, cur:1 },
+  {id:27, cat:'cleaning',emoji:'🧂',ar:'ملح',                 en:'Salt',                       brand:'',             par:4, cur:6 },
+  {id:28, cat:'cleaning',emoji:'☕',ar:'نسكافيه',             en:'Nescafe',                    brand:'Nescafé',      par:1, cur:1 },
+  {id:29, cat:'cleaning',emoji:'🍵',ar:'شاي',                 en:'Tea',                        brand:'',             par:25,cur:8 },
+  {id:30, cat:'cleaning',emoji:'🫙',ar:'زيت',                 en:'Cooking oil',                brand:'',             par:4, cur:1 },
+  {id:31, cat:'cleaning',emoji:'🍶',ar:'خل',                  en:'Vinegar',                    brand:'',             par:4, cur:4 },
+  {id:32, cat:'snacks',  emoji:'🥔',ar:'شيبس',                en:'Chips',                      brand:'',             par:16,cur:43},
+  {id:33, cat:'snacks',  emoji:'☁️',ar:'مارشميلو',            en:'Marshmallow',                brand:'',             par:4, cur:0 },
+  {id:34, cat:'snacks',  emoji:'🍪',ar:'بسكويت ملح',          en:'Salt biscuits',              brand:'',             par:4, cur:0 },
+  {id:35, cat:'snacks',  emoji:'🍫',ar:'بسكويت شيكولاتة',     en:'Chocolate biscuits',         brand:'',             par:4, cur:0 },
+  {id:36, cat:'snacks',  emoji:'🌾',ar:'بسكويت شوفان',        en:'Oat biscuits',               brand:'',             par:4, cur:17},
+  {id:37, cat:'snacks',  emoji:'🌴',ar:'بسكويت بلح',          en:'Date biscuits',              brand:'',             par:4, cur:0 },
+  {id:38, cat:'snacks',  emoji:'🍩',ar:'بسكويت سكر',          en:'Sugar biscuits',             brand:'',             par:4, cur:0 },
+];
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let currentUser = 'emad';
+let currentUserName = 'عماد';
+let items = [];
+let orders = [];
+let events = [];
+let pendingOrderItems = [];
+let pendingReceiveOrderId = null;
+let pendingConsumeItemId = null;
+let syncing = false;
+
+// ─────────────────────────────────────────────
+// API
+// ─────────────────────────────────────────────
+async function api(action, extra = {}) {
+  const body = JSON.stringify({ action, ...extra });
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// ─────────────────────────────────────────────
+// INIT & SYNC
+// ─────────────────────────────────────────────
+async function syncData() {
+  if (syncing) return;
+  syncing = true;
+  toast('⏳ جاري التزامن...');
+  try {
+    // Try to get items from sheet
+    const res = await api('inv_get_items');
+    if (res.items && res.items.length > 0) {
+      items = res.items;
+    } else {
+      // First time: seed the sheet with defaults
+      await api('inv_init', { items: DEFAULT_ITEMS });
+      items = DEFAULT_ITEMS.map(i => ({...i}));
+    }
+
+    // Get orders
+    const ordRes = await api('inv_get_orders');
+    orders = ordRes.orders || [];
+
+    // Get recent events
+    const evRes = await api('inv_get_events', { limit: 300 });
+    events = evRes.events || [];
+
+    renderAll();
+    toast('✅ تم التحديث');
+  } catch(e) {
+    // Fallback to defaults if offline
+    if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
+    renderAll();
+    toast('⚠️ وضع غير متصل — البيانات محلية');
+  }
+  syncing = false;
+}
+
+// ─────────────────────────────────────────────
+// STATUS HELPERS
+// ─────────────────────────────────────────────
+function isLow(it)  { return it.cur < it.par; }
+function pct(it)    { return it.par === 0 ? 100 : Math.min(100, Math.round(it.cur / it.par * 100)); }
+function scls(it)   { const p=pct(it); if(it.cur===0||p<40) return 'low'; if(p<70) return 'warn'; return ''; }
+function fcls(it)   { const p=pct(it); if(it.cur===0||p<40) return 'pf-low'; if(p<70) return 'pf-warn'; return 'pf-ok'; }
+function vcls(it)   { const p=pct(it); if(it.cur===0||p<40) return 'low'; if(p<70) return 'warn'; return 'ok'; }
+function gap(it)    { return Math.max(0, it.par - it.cur); }
+function inTransit(itemId) { return orders.some(o => String(o.itemId)===String(itemId) && o.status==='ordered'); }
+function getOrder(itemId)  { return orders.find(o => String(o.itemId)===String(itemId) && o.status==='ordered'); }
+function isReadonly()      { return currentUser !== 'emad'; }
+function canOrder()        { return currentUser === 'sarah' || currentUser === 'khaled'; }
+function genId()           { return 'i' + Date.now() + Math.random().toString(36).substr(2,4); }
+function fmtDate(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleDateString('ar-EG',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch(e) { return ts; }
+}
+function fmtDateShort(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}); } catch(e){ return ts; }
+}
+
+// ─────────────────────────────────────────────
+// RENDER ALL
+// ─────────────────────────────────────────────
+function renderAll() {
+  renderSummary();
+  renderNawaqes();
+  renderList('cleaning');
+  renderList('snacks');
+  renderOrders();
+  renderStats();
+  document.getElementById('fab-add').style.display = isReadonly() ? 'none' : 'flex';
+  // update user dots
+  ['emad','sarah','khaled'].forEach(u => {
+    const d = document.getElementById('dot-'+u);
+    if (d) d.style.background = u === currentUser ? 'var(--ok)' : 'var(--border)';
+  });
+  document.getElementById('user-dot').style.background = 'var(--ok)';
+}
+
+function renderSummary() {
+  const low = items.filter(isLow).length;
+  const ok  = items.filter(i => !isLow(i)).length;
+  const tr  = [...new Set(orders.filter(o=>o.status==='ordered').map(o=>String(o.itemId)))].length;
+  document.getElementById('summary-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${low}</div><div class="stat-label">ناقص</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${ok}</div><div class="stat-label">كافي</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${tr}</div><div class="stat-label">في الطريق</div></div>
+  `;
+}
+
+function renderNawaqes() {
+  const low = items.filter(isLow);
+  const el = document.getElementById('nawaqes-content');
+  if (low.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">المخزون مكتمل</div></div>`;
+    return;
+  }
+  const needOrder = low.filter(i => !inTransit(i.id));
+  const transit   = low.filter(i => inTransit(i.id));
+  let html = '';
+
+  if (needOrder.length > 0) {
+    html += `<div class="nawaqes-card">
+      <div class="nawaqes-header">
+        <h3>🛒 يحتاج طلب</h3>
+        <div class="nawaqes-badge">${needOrder.length} صنف</div>
+      </div>`;
+    needOrder.forEach(it => {
+      html += `<div class="nawaqes-row">
+        <div class="nawaqes-emoji">${it.emoji}</div>
+        <div class="nawaqes-info">
+          <div class="nawaqes-name">${it.ar}</div>
+          ${it.brand ? `<div class="nawaqes-meta">${it.brand}</div>` : ''}
+        </div>
+        <div class="nawaqes-right">
+          <div class="counts-text">${it.cur} / ${it.par}</div>
+          <div class="gap-chip">ينقص ${gap(it)}</div>
+        </div>
+      </div>`;
+    });
+    if (canOrder()) {
+      html += `<div class="order-action-row">
+        <button class="btn btn-primary btn-sm" style="width:100%" onclick="openOrderModal()">🛒 تأكيد الطلب لهذه الأصناف</button>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (transit.length > 0) {
+    html += `<div class="nawaqes-card transit" style="margin-top:10px">
+      <div class="nawaqes-header transit-hdr">
+        <h3>🚚 في الطريق</h3>
+        <div class="nawaqes-badge blue">${transit.length} صنف</div>
+      </div>`;
+    transit.forEach(it => {
+      const ord = getOrder(it.id);
+      html += `<div class="nawaqes-row">
+        <div class="nawaqes-emoji">${it.emoji}</div>
+        <div class="nawaqes-info">
+          <div class="nawaqes-name">${it.ar}</div>
+          <div class="nawaqes-meta">طُلب ${ord?.qtyRequested||'?'} — ${ord?.orderedBy||'—'} — ${fmtDateShort(ord?.orderedAt)}</div>
+        </div>
+        <div class="nawaqes-right">
+          ${currentUser==='emad'
+            ? `<button class="btn btn-success btn-sm" onclick="openReceiveModal('${ord?.id}')">✅ استلمت</button>`
+            : `<span class="badge badge-transit">🚚 جارٍ</span>`}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderList(cat) {
+  const catItems = items.filter(i => i.cat === cat);
+  const elId = cat === 'cleaning' ? 'list-cleaning' : 'list-snacks';
+  const ro = isReadonly();
+
+  document.getElementById(elId).innerHTML = catItems.map(it => {
+    const p = pct(it);
+    const tr = inTransit(it.id);
+    const btnCls = ro ? 'qty-btn disabled' : 'qty-btn';
+    return `
+    <div class="item-card ${scls(it)}" id="card-${it.id}">
+      <div class="item-body">
+        <div class="item-icon">${it.emoji}</div>
+        <div class="item-text">
+          <div class="item-name">${it.ar}</div>
+          ${it.en ? `<div class="item-en">${it.en}</div>` : ''}
+          ${it.brand ? `<div class="item-brand">${it.brand}</div>` : ''}
+          ${tr ? `<div class="transit-tag">🚚 في الطريق</div>` : ''}
+        </div>
+        <div class="item-controls">
+          <div class="ctrl-row">
+            <span class="ctrl-lbl">حالي</span>
+            <div class="qty-ctrl">
+              <button class="${btnCls}" onclick="adjCur(${it.id},-1)">−</button>
+              <span class="qty-val ${vcls(it)}" id="cv-${it.id}">${it.cur}</span>
+              <button class="${btnCls}" onclick="adjCur(${it.id},+1)">＋</button>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <span class="ctrl-lbl">ثابت</span>
+            <div class="qty-ctrl">
+              <button class="${btnCls}" onclick="adjPar(${it.id},-1)">−</button>
+              <span class="qty-val" id="pv-${it.id}">${it.par}</span>
+              <button class="${btnCls}" onclick="adjPar(${it.id},+1)">＋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill ${fcls(it)}" id="bar-${it.id}" style="width:${p}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderOrders() {
+  const el = document.getElementById('orders-content');
+  const active   = orders.filter(o => o.status === 'ordered');
+  const received = orders.filter(o => o.status === 'received').slice(-20).reverse();
+
+  if (active.length === 0 && received.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">لا توجد طلبات بعد</div></div>`;
+    return;
+  }
+  let html = '';
+
+  if (active.length > 0) {
+    html += `<div class="section-title">طلبات جارية</div><div class="nawaqes-card">`;
+    active.forEach(ord => {
+      const it = items.find(i => String(i.id)===String(ord.itemId));
+      html += `<div class="nawaqes-row">
+        <div class="nawaqes-emoji">${it?.emoji||'📦'}</div>
+        <div class="nawaqes-info">
+          <div class="nawaqes-name">${ord.itemName}</div>
+          <div class="nawaqes-meta">طُلب ${ord.qtyRequested} — ${ord.orderedBy} — ${fmtDateShort(ord.orderedAt)}</div>
+        </div>
+        <div class="nawaqes-right">
+          ${currentUser==='emad'
+            ? `<button class="btn btn-success btn-sm" onclick="openReceiveModal('${ord.id}')">✅ استلمت</button>`
+            : `<span class="badge badge-transit">🚚 جارٍ</span>`}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (received.length > 0) {
+    html += `<div class="section-title" style="margin-top:14px">آخر المستلمات</div><div class="nawaqes-card">`;
+    received.forEach(ord => {
+      html += `<div class="nawaqes-row">
+        <div class="nawaqes-emoji">📦</div>
+        <div class="nawaqes-info">
+          <div class="nawaqes-name">${ord.itemName}</div>
+          <div class="nawaqes-meta">استلم ${ord.qtyReceived} — ${ord.receivedBy||'—'} — ${fmtDateShort(ord.receivedAt)}</div>
+        </div>
+        <span class="badge badge-ok">✅</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-content');
+  if (events.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">لا توجد بيانات بعد — ستظهر الإحصائيات مع الاستخدام</div></div>`;
+    return;
+  }
+
+  // Monthly consumption totals
+  const byMonth = {};
+  events.filter(e => e.type === 'consume').forEach(e => {
+    const d = new Date(e.timestamp);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    byMonth[key] = (byMonth[key] || 0) + e.qty;
+  });
+  const months = Object.entries(byMonth).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6);
+
+  // Top consumed items
+  const byItem = {};
+  events.filter(e => e.type === 'consume').forEach(e => {
+    byItem[e.itemName] = (byItem[e.itemName]||0) + e.qty;
+  });
+  const topItems = Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxQty = topItems[0]?.[1] || 1;
+
+  // Top purchased
+  const byPurch = {};
+  events.filter(e => e.type === 'purchase').forEach(e => {
+    byPurch[e.itemName] = (byPurch[e.itemName]||0) + e.qty;
+  });
+
+  let html = `
+  <div class="stats-grid" style="margin-bottom:16px">
+    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${events.filter(e=>e.type==='consume').length}</div><div class="stat-label">عمليات استهلاك</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${events.filter(e=>e.type==='purchase').length}</div><div class="stat-label">عمليات شراء</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${orders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
+  </div>`;
+
+  if (months.length > 0) {
+    html += `<div class="section-title">الاستهلاك الشهري</div>
+    <div class="nawaqes-card" style="padding:14px 16px">`;
+    const maxM = Math.max(...months.map(m=>m[1]),1);
+    months.forEach(([k,v]) => {
+      const [y,m] = k.split('-');
+      const label = new Date(y,m-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+      html += `<div class="stats-bar-row">
+        <div class="stats-bar-top"><span class="stats-bar-name">${label}</span><span class="stats-bar-val">${v} وحدة</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${(v/maxM*100).toFixed(0)}%"></div></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (topItems.length > 0) {
+    html += `<div class="section-title" style="margin-top:14px">الأصناف الأكثر استهلاكاً</div>
+    <div class="nawaqes-card" style="padding:14px 16px">`;
+    topItems.forEach(([name,qty]) => {
+      html += `<div class="stats-bar-row">
+        <div class="stats-bar-top"><span class="stats-bar-name">${name}</span><span class="stats-bar-val">${qty} وحدة</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${(qty/maxQty*100).toFixed(0)}%"></div></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Recent events log
+  html += `<div class="section-title" style="margin-top:14px">آخر الأحداث</div>
+  <div class="nawaqes-card">`;
+  events.slice(0,30).forEach(ev => {
+    const icon = ev.type==='consume'?'📉':ev.type==='purchase'?'📦':ev.type==='par_change'?'⚙️':'🔧';
+    const typeLabel = {consume:'استهلاك',purchase:'شراء',adjust:'تعديل',par_change:'تغيير ثابت'}[ev.type]||ev.type;
+    const qcls = ev.type==='consume'?'consume':ev.type==='purchase'?'purchase':'adjust';
+    const sign = ev.type==='consume'?'-':'+';
+    html += `<div class="event-row">
+      <div class="event-icon">${icon}</div>
+      <div class="event-info">
+        <div class="event-name">${ev.itemName}</div>
+        <div class="event-meta">${typeLabel} — ${ev.user} — ${fmtDate(ev.timestamp)}${ev.note ? ` — ${ev.note}` : ''}</div>
+      </div>
+      <div class="event-qty ${qcls}">${sign}${ev.qty}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// ADJUST (with event logging)
+// ─────────────────────────────────────────────
+async function adjCur(id, delta) {
+  if (isReadonly()) { toast('عماد فقط يمكنه التعديل'); return; }
+  const it = items.find(i => i.id == id);
+  if (!it) return;
+
+  if (delta < 0) {
+    // Open consume modal for proper logging
+    pendingConsumeItemId = id;
+    document.getElementById('consume-title').textContent = `استهلاك — ${it.ar}`;
+    document.getElementById('consume-qty').value = 1;
+    document.getElementById('consume-note').value = '';
+    openModal('consume-modal');
+    return;
+  }
+
+  // Positive = manual add without full receive flow
+  it.cur = Math.max(0, it.cur + delta);
+  updateCardUI(it);
+  renderSummary(); renderNawaqes();
+
+  const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'adjust', qty:delta, user:currentUserName, timestamp:new Date().toISOString(), note:'إضافة يدوية', curAfter:it.cur };
+  events.unshift(ev);
+  try {
+    await api('inv_update_cur', { itemId: it.id, cur: it.cur });
+    await api('inv_log_event', { event: ev });
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  toast(`✓ ${it.ar} — ${it.cur}`);
+}
+
+async function adjPar(id, delta) {
+  if (isReadonly()) { toast('فقط عماد يمكنه التعديل'); return; }
+  const it = items.find(i => i.id == id);
+  if (!it) return;
+  const oldPar = it.par;
+  it.par = Math.max(0, it.par + delta);
+  updateCardUI(it);
+  renderSummary(); renderNawaqes();
+
+  const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'par_change', qty:delta, user:currentUserName, timestamp:new Date().toISOString(), note:`من ${oldPar} إلى ${it.par}`, curAfter:it.cur };
+  events.unshift(ev);
+  try {
+    await api('inv_update_par', { itemId: it.id, par: it.par });
+    await api('inv_log_event', { event: ev });
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  toast(`✓ الثابت: ${it.par}`);
+}
+
+function updateCardUI(it) {
+  const cv = document.getElementById('cv-'+it.id);
+  if (cv) { cv.textContent = it.cur; cv.className = `qty-val ${vcls(it)}`; }
+  const pv = document.getElementById('pv-'+it.id);
+  if (pv) pv.textContent = it.par;
+  const bar = document.getElementById('bar-'+it.id);
+  if (bar) { bar.style.width = pct(it)+'%'; bar.className = `progress-fill ${fcls(it)}`; }
+  const card = document.getElementById('card-'+it.id);
+  if (card) card.className = `item-card ${scls(it)}`;
+}
+
+// ─────────────────────────────────────────────
+// CONSUME MODAL
+// ─────────────────────────────────────────────
+async function confirmConsume() {
+  const it = items.find(i => i.id == pendingConsumeItemId);
+  if (!it) return;
+  const qty = parseInt(document.getElementById('consume-qty').value) || 1;
+  const note = document.getElementById('consume-note').value.trim();
+  it.cur = Math.max(0, it.cur - qty);
+  updateCardUI(it);
+  renderSummary(); renderNawaqes();
+  closeModal('consume-modal');
+
+  const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'consume', qty, user:currentUserName, timestamp:new Date().toISOString(), note, curAfter:it.cur };
+  events.unshift(ev);
+  try {
+    await api('inv_update_cur', { itemId: it.id, cur: it.cur });
+    await api('inv_log_event', { event: ev });
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  toast(`📉 ${it.ar} — تبقى ${it.cur}`);
+}
+
+// ─────────────────────────────────────────────
+// ORDER FLOW
+// ─────────────────────────────────────────────
+function openOrderModal() {
+  const needOrder = items.filter(i => isLow(i) && !inTransit(i.id));
+  pendingOrderItems = needOrder;
+  let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--text2)">الأصناف الناقصة التي سيتم طلبها:</div>
+  <div class="nawaqes-card">`;
+  needOrder.forEach(it => {
+    html += `<div class="nawaqes-row">
+      <div class="nawaqes-emoji">${it.emoji}</div>
+      <div class="nawaqes-info"><div class="nawaqes-name">${it.ar}</div></div>
+      <div class="nawaqes-right"><div class="counts-text" style="color:var(--text)">${gap(it)} وحدة</div><div class="nawaqes-meta">المطلوب</div></div>
+    </div>`;
+  });
+  html += `</div>`;
+  document.getElementById('order-modal-body').innerHTML = html;
+  openModal('order-modal');
+}
+
+async function confirmOrder() {
+  closeModal('order-modal');
+  const now = new Date().toISOString();
+  const newOrders = [];
+  for (const it of pendingOrderItems) {
+    const ord = { id:genId(), itemId:it.id, itemName:it.ar, qtyRequested:gap(it), qtyReceived:0, orderedBy:currentUserName, orderedAt:now, receivedBy:'', receivedAt:'', status:'ordered' };
+    orders.push(ord);
+    newOrders.push(ord);
+  }
+  renderAll();
+  toast('✅ تم تسجيل الطلب');
+  try {
+    for (const ord of newOrders) {
+      await api('inv_add_order', { order: ord });
+    }
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+}
+
+// ─────────────────────────────────────────────
+// RECEIVE FLOW
+// ─────────────────────────────────────────────
+function openReceiveModal(orderId) {
+  pendingReceiveOrderId = orderId;
+  const ord = orders.find(o => o.id === orderId);
+  if (!ord) return;
+  const it = items.find(i => String(i.id)===String(ord.itemId));
+  document.getElementById('receive-modal-body').innerHTML = `
+    <div class="nawaqes-card">
+      <div class="nawaqes-row">
+        <div class="nawaqes-emoji">${it?.emoji||'📦'}</div>
+        <div class="nawaqes-info">
+          <div class="nawaqes-name">${ord.itemName}</div>
+          <div class="nawaqes-meta">طُلب ${ord.qtyRequested} — ${ord.orderedBy} — ${fmtDateShort(ord.orderedAt)}</div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('recv-qty').value = ord.qtyRequested;
+  openModal('receive-modal');
+}
+
+async function confirmReceive() {
+  const ord = orders.find(o => o.id === pendingReceiveOrderId);
+  if (!ord) return;
+  const qty = parseInt(document.getElementById('recv-qty').value) || 0;
+  const it = items.find(i => String(i.id)===String(ord.itemId));
+  const now = new Date().toISOString();
+
+  if (it) { it.cur += qty; }
+  ord.status = 'received';
+  ord.qtyReceived = qty;
+  ord.receivedBy = currentUserName;
+  ord.receivedAt = now;
+
+  closeModal('receive-modal');
+  renderAll();
+
+  const ev = { id:genId(), itemId:ord.itemId, itemName:ord.itemName, type:'purchase', qty, user:currentUserName, timestamp:now, note:`طلب ${ord.id}`, curAfter:it?.cur||0 };
+  events.unshift(ev);
+
+  try {
+    if (it) await api('inv_update_cur', { itemId: it.id, cur: it.cur });
+    await api('inv_update_order', { orderId: ord.id, fields: { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received' } });
+    await api('inv_log_event', { event: ev });
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  toast(`✅ تم استلام ${qty} ${ord.itemName}`);
+}
+
+// ─────────────────────────────────────────────
+// ADD ITEM
+// ─────────────────────────────────────────────
+async function addItem() {
+  const ar = document.getElementById('n-ar').value.trim();
+  if (!ar) { toast('برجاء إدخال الاسم'); return; }
+  const newItem = {
+    id: Date.now(),
+    cat: document.getElementById('n-cat').value,
+    emoji: document.getElementById('n-emoji').value.trim() || '📦',
+    ar, en: document.getElementById('n-en').value.trim(),
+    brand: document.getElementById('n-brand').value.trim(),
+    par: parseInt(document.getElementById('n-par').value)||0,
+    cur: parseInt(document.getElementById('n-cur').value)||0,
+  };
+  items.push(newItem);
+  closeModal('add-modal');
+  ['n-ar','n-en','n-brand','n-par','n-cur','n-emoji'].forEach(id => document.getElementById(id).value='');
+  renderAll();
+  try { await api('inv_add_item', { item: newItem }); } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  toast(`✅ تمت إضافة ${newItem.ar}`);
+}
+
+// ─────────────────────────────────────────────
+// TABS & MODALS
+// ─────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function overlayClose(e, id) { if (e.target===document.getElementById(id)) closeModal(id); }
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+function switchUser(u, name) {
+  currentUser = u; currentUserName = name;
+  document.getElementById('user-label').textContent = name;
+  closeModal('user-modal');
+  renderAll();
+  toast(`تم التبديل إلى ${name}`);
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  items = DEFAULT_ITEMS.map(i => ({...i}));
+  renderAll();
+  syncData(); // then sync from sheet
+});
+</script>
+</body>
+</html>
