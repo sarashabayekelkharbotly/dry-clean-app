@@ -776,6 +776,7 @@ function renderSubmissionCard(s, clickable=false) {
           <div>
             <div class="sub-apt">${s.apt}</div>
             <div class="sub-date">📅 ${date} — ${s.submittedBy||''}</div>
+            <div style="font-size:9px;color:var(--text3);font-family:monospace;margin-top:2px">${s.id}</div>
           </div>
           <div>${statusBadge}</div>
         </div>
@@ -922,7 +923,8 @@ async function submitNew() {
   showToast('⏳ جاري الحفظ...');
   try {
     const submissionId = generateId();
-    const ts = jsDateToExcel(new Date(dateVal || Date.now()));
+    const now = new Date(dateVal ? dateVal + 'T12:00:00' : Date.now());
+    const ts = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
     await appendToSheet('Submissions', [[submissionId, apt, ts, '', submitter, 'sent']]);
     const itemRows = newItems.map(item => [generateId(), submissionId, ts, item.type, item.color, item.qty, item.unitPrice, item.total, 'sent', '']);
     await appendToSheet('Items', itemRows);
@@ -970,6 +972,14 @@ function openReviewModal(subId) {
   const total = items.reduce((s,i) => s+(i.total||0), 0);
   const d = sub.timestamp ? excelDateToJS(sub.timestamp) : null;
   document.getElementById('modalTitle').textContent = `${sub.apt} — ${d ? formatDate(d) : '—'}`;
+  // Add ID below title for reference
+  const existingId = document.getElementById('modal-sub-id');
+  if (existingId) existingId.remove();
+  const idEl = document.createElement('div');
+  idEl.id = 'modal-sub-id';
+  idEl.style.cssText = 'font-size:10px;color:var(--text3);margin-top:-10px;margin-bottom:10px;font-family:monospace';
+  idEl.textContent = 'ID: ' + subId;
+  document.getElementById('modalTitle').after(idEl);
 
   const groups = {};
   items.forEach(item => {
