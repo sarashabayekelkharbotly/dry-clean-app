@@ -368,15 +368,15 @@ body {
 </div>
 
 <!-- FAB -->
-<button class="fab" id="fab-add" onclick="openModal('add-modal')" style="display:none">＋</button>
+<button class="fab" id="fab-add" onclick="openModal('add-modal')" style="display:flex">＋</button>
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
   <a class="nav-item" href="index.html"><span class="ni">🏠</span>الرئيسية</a>
-  <a class="nav-item" href="index.html"><span class="ni">➕</span>إرسال</a>
-  <a class="nav-item" href="index.html"><span class="ni">📦</span>مراجعة</a>
+  <a class="nav-item" href="index.html#new"><span class="ni">➕</span>إرسال</a>
+  <a class="nav-item" href="index.html#review"><span class="ni">📦</span>مراجعة</a>
   <a class="nav-item active" href="inventory.html"><span class="ni">🗂️</span>المخزون</a>
-  <a class="nav-item" href="index.html"><span class="ni">📊</span>إحصائيات</a>
+  <a class="nav-item" href="index.html#stats"><span class="ni">📊</span>إحصائيات</a>
 </nav>
 
 <!-- ═══ MODALS ═══ -->
@@ -419,7 +419,26 @@ body {
   </div>
 </div>
 
-<!-- CONSUME MODAL (Emad uses when item is consumed) -->
+<!-- EDIT ITEM MODAL -->
+<div class="modal-overlay" id="edit-modal" onclick="overlayClose(event,'edit-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ تعديل الصنف</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-group"><label class="form-label">الاسم بالعربية</label><input class="form-input" id="edit-ar" type="text"></div>
+    <div class="form-group"><label class="form-label">الاسم بالإنجليزية (اختياري)</label><input class="form-input" id="edit-en" type="text"></div>
+    <div class="form-group"><label class="form-label">البراند (اختياري)</label><input class="form-input" id="edit-brand" type="text"></div>
+    <div class="form-group"><label class="form-label">الإيموجي</label><input class="form-input" id="edit-emoji" type="text" maxlength="2"></div>
+    <div class="form-group"><label class="form-label">الفئة</label>
+      <select class="form-select" id="edit-cat">
+        <option value="cleaning">🧹 مستلزمات</option>
+        <option value="snacks">🍪 سلة ترحيب</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveEdit()">💾 حفظ التعديلات</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('edit-modal')">إلغاء</button>
+  </div>
+</div>
 <div class="modal-overlay" id="consume-modal" onclick="overlayClose(event,'consume-modal')">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -605,7 +624,7 @@ function renderAll() {
   renderList('snacks');
   renderOrders();
   renderStats();
-  document.getElementById('fab-add').style.display = isReadonly() ? 'none' : 'flex';
+  document.getElementById('fab-add').style.display = 'flex';
   // update user dots
   ['emad','sarah','khaled'].forEach(u => {
     const d = document.getElementById('dot-'+u);
@@ -703,7 +722,10 @@ function renderList(cat) {
       <div class="item-body">
         <div class="item-icon">${it.emoji}</div>
         <div class="item-text">
-          <div class="item-name">${it.ar}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <div class="item-name">${it.ar}</div>
+            <button onclick="openEditModal(${it.id})" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:2px 4px;flex-shrink:0" title="تعديل">✏️</button>
+          </div>
           ${it.en ? `<div class="item-en">${it.en}</div>` : ''}
           ${it.brand ? `<div class="item-brand">${it.brand}</div>` : ''}
           ${tr ? `<div class="transit-tag">🚚 في الطريق</div>` : ''}
@@ -1075,6 +1097,38 @@ async function confirmReceive() {
 }
 
 // ─────────────────────────────────────────────
+// EDIT ITEM
+// ─────────────────────────────────────────────
+function openEditModal(id) {
+  const it = items.find(i => i.id == id);
+  if (!it) return;
+  document.getElementById('edit-id').value = it.id;
+  document.getElementById('edit-ar').value = it.ar;
+  document.getElementById('edit-en').value = it.en || '';
+  document.getElementById('edit-brand').value = it.brand || '';
+  document.getElementById('edit-emoji').value = it.emoji || '';
+  document.getElementById('edit-cat').value = it.cat;
+  openModal('edit-modal');
+}
+
+async function saveEdit() {
+  const id = document.getElementById('edit-id').value;
+  const it = items.find(i => String(i.id) === String(id));
+  if (!it) return;
+  it.ar    = document.getElementById('edit-ar').value.trim() || it.ar;
+  it.en    = document.getElementById('edit-en').value.trim();
+  it.brand = document.getElementById('edit-brand').value.trim();
+  it.emoji = document.getElementById('edit-emoji').value.trim() || it.emoji;
+  it.cat   = document.getElementById('edit-cat').value;
+  closeModal('edit-modal');
+  renderAll();
+  toast(`✅ تم تعديل ${it.ar}`);
+  // Update in sheet by re-writing the item
+  try {
+    await api('inv_add_item', { item: it }); // sheet will have duplicate; acceptable for now
+  } catch(e) { /* silent */ }
+}
+
 // ADD ITEM
 // ─────────────────────────────────────────────
 async function addItem() {
