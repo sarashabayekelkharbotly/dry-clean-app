@@ -439,9 +439,10 @@ body {
 <div class="modal-overlay" id="order-modal" onclick="overlayClose(event,'order-modal')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">🛒 تأكيد طلب الشراء</div>
+    <div class="modal-title">🛒 ما الذي اشتريته؟</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px">الكميات محسوبة تلقائياً — عدّل أي صنف أو اجعله صفراً لتخطيه</div>
     <div id="order-modal-body"></div>
-    <button class="btn btn-primary" onclick="confirmOrder()">✅ تأكيد — تم الطلب</button>
+    <button class="btn btn-primary" onclick="confirmOrder()" style="margin-top:4px">✅ تأكيد الشراء</button>
     <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('order-modal')">إلغاء</button>
   </div>
 </div>
@@ -583,7 +584,7 @@ function gap(it)    { return Math.max(0, it.par - it.cur); }
 function inTransit(itemId) { return orders.some(o => String(o.itemId)===String(itemId) && o.status==='ordered'); }
 function getOrder(itemId)  { return orders.find(o => String(o.itemId)===String(itemId) && o.status==='ordered'); }
 function isReadonly()      { return currentUser !== 'emad'; }
-function canOrder()        { return currentUser === 'sarah' || currentUser === 'khaled'; }
+function canOrder()        { return true; } // anyone can log a purchase
 function genId()           { return 'i' + Date.now() + Math.random().toString(36).substr(2,4); }
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -656,7 +657,7 @@ function renderNawaqes() {
     });
     if (canOrder()) {
       html += `<div class="order-action-row">
-        <button class="btn btn-primary btn-sm" style="width:100%" onclick="openOrderModal()">🛒 تأكيد الطلب لهذه الأصناف</button>
+        <button class="btn btn-primary btn-sm" style="width:100%" onclick="openOrderModal()">🛒 سجّل ما اشتريته</button>
       </div>`;
     }
     html += `</div>`;
@@ -953,31 +954,70 @@ async function confirmConsume() {
 function openOrderModal() {
   const needOrder = items.filter(i => isLow(i) && !inTransit(i.id));
   pendingOrderItems = needOrder;
-  let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--text2)">الأصناف الناقصة التي سيتم طلبها:</div>
-  <div class="nawaqes-card">`;
+
+  let html = '';
   needOrder.forEach(it => {
-    html += `<div class="nawaqes-row">
-      <div class="nawaqes-emoji">${it.emoji}</div>
-      <div class="nawaqes-info"><div class="nawaqes-name">${it.ar}</div></div>
-      <div class="nawaqes-right"><div class="counts-text" style="color:var(--text)">${gap(it)} وحدة</div><div class="nawaqes-meta">المطلوب</div></div>
+    const g = gap(it);
+    html += `
+    <div style="display:flex;align-items:center;padding:12px 4px;border-bottom:1px solid var(--border);gap:12px">
+      <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0">${it.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700">${it.ar}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">ينقص ${g} — حالي ${it.cur} / ثابت ${it.par}</div>
+      </div>
+      <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+        <button class="qty-btn" onclick="orderQtyAdj(${it.id},-1)">−</button>
+        <span id="oq-${it.id}" style="min-width:32px;text-align:center;font-size:15px;font-weight:900;color:var(--primary)">${g}</span>
+        <button class="qty-btn" onclick="orderQtyAdj(${it.id},+1)">＋</button>
+      </div>
     </div>`;
   });
-  html += `</div>`;
+
+  if (needOrder.length === 0) {
+    html = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">لا توجد أصناف ناقصة</div></div>`;
+  }
+
   document.getElementById('order-modal-body').innerHTML = html;
   openModal('order-modal');
 }
 
+// adjust qty inside order modal
+function orderQtyAdj(itemId, delta) {
+  const el = document.getElementById('oq-'+itemId);
+  if (!el) return;
+  const cur = parseInt(el.textContent) || 0;
+  const newVal = Math.max(0, cur + delta);
+  el.textContent = newVal;
+  el.style.color = newVal === 0 ? 'var(--text3)' : 'var(--primary)';
+}
+
 async function confirmOrder() {
-  closeModal('order-modal');
   const now = new Date().toISOString();
   const newOrders = [];
+
   for (const it of pendingOrderItems) {
-    const ord = { id:genId(), itemId:it.id, itemName:it.ar, qtyRequested:gap(it), qtyReceived:0, orderedBy:currentUserName, orderedAt:now, receivedBy:'', receivedAt:'', status:'ordered' };
+    const el = document.getElementById('oq-'+it.id);
+    const qty = el ? parseInt(el.textContent) || 0 : gap(it);
+    if (qty === 0) continue; // skip items set to zero
+    const ord = {
+      id: genId(), itemId: it.id, itemName: it.ar,
+      qtyRequested: qty, qtyReceived: 0,
+      orderedBy: currentUserName, orderedAt: now,
+      receivedBy: '', receivedAt: '', status: 'ordered'
+    };
     orders.push(ord);
     newOrders.push(ord);
   }
+
+  if (newOrders.length === 0) {
+    toast('لم تختر أي صنف');
+    return;
+  }
+
+  closeModal('order-modal');
   renderAll();
-  toast('✅ تم تسجيل الطلب');
+  toast(`✅ تم تسجيل شراء ${newOrders.length} صنف`);
+
   try {
     for (const ord of newOrders) {
       await api('inv_add_order', { order: ord });
