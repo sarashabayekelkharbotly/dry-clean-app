@@ -705,6 +705,25 @@ async function fetchSheet(range) {
 
 async function loadAllData() {
   try {
+    // Load prices from sheet
+    const priceRows = await fetchSheet('ItemPrices!A2:B20');
+    itemPrices = {};
+    priceRows.forEach(r => { if(r[0]) itemPrices[r[0].trim()] = parseFloat(r[1]||0); });
+
+    // Load color options from sheet — always fresh from sheet, never localStorage
+    const colorRows = await fetchSheet('ColorOptions!A2:B200');
+    colorOptions = {};
+    colorRows.forEach(r => {
+      if(r[0] && r[1]) {
+        const type = r[0].trim();
+        const color = r[1].trim();
+        if(!colorOptions[type]) colorOptions[type] = [];
+        colorOptions[type].push(color);
+      }
+    });
+    // Rebuild item type dropdown from sheet colors
+    populateItemTypeDropdown();
+
     const subRows = await fetchSheet('Submissions!A2:F500');
     allSubmissions = subRows.filter(r => r[0]).map(r => ({
       id: r[0]||'', apt: r[1]||'', timestamp: r[2]||'',
