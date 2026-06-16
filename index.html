@@ -755,15 +755,27 @@ async function fetchSheet(range) {
 
 async function loadAllData() {
   try {
-    // Load prices from sheet
-    const priceRows = await fetchSheet('ItemPrices!A2:B20');
-    itemPrices = {};
-    priceRows.forEach(r => { if(r[0]) itemPrices[r[0].trim()] = parseFloat(r[1]||0); });
+    // Fetch all 4 ranges in ONE request using batchGet
+    const ranges = [
+      'ItemPrices!A2:B20',
+      'ColorOptions!A2:B200',
+      'Submissions!A2:F500',
+      'Items!A2:J2000'
+    ];
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?key=${API_KEY}&` +
+      ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('batchGet failed: ' + res.status);
+    const data = await res.json();
+    const [priceVals, colorVals, subVals, itemVals] = data.valueRanges.map(r => r.values || []);
 
-    // Load color options from sheet — always fresh from sheet, never localStorage
-    const colorRows = await fetchSheet('ColorOptions!A2:B200');
+    // Prices
+    itemPrices = {};
+    priceVals.forEach(r => { if(r[0]) itemPrices[r[0].trim()] = parseFloat(r[1]||0); });
+
+    // Colors
     colorOptions = {};
-    colorRows.forEach(r => {
+    colorVals.forEach(r => {
       if(r[0] && r[1]) {
         const type = r[0].trim();
         const color = r[1].trim();
@@ -771,30 +783,28 @@ async function loadAllData() {
         colorOptions[type].push(color);
       }
     });
-    // Rebuild catalog and dropdown now that colorOptions and itemPrices are loaded
-    rebuildCatalogFromColorOptions();
-    populateItemTypeDropdown();
-    renderManageList();
 
-    const subRows = await fetchSheet('Submissions!A2:F500');
-    allSubmissions = subRows.filter(r => r[0]).map(r => ({
+    // Submissions
+    allSubmissions = subVals.filter(r => r[0]).map(r => ({
       id: r[0]||'', apt: r[1]||'', timestamp: r[2]||'',
       paid: r[3]||'', submittedBy: r[4]||'', status: r[5]||'sent'
     }));
 
-    const itemRows = await fetchSheet('Items!A2:H2000');
-    allItems = itemRows.filter(r => r[0]).map(r => ({
+    // Items
+    allItems = itemVals.filter(r => r[0]).map(r => ({
       itemId: r[0]||'', submissionId: r[1]||'', timestamp: r[2]||'',
       type: r[3]||'', color: r[4]||'', qty: parseFloat(r[5]||0),
       unitPrice: parseFloat(r[6]||0), total: parseFloat(r[7]||0),
     }));
 
+    // Rebuild catalog now that everything is loaded
+    rebuildCatalogFromColorOptions();
+    populateItemTypeDropdown();
     renderHome();
     renderReview();
     renderStats();
-    showToast('✅ تم تحديث البيانات');
-    // Also refresh manage tab if it's open
     renderManageList();
+    showToast('✅ تم تحديث البيانات');
   } catch(e) {
     showToast('❌ خطأ في تحميل البيانات');
     console.error(e);
