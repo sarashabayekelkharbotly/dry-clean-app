@@ -364,8 +364,9 @@ window.addEventListener('load',function(){
 <!-- NAWAQES -->
 <div class="page active" id="page-nawaqes">
   <div class="stats-grid" id="summary-stats">
-    <div class="stat-card"><div class="spinner" style="margin:0 auto"></div></div>
-    <div class="stat-card"></div><div class="stat-card"></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--text3)">—</div><div class="stat-label">ناقص</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--text3)">—</div><div class="stat-label">كافي</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--text3)">—</div><div class="stat-label">في الطريق</div></div>
   </div>
   <div id="nawaqes-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
 </div>
@@ -1213,9 +1214,13 @@ function toast(msg) {
 // INIT
 // ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  items = DEFAULT_ITEMS.map(i => ({...i}));
-  renderAll();
-  syncData(); // then sync from sheet
+  // Show loading state — don't render defaults which causes false النواقص flash
+  document.getElementById('nawaqes-content').innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  document.getElementById('list-cleaning').innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  document.getElementById('list-snacks').innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  document.getElementById('orders-content').innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  document.getElementById('stats-content').innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  syncData(); // load from sheet first, render only when ready
 });
 </script>
 </body>
