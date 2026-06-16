@@ -873,6 +873,7 @@ function renderSubmissionCard(s, clickable=false) {
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px">
         ${clickable ? `<button class="btn btn-outline btn-sm" onclick="openReviewModal('${s.id}')" style="flex:1;justify-content:center">📋 مراجعة</button>` : ''}
         <button class="btn btn-sm" style="flex:1;justify-content:center;background:var(--surface3);border:1px solid var(--border);color:var(--text2)" onclick="openReceiptModal('${s.id}')">📤 إرسال للغسيل</button>
+        <button class="btn btn-sm" style="flex-shrink:0;background:var(--surface3);border:1px solid var(--border);color:var(--text2)" onclick="openEditModal('${s.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="promptDelete('${s.id}')" style="flex-shrink:0">🗑️</button>
       </div>
     </div>`;
@@ -886,6 +887,183 @@ function getStatusBadge(status) {
     'partial': `<span class="badge badge-partial">📦 جزئي</span>`,
   };
   return map[status] || map['sent'];
+}
+
+
+// ============================================================
+// EDIT SUBMISSION
+// ============================================================
+let editSubId = null;
+let editItems = []; // working copy of items being edited
+
+function openEditModal(subId) {
+  const sub = allSubmissions.find(s => s.id === subId);
+  if (!sub) return;
+  editSubId = subId;
+  // Deep copy items for editing
+  editItems = allItems.filter(i => i.submissionId === subId).map(i => ({...i}));
+
+  const d = sub.timestamp ? excelDateToJS(sub.timestamp) : new Date();
+  const dateStr = d ? d.toISOString().slice(0,10) : new Date().toISOString().slice(0,10);
+
+  const aptOptions = ['8A','17A','28A','Zayed 2000'].map(a =>
+    `<option value="${a}" ${sub.apt===a?'selected':''}>${a}</option>`).join('');
+  const submitterOptions = ['Emad','Sarah','Khaled','Amal'].map(p =>
+    `<option value="${p}" ${sub.submittedBy===p?'selected':''}>${p}</option>`).join('');
+  const statusOptions = [
+    {v:'sent',l:'⏳ عند الغسيل'},
+    {v:'returned',l:'✅ مُسترجع'},
+    {v:'partial',l:'📦 جزئي'},
+    {v:'issue',l:'⚠️ مشكلة'}
+  ].map(s => `<option value="${s.v}" ${sub.status===s.v?'selected':''}>${s.l}</option>`).join('');
+
+  let html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">الشقة</div>
+        <select id="editApt" class="form-select">${aptOptions}</select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">التاريخ</div>
+        <input type="date" id="editDate" class="form-input" value="${dateStr}">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">بواسطة</div>
+        <select id="editSubmitter" class="form-select">${submitterOptions}</select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">الحالة</div>
+        <select id="editStatus" class="form-select">${statusOptions}</select>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">القطع</div>
+    <div id="editItemsList"></div>
+    <button onclick="addEditItem()" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px;margin-bottom:14px">＋ إضافة قطعة</button>
+    <button onclick="saveEdit()" class="btn btn-primary" style="width:100%;justify-content:center">💾 حفظ التعديلات</button>`;
+
+  document.getElementById('editModalContent').innerHTML = html;
+  renderEditItems();
+  document.getElementById('editModal').classList.add('open');
+}
+
+function renderEditItems() {
+  const el = document.getElementById('editItemsList');
+  if (!el) return;
+  if (editItems.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:10px">لا توجد قطع — أضف قطعة</div>';
+    return;
+  }
+  el.innerHTML = editItems.map((item, idx) => {
+    const typeOptions = Object.keys(colorOptions).map(t =>
+      `<option value="${t}" ${item.type===t?'selected':''}>${t}</option>`).join('');
+    const colors = colorOptions[item.type] || [];
+    const colorOptions2 = colors.map(c =>
+      `<option value="${c}" ${item.color===c?'selected':''}>${c}</option>`).join('');
+    return `
+      <div style="background:var(--surface2);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center">
+          <select class="form-select" onchange="updateEditItemType(${idx},this.value)" style="font-size:12px">
+            <option value="">نوع</option>${typeOptions}
+          </select>
+          <select class="form-select" style="font-size:12px" onchange="updateEditItemColor(${idx},this.value)">
+            <option value="">لون</option>${colorOptions2}
+          </select>
+          <button onclick="removeEditItem(${idx})" style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">الكمية</div>
+            <input type="number" class="form-input" value="${item.qty}" min="1"
+              onchange="updateEditItemQty(${idx},this.value)" style="font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">السعر</div>
+            <input type="number" class="form-input" value="${item.unitPrice}" min="0"
+              onchange="updateEditItemPrice(${idx},this.value)" style="font-size:13px">
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updateEditItemType(idx, type) {
+  editItems[idx].type = type;
+  editItems[idx].unitPrice = itemPrices[type] || editItems[idx].unitPrice || 0;
+  editItems[idx].color = '';
+  renderEditItems();
+}
+function updateEditItemColor(idx, color) { editItems[idx].color = color; }
+function updateEditItemQty(idx, val) {
+  editItems[idx].qty = parseInt(val)||1;
+  editItems[idx].total = editItems[idx].qty * editItems[idx].unitPrice;
+}
+function updateEditItemPrice(idx, val) {
+  editItems[idx].unitPrice = parseFloat(val)||0;
+  editItems[idx].total = editItems[idx].qty * editItems[idx].unitPrice;
+}
+function removeEditItem(idx) { editItems.splice(idx,1); renderEditItems(); }
+function addEditItem() {
+  editItems.push({ itemId: generateId(), submissionId: editSubId, type:'', color:'', qty:1, unitPrice:0, total:0, timestamp:'', status:'sent' });
+  renderEditItems();
+}
+
+async function saveEdit() {
+  const sub = allSubmissions.find(s => s.id === editSubId);
+  if (!sub) return;
+
+  const newApt       = document.getElementById('editApt').value;
+  const newDate      = document.getElementById('editDate').value;
+  const newSubmitter = document.getElementById('editSubmitter').value;
+  const newStatus    = document.getElementById('editStatus').value;
+
+  // Validate items
+  for (const item of editItems) {
+    if (!item.type) { showToast('⚠️ اختر نوع لكل قطعة'); return; }
+  }
+
+  showToast('⏳ جاري الحفظ...');
+  try {
+    const subIdx = allSubmissions.findIndex(s => s.id === editSubId);
+    const ts = newDate + ' 12:00';
+
+    // Update submission row: apt, timestamp, submitter, status
+    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:2, value: newApt });
+    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:3, value: ts });
+    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:5, value: newSubmitter });
+    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:6, value: newStatus });
+
+    // Delete all old items for this submission then re-append
+    await callScript({ action:'delete_submission_items', submissionId: editSubId });
+
+    // Recalculate totals and append new items
+    const itemRows = editItems.map(item => {
+      const total = (item.qty||1) * (item.unitPrice||0);
+      return [item.itemId||generateId(), editSubId, ts, item.type, item.color, item.qty, item.unitPrice, total, item.status||'sent', ''];
+    });
+    if (itemRows.length > 0) {
+      await callScript({ action:'append', sheet:'Items', rows: itemRows });
+    }
+
+    // Update local state
+    allSubmissions[subIdx] = { ...sub, apt:newApt, timestamp:ts, submittedBy:newSubmitter, status:newStatus };
+    allItems = allItems.filter(i => i.submissionId !== editSubId);
+    editItems.forEach(item => {
+      allItems.push({ ...item, submissionId:editSubId, timestamp:ts, total:(item.qty||1)*(item.unitPrice||0) });
+    });
+
+    renderHome(); renderReview();
+    closeEditModal();
+    showToast('✅ تم حفظ التعديلات');
+  } catch(e) {
+    showToast('❌ خطأ في الحفظ: ' + e.message);
+    console.error(e);
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+  editSubId = null;
+  editItems = [];
 }
 
 // ============================================================
@@ -1285,6 +1463,7 @@ async function callScript(body) {
 
 // Close modals on overlay click
 document.getElementById('reviewModal').addEventListener('click', e => { if(e.target===document.getElementById('reviewModal')) closeModal(); });
+document.getElementById('editModal').addEventListener('click', e => { if(e.target===document.getElementById('editModal')) closeEditModal(); });
 document.getElementById('receiptModal').addEventListener('click', e => { if(e.target===document.getElementById('receiptModal')) closeReceiptModal(); });
 document.getElementById('deleteModal').addEventListener('click', e => { if(e.target===document.getElementById('deleteModal')) closeDeleteModal(); });
 document.getElementById('addColorModal').addEventListener('click', e => { if(e.target===document.getElementById('addColorModal')) closeAddColorModal(); });
