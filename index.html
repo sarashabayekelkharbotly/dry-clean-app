@@ -574,7 +574,6 @@ let pendingColorType = null;
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('newDate').valueAsDate = new Date();
-  loadCatalog();
   loadAllData();
 });
 
@@ -586,8 +585,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 
 function loadCatalog() {
-  // Build catalog from colorOptions already loaded from sheet
-  // colorOptions is populated in loadAllData from ColorOptions sheet
   rebuildCatalogFromColorOptions();
   populateItemTypeDropdown();
   renderManageList();
@@ -774,8 +771,10 @@ async function loadAllData() {
         colorOptions[type].push(color);
       }
     });
-    // Rebuild item type dropdown from sheet colors
+    // Rebuild catalog and dropdown now that colorOptions and itemPrices are loaded
+    rebuildCatalogFromColorOptions();
     populateItemTypeDropdown();
+    renderManageList();
 
     const subRows = await fetchSheet('Submissions!A2:F500');
     allSubmissions = subRows.filter(r => r[0]).map(r => ({
@@ -794,6 +793,8 @@ async function loadAllData() {
     renderReview();
     renderStats();
     showToast('✅ تم تحديث البيانات');
+    // Also refresh manage tab if it's open
+    renderManageList();
   } catch(e) {
     showToast('❌ خطأ في تحميل البيانات');
     console.error(e);
