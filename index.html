@@ -581,30 +581,25 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 // CATALOG MANAGEMENT
 // ============================================================
+// ============================================================
+// CATALOG — reads from sheet, writes to sheet
+// ============================================================
+
 function loadCatalog() {
-  try {
-    const saved = localStorage.getItem('owh_catalog');
-    catalog = saved ? JSON.parse(saved) : DEFAULT_CATALOG.map(i => ({...i}));
-  } catch(e) { catalog = DEFAULT_CATALOG.map(i => ({...i})); }
-  rebuildItemPricesAndColors();
+  // Build catalog from colorOptions already loaded from sheet
+  // colorOptions is populated in loadAllData from ColorOptions sheet
+  rebuildCatalogFromColorOptions();
   populateItemTypeDropdown();
   renderManageList();
 }
 
-function saveCatalog() {
-  localStorage.setItem('owh_catalog', JSON.stringify(catalog));
-  rebuildItemPricesAndColors();
-  populateItemTypeDropdown();
-  renderManageList();
-}
-
-function rebuildItemPricesAndColors() {
-  itemPrices = {};
-  colorOptions = {};
-  catalog.forEach(item => {
-    itemPrices[item.name] = item.price;
-    colorOptions[item.name] = [...item.colors];
-  });
+function rebuildCatalogFromColorOptions() {
+  // Build catalog array from live colorOptions + itemPrices
+  catalog = Object.keys(colorOptions).map(name => ({
+    name,
+    price: itemPrices[name] || 0,
+    colors: colorOptions[name] || []
+  }));
 }
 
 function populateItemTypeDropdown() {
@@ -612,7 +607,8 @@ function populateItemTypeDropdown() {
   const current = sel.value;
   sel.innerHTML = '<option value="">نوع القطعة</option>';
   catalog.forEach(item => {
-    sel.innerHTML += `<option value="${item.name}" ${item.name===current?'selected':''}>${item.name} — $${item.price}</option>`;
+    const priceLabel = item.price ? ` — $${item.price}` : '';
+    sel.innerHTML += `<option value="${item.name}" ${item.name===current?'selected':''}>${item.name}${priceLabel}</option>`;
   });
   if (current) updateColorOptions();
 }
@@ -621,7 +617,7 @@ function renderManageList() {
   const el = document.getElementById('manageItemsList');
   if (!el) return;
   if (catalog.length === 0) {
-    el.innerHTML = '<div class="empty" style="padding:20px"><div class="empty-text">لا توجد أنواع بعد</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:20px"><div class="empty-text">جاري التحميل...</div></div>';
     return;
   }
   el.innerHTML = catalog.map((item, idx) => `
@@ -629,7 +625,7 @@ function renderManageList() {
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="manage-row-name">${item.name}</div>
-          <div class="manage-row-price">$${item.price}</div>
+          ${item.price ? `<div class="manage-row-price">$${item.price}</div>` : ''}
         </div>
         <div class="manage-row-colors">
           ${item.colors.map(c => `
@@ -645,31 +641,76 @@ function renderManageList() {
   `).join('');
 }
 
-function addNewItemType() {
-  const name  = document.getElementById('newTypeName').value.trim();
-  const price = parseFloat(document.getElementById('newTypePrice').value) || 0;
+async function addNewItemType() {
+  const name     = document.getElementById('newTypeName').value.trim();
+  const price    = parseFloat(document.getElementById('newTypePrice').value) || 0;
   const colorsRaw = document.getElementById('newTypeColors').value.trim();
   if (!name) { showToast('⚠️ أدخل اسم القطعة'); return; }
-  if (catalog.find(i => i.name === name)) { showToast('هذا النوع موجود بالفعل'); return; }
+  if (colorOptions[name]) { showToast('هذا النوع موجود بالفعل'); return; }
   const colors = colorsRaw ? colorsRaw.split(/[,،]/).map(c => c.trim()).filter(Boolean) : [];
-  catalog.push({ name, price, colors });
-  saveCatalog();
-  document.getElementById('newTypeName').value = '';
-  document.getElementById('newTypePrice').value = '';
-  document.getElementById('newTypeColors').value = '';
-  showToast(`✅ تمت إضافة ${name}`);
+
+  showToast('⏳ جاري الحفظ...');
+  try {
+    // Write to ItemPrices sheet
+    await callScript({ action: 'append', sheet: 'ItemPrices', rows: [[name, price]] });
+    // Write each color to ColorOptions sheet
+    if (colors.length > 0) {
+      const colorRows = colors.map(c => [name, c]);
+      await callScript({ action: 'append', sheet: 'ColorOptions', rows: colorRows });
+    }
+    // Update local state
+    colorOptions[name] = colors;
+    itemPrices[name] = price;
+    rebuildCatalogFromColorOptions();
+    populateItemTypeDropdown();
+    renderManageList();
+    document.getElementById('newTypeName').value = '';
+    document.getElementById('newTypePrice').value = '';
+    document.getElementById('newTypeColors').value = '';
+    showToast(`✅ تمت إضافة ${name}`);
+  } catch(e) {
+    showToast('❌ خطأ في الحفظ');
+    console.error(e);
+  }
 }
 
-function deleteItemType(idx) {
-  if (!confirm(`حذف "${catalog[idx].name}"؟`)) return;
-  catalog.splice(idx, 1);
-  saveCatalog();
-  showToast('✅ تم الحذف');
+async function deleteItemType(idx) {
+  const item = catalog[idx];
+  if (!confirm(`حذف "${item.name}" وجميع ألوانه؟`)) return;
+  showToast('⏳ جاري الحذف...');
+  try {
+    await callScript({ action: 'delete_catalog_item', itemName: item.name });
+    delete colorOptions[item.name];
+    delete itemPrices[item.name];
+    rebuildCatalogFromColorOptions();
+    populateItemTypeDropdown();
+    renderManageList();
+    showToast('✅ تم الحذف');
+  } catch(e) {
+    // Remove locally even if sheet fails
+    delete colorOptions[item.name];
+    rebuildCatalogFromColorOptions();
+    populateItemTypeDropdown();
+    renderManageList();
+    showToast('⚠️ تم الحذف محلياً — تحقق من الشيت');
+  }
 }
 
-function deleteColor(itemIdx, color) {
-  catalog[itemIdx].colors = catalog[itemIdx].colors.filter(c => c !== color);
-  saveCatalog();
+async function deleteColor(itemIdx, color) {
+  const item = catalog[itemIdx];
+  showToast('⏳ جاري الحذف...');
+  try {
+    await callScript({ action: 'delete_color_option', itemName: item.name, color });
+    colorOptions[item.name] = (colorOptions[item.name] || []).filter(c => c !== color);
+    rebuildCatalogFromColorOptions();
+    renderManageList();
+    showToast(`✅ تم حذف ${color}`);
+  } catch(e) {
+    colorOptions[item.name] = (colorOptions[item.name] || []).filter(c => c !== color);
+    rebuildCatalogFromColorOptions();
+    renderManageList();
+    showToast('⚠️ تم الحذف محلياً');
+  }
 }
 
 let pendingColorItemIdx = null;
@@ -680,16 +721,28 @@ function openAddColor(itemIdx) {
   document.getElementById('addColorModal').classList.add('open');
 }
 function closeAddColorModal() { document.getElementById('addColorModal').classList.remove('open'); }
-function confirmAddColor() {
+
+async function confirmAddColor() {
   const color = document.getElementById('newColorInput').value.trim();
   if (!color) { showToast('أدخل اسم اللون'); return; }
   if (pendingColorItemIdx === null) return;
-  if (!catalog[pendingColorItemIdx].colors.includes(color)) {
-    catalog[pendingColorItemIdx].colors.push(color);
-    saveCatalog();
+  const item = catalog[pendingColorItemIdx];
+  if ((colorOptions[item.name] || []).includes(color)) {
+    showToast('هذا اللون موجود بالفعل');
+    return;
   }
-  closeAddColorModal();
-  showToast(`✅ تمت إضافة اللون ${color}`);
+  showToast('⏳ جاري الحفظ...');
+  try {
+    await callScript({ action: 'append', sheet: 'ColorOptions', rows: [[item.name, color]] });
+    if (!colorOptions[item.name]) colorOptions[item.name] = [];
+    colorOptions[item.name].push(color);
+    rebuildCatalogFromColorOptions();
+    renderManageList();
+    closeAddColorModal();
+    showToast(`✅ تمت إضافة اللون ${color}`);
+  } catch(e) {
+    showToast('❌ خطأ في الحفظ');
+  }
 }
 
 // ============================================================
