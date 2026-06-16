@@ -529,6 +529,18 @@ window.addEventListener('load',function(){
   </div>
 </div>
 
+<!-- EDIT SUBMISSION MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal" style="max-height:95vh">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title">✏️ تعديل الطلب</div>
+      <button onclick="closeEditModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+    <div id="editModalContent"></div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // CONFIG
