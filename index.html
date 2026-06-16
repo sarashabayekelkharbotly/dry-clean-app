@@ -915,8 +915,11 @@ function openEditModal(subId) {
   // Deep copy items for editing
   editItems = allItems.filter(i => i.submissionId === subId).map(i => ({...i}));
 
-  const d = sub.timestamp ? excelDateToJS(sub.timestamp) : new Date();
-  const dateStr = d ? d.toISOString().slice(0,10) : new Date().toISOString().slice(0,10);
+  let dateStr = new Date().toISOString().slice(0,10);
+  try {
+    const d = sub.timestamp ? excelDateToJS(sub.timestamp) : new Date();
+    if (d && !isNaN(d)) dateStr = d.toISOString().slice(0,10);
+  } catch(e) { /* use today */ }
 
   const aptOptions = ['8A','17A','28A','Zayed 2000'].map(a =>
     `<option value="${a}" ${sub.apt===a?'selected':''}>${a}</option>`).join('');
@@ -966,10 +969,16 @@ function renderEditItems() {
     return;
   }
   el.innerHTML = editItems.map((item, idx) => {
-    const typeOptions = Object.keys(colorOptions).map(t =>
+    // Include item's existing type even if not in colorOptions (spelling diff or missing from sheet)
+    const typeKeys = Object.keys(colorOptions);
+    if (item.type && !typeKeys.includes(item.type)) typeKeys.unshift(item.type);
+    const typeOptions = typeKeys.map(t =>
       `<option value="${t}" ${item.type===t?'selected':''}>${t}</option>`).join('');
     const colors = colorOptions[item.type] || [];
-    const colorOptions2 = colors.map(c =>
+    // If existing color not in list, still show it as selected
+    const colorSet = [...colors];
+    if (item.color && !colorSet.includes(item.color)) colorSet.unshift(item.color);
+    const colorOptions2 = colorSet.map(c =>
       `<option value="${c}" ${item.color===c?'selected':''}>${c}</option>`).join('');
     return `
       <div style="background:var(--surface2);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid var(--border)">
