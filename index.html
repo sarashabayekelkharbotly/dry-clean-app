@@ -1058,10 +1058,10 @@ async function saveEdit() {
     const ts = newDate + ' 12:00';
 
     // Update submission row: apt, timestamp, submitter, status
-    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:2, value: newApt });
-    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:3, value: ts });
-    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:5, value: newSubmitter });
-    await callScript({ action:'update', sheet:'Submissions', row: subIdx+2, col:6, value: newStatus });
+    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:2, value: newApt });
+    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:3, value: ts });
+    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:5, value: newSubmitter });
+    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:6, value: newStatus });
 
     // Delete all old items for this submission then re-append
     await callScript({ action:'delete_submission_items', submissionId: editSubId });
@@ -1440,7 +1440,7 @@ async function updateSubmissionStatus(subId, status) {
   if (subIdx === -1) return;
   showToast('⏳ جاري الحفظ...');
   try {
-    await updateSheetCell(`Submissions!F${subIdx+2}`, status);
+    await callScript({ action: 'update_by_id', sheet: 'Submissions', id: subId, col: 6, value: status });
     allSubmissions[subIdx].status = status;
     renderHome(); renderReview();
     closeModal();
