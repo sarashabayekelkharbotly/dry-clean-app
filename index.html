@@ -1254,16 +1254,40 @@ function renderIssuesSummary() {
       <div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:10px">⚠️ قطع بها مشكلة (${issueItems.length})</div>
       ${issueItems.map(item => {
         const sub = allSubmissions.find(s => s.id === item.submissionId);
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #ffcdd2">
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--text1)">${item.type}${item.color ? ' — ' + item.color : ''}</div>
-            <div style="font-size:11px;color:var(--text3)">${sub ? sub.apt + ' · ' + (excelDateToJS(sub.timestamp) ? formatDate(excelDateToJS(sub.timestamp)) : '') : ''}</div>
-            ${item.note ? `<div style="font-size:11px;color:#cc5f5f;margin-top:2px">📝 ${item.note}</div>` : ''}
+        const subDate = sub && excelDateToJS(sub.timestamp) ? formatDate(excelDateToJS(sub.timestamp)) : '';
+        return `<div style="padding:10px 0;border-bottom:1px solid #ffcdd2">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:700;color:var(--text1)">${item.type}${item.color ? ' — ' + item.color : ''}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">${sub ? sub.apt + ' · ' + subDate : ''}</div>
+              ${item.note ? `<div style="font-size:11px;color:#cc5f5f;margin-top:4px">📝 ${item.note}</div>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+              <button onclick="resolveIssue('${item.itemId}')" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:4px 10px;font-size:11px;color:#2e7d32;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:700">✅ تم الإصلاح</button>
+              <button onclick="openReviewModal('${item.submissionId}')" style="background:none;border:1px solid #ffcdd2;border-radius:8px;padding:4px 10px;font-size:11px;color:#cc5f5f;cursor:pointer;font-family:'Cairo',sans-serif">فتح</button>
+            </div>
           </div>
-          <button onclick="openReviewModal('${item.submissionId}')" style="background:none;border:1px solid #ffcdd2;border-radius:8px;padding:4px 10px;font-size:11px;color:#cc5f5f;cursor:pointer;font-family:'Cairo',sans-serif">فتح</button>
         </div>`;
       }).join('')}
     </div>`;
+}
+
+async function resolveIssue(itemId) {
+  const itemIdx = allItems.findIndex(i => i.itemId === itemId);
+  if (itemIdx === -1) return;
+  const now = new Date().toISOString().slice(0,10);
+  const resolvedNote = (allItems[itemIdx].note ? allItems[itemIdx].note + ' — ' : '') + 'تم الإصلاح ' + now;
+  showToast('⏳ جاري الحفظ...');
+  try {
+    await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 9, value: 'ok' });
+    await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 10, value: resolvedNote });
+    allItems[itemIdx].status = 'ok';
+    allItems[itemIdx].note = resolvedNote;
+    renderReview();
+    showToast('✅ تم تسجيل الإصلاح');
+  } catch(e) {
+    showToast('❌ خطأ في الحفظ');
+  }
 }
 
 function renderReview() {
@@ -1381,10 +1405,8 @@ async function setItemStatus(itemId, status) {
   const itemIdx = allItems.findIndex(i => i.itemId === itemId);
   if (itemIdx === -1) return;
   try {
-    // Find row number in sheet (itemIdx + 2 since row 1 is header)
-    await callScript({ action: 'update', sheet: 'Items', row: itemIdx+2, col: 9, value: status });
+    await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 9, value: status });
     allItems[itemIdx].status = status;
-    // Re-render modal to show/hide note input
     const subId = allItems[itemIdx].submissionId;
     openReviewModal(subId);
   } catch(e) { showToast('❌ خطأ في الحفظ'); }
@@ -1394,7 +1416,7 @@ async function setItemNote(itemId, note) {
   const itemIdx = allItems.findIndex(i => i.itemId === itemId);
   if (itemIdx === -1) return;
   try {
-    await callScript({ action: 'update', sheet: 'Items', row: itemIdx+2, col: 10, value: note });
+    await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 10, value: note });
     allItems[itemIdx].note = note;
     showToast('✅ تم حفظ الملاحظة');
   } catch(e) { showToast('❌ خطأ في الحفظ'); }
@@ -1406,7 +1428,7 @@ async function togglePaid(subId) {
   const newPaid = !allSubmissions[subIdx].paid;
   showToast('⏳ جاري الحفظ...');
   try {
-    await callScript({ action: 'update', sheet: 'Submissions', row: subIdx+2, col: 4, value: newPaid ? 'paid' : '' });
+    await callScript({ action: 'update_by_id', sheet: 'Submissions', id: subId, col: 4, value: newPaid ? 'paid' : '' });
     allSubmissions[subIdx].paid = newPaid;
     renderHome(); renderReview();
     showToast(newPaid ? '✅ تم تسجيل الدفع' : '✅ تم إلغاء الدفع');
