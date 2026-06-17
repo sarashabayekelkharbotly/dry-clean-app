@@ -410,6 +410,8 @@ window.addEventListener('load',function(){
     <button class="apt-pill" onclick="filterReviewStatus('sent', this)">⏳ عند الغسيل</button>
     <button class="apt-pill" onclick="filterReviewStatus('returned', this)">✅ مُسترجع</button>
     <button class="apt-pill" onclick="filterReviewStatus('issue', this)">⚠️ مشكلة</button>
+    <button class="apt-pill" onclick="filterReviewStatus('partial', this)">📦 جزئي</button>
+    <button class="apt-pill" onclick="filterReviewStatus('unpaid', this)">💰 غير مدفوع</button>
   </div>
   <div id="reviewList">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
@@ -799,7 +801,7 @@ async function loadAllData() {
     // Submissions
     allSubmissions = subVals.filter(r => r[0]).map(r => ({
       id: r[0]||'', apt: r[1]||'', timestamp: r[2]||'',
-      paid: r[3]||'', submittedBy: r[4]||'', status: r[5]||'sent'
+      paid: (r[3]||'') === 'paid', submittedBy: r[4]||'', status: r[5]||'sent'
     }));
 
     // Items
@@ -807,6 +809,7 @@ async function loadAllData() {
       itemId: r[0]||'', submissionId: r[1]||'', timestamp: r[2]||'',
       type: r[3]||'', color: r[4]||'', qty: parseFloat(r[5]||0),
       unitPrice: parseFloat(r[6]||0), total: parseFloat(r[7]||0),
+      status: r[8]||'sent', note: r[9]||''
     }));
 
     // Rebuild catalog now that everything is loaded
@@ -873,7 +876,10 @@ function renderSubmissionCard(s, clickable=false) {
             <div class="sub-date">📅 ${date} — ${s.submittedBy||''}</div>
             <div style="font-size:9px;color:var(--text3);font-family:monospace;margin-top:2px">${s.id}</div>
           </div>
-          <div>${statusBadge}</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            ${statusBadge}
+            <button onclick="event.stopPropagation();togglePaid('${s.id}')" style="border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif;background:${s.paid?'#e8f5e9':'#ffeef0'};color:${s.paid?'#2e7d32':'#cc5f5f'}">${s.paid?'✅ مدفوع':'💰 غير مدفوع'}</button>
+          </div>
         </div>
         <div class="sub-meta">
           <div class="sub-stat"><strong>${itemCount}</strong> قطعة</div>
@@ -1237,8 +1243,12 @@ function filterReviewStatus(status, btn) {
 function renderReview() {
   let subs = [...allSubmissions];
   if (currentReviewFilter !== 'all') subs = subs.filter(s => s.apt === currentReviewFilter);
-  if (currentStatusFilter !== 'all') subs = subs.filter(s => (s.status||'sent') === currentStatusFilter);
-  subs.sort((a,b) => parseFloat(b.timestamp||0) - parseFloat(a.timestamp||0));
+  if (currentStatusFilter === 'unpaid') subs = subs.filter(s => !s.paid);
+  else if (currentStatusFilter !== 'all') subs = subs.filter(s => (s.status||'sent') === currentStatusFilter);
+  subs.sort((a,b) => {
+    const da = excelDateToJS(a.timestamp), db = excelDateToJS(b.timestamp);
+    return (db||0) - (da||0);
+  });
   const container = document.getElementById('reviewList');
   if (subs.length === 0) { container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">لا توجد طلبات</div></div>`; return; }
   container.innerHTML = subs.map(s => renderSubmissionCard(s, true)).join('');
@@ -1308,9 +1318,14 @@ function openReviewModal(subId) {
           </div>
         </div>
         <div class="review-status-btns">
-          <button class="btn btn-sm btn-success">✅</button>
-          <button class="btn btn-sm btn-warn">🟡</button>
-          <button class="btn btn-sm btn-danger">❌</button>
+          ${data.items.map(item => `
+            <div style="margin-bottom:6px">
+              <div style="display:flex;gap:4px;margin-bottom:3px">
+                <button onclick="setItemStatus('${item.itemId}','ok')" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='ok'?'#e8f5e9':'var(--surface3)'};color:${(item.status||'sent')==='ok'?'#2e7d32':'var(--text3)'}">✅ ok</button>
+                <button onclick="setItemStatus('${item.itemId}','issue')" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='issue'?'#ffeef0':'var(--surface3)'};color:${(item.status||'sent')==='issue'?'#cc5f5f':'var(--text3)'}">⚠️ مشكلة</button>
+              </div>
+              ${(item.status||'sent')==='issue' ? `<input placeholder="وصف المشكلة..." value="${item.note||''}" onchange="setItemNote('${item.itemId}',this.value)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:'Cairo',sans-serif;background:var(--surface2)">` : ''}
+            </div>`).join('')}
         </div>
       </div>`;
     });
@@ -1334,6 +1349,42 @@ function openReviewModal(subId) {
 }
 
 function closeModal() { document.getElementById('reviewModal').classList.remove('open'); }
+
+async function setItemStatus(itemId, status) {
+  const itemIdx = allItems.findIndex(i => i.itemId === itemId);
+  if (itemIdx === -1) return;
+  try {
+    // Find row number in sheet (itemIdx + 2 since row 1 is header)
+    await callScript({ action: 'update', sheet: 'Items', row: itemIdx+2, col: 9, value: status });
+    allItems[itemIdx].status = status;
+    // Re-render modal to show/hide note input
+    const subId = allItems[itemIdx].submissionId;
+    openReviewModal(subId);
+  } catch(e) { showToast('❌ خطأ في الحفظ'); }
+}
+
+async function setItemNote(itemId, note) {
+  const itemIdx = allItems.findIndex(i => i.itemId === itemId);
+  if (itemIdx === -1) return;
+  try {
+    await callScript({ action: 'update', sheet: 'Items', row: itemIdx+2, col: 10, value: note });
+    allItems[itemIdx].note = note;
+    showToast('✅ تم حفظ الملاحظة');
+  } catch(e) { showToast('❌ خطأ في الحفظ'); }
+}
+
+async function togglePaid(subId) {
+  const subIdx = allSubmissions.findIndex(s => s.id === subId);
+  if (subIdx === -1) return;
+  const newPaid = !allSubmissions[subIdx].paid;
+  showToast('⏳ جاري الحفظ...');
+  try {
+    await callScript({ action: 'update', sheet: 'Submissions', row: subIdx+2, col: 4, value: newPaid ? 'paid' : '' });
+    allSubmissions[subIdx].paid = newPaid;
+    renderHome(); renderReview();
+    showToast(newPaid ? '✅ تم تسجيل الدفع' : '✅ تم إلغاء الدفع');
+  } catch(e) { showToast('❌ خطأ في الحفظ'); }
+}
 
 async function updateSubmissionStatus(subId, status) {
   const subIdx = allSubmissions.findIndex(s => s.id === subId);
@@ -1388,9 +1439,13 @@ function updateStatsForMonth(month) {
   const totalItems = subs.reduce((sum,s) => sum+allItems.filter(i=>i.submissionId===s.id).reduce((a,i)=>a+i.qty,0), 0);
   const avgOrder   = subs.length ? totalCost/subs.length : 0;
 
+  const paidCost   = subs.filter(s=>s.paid).reduce((sum,s)=>sum+getSubmissionTotal(s.id),0);
+  const unpaidCost = subs.filter(s=>!s.paid).reduce((sum,s)=>sum+getSubmissionTotal(s.id),0);
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card"><div class="stat-value">$${totalCost.toFixed(0)}</div><div class="stat-label">إجمالي التكلفة</div></div>
     <div class="stat-card"><div class="stat-value">${subs.length}</div><div class="stat-label">عدد الطلبات</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">$${paidCost.toFixed(0)}</div><div class="stat-label">✅ مدفوع</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">$${unpaidCost.toFixed(0)}</div><div class="stat-label">💰 غير مدفوع</div></div>
     <div class="stat-card"><div class="stat-value">${totalItems}</div><div class="stat-label">إجمالي القطع</div></div>
     <div class="stat-card"><div class="stat-value">$${avgOrder.toFixed(0)}</div><div class="stat-label">متوسط الطلب</div></div>`;
 
