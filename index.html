@@ -416,6 +416,7 @@ window.addEventListener('load',function(){
   <div id="reviewList">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
   </div>
+  <div id="issuesSummary" style="margin-top:16px"></div>
 </div>
 
 <!-- ===================== STATS PAGE ===================== -->
@@ -849,7 +850,10 @@ function renderHome() {
   if (sent.length === 0) {
     html += `<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">لا توجد طلبات حالياً</div></div>`;
   } else {
-    const sorted = [...sent].sort((a,b) => parseFloat(b.timestamp||0) - parseFloat(a.timestamp||0));
+    const sorted = [...sent].sort((a,b) => {
+    const da = excelDateToJS(a.timestamp), db = excelDateToJS(b.timestamp);
+    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+  });
     sorted.forEach(s => { html += renderSubmissionCard(s, true); });
   }
   container.innerHTML = html;
@@ -1240,6 +1244,28 @@ function filterReviewStatus(status, btn) {
   btn.classList.add('active');
   renderReview();
 }
+function renderIssuesSummary() {
+  const el = document.getElementById('issuesSummary');
+  if (!el) return;
+  const issueItems = allItems.filter(i => (i.status||'') === 'issue');
+  if (issueItems.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="background:#fff5f5;border:1.5px solid #ffcdd2;border-radius:12px;padding:14px">
+      <div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:10px">⚠️ قطع بها مشكلة (${issueItems.length})</div>
+      ${issueItems.map(item => {
+        const sub = allSubmissions.find(s => s.id === item.submissionId);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #ffcdd2">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text1)">${item.type}${item.color ? ' — ' + item.color : ''}</div>
+            <div style="font-size:11px;color:var(--text3)">${sub ? sub.apt + ' · ' + (excelDateToJS(sub.timestamp) ? formatDate(excelDateToJS(sub.timestamp)) : '') : ''}</div>
+            ${item.note ? `<div style="font-size:11px;color:#cc5f5f;margin-top:2px">📝 ${item.note}</div>` : ''}
+          </div>
+          <button onclick="openReviewModal('${item.submissionId}')" style="background:none;border:1px solid #ffcdd2;border-radius:8px;padding:4px 10px;font-size:11px;color:#cc5f5f;cursor:pointer;font-family:'Cairo',sans-serif">فتح</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function renderReview() {
   let subs = [...allSubmissions];
   if (currentReviewFilter !== 'all') subs = subs.filter(s => s.apt === currentReviewFilter);
@@ -1247,11 +1273,12 @@ function renderReview() {
   else if (currentStatusFilter !== 'all') subs = subs.filter(s => (s.status||'sent') === currentStatusFilter);
   subs.sort((a,b) => {
     const da = excelDateToJS(a.timestamp), db = excelDateToJS(b.timestamp);
-    return (db||0) - (da||0);
+    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
   });
   const container = document.getElementById('reviewList');
   if (subs.length === 0) { container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">لا توجد طلبات</div></div>`; return; }
   container.innerHTML = subs.map(s => renderSubmissionCard(s, true)).join('');
+  renderIssuesSummary();
 }
 
 // ============================================================
