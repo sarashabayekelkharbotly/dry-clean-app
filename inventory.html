@@ -582,6 +582,37 @@ async function api(action, extra = {}) {
 // ─────────────────────────────────────────────
 // INIT & SYNC
 // ─────────────────────────────────────────────
+async function cancelOrder(orderId, itemId) {
+  if (!confirm('إلغاء هذا الطلب؟')) return;
+  toast('⏳ جاري الإلغاء...');
+  try {
+    await api('inv_cancel_order', { orderId, itemId });
+    orders = orders.filter(o => o.id !== orderId);
+    renderAll();
+    toast('✅ تم إلغاء الطلب');
+  } catch(e) {
+    orders = orders.filter(o => o.id !== orderId);
+    renderAll();
+    toast('⚠️ تم الإلغاء محلياً');
+  }
+}
+
+async function toggleNoReorder(itemId) {
+  const idx = items.findIndex(i => String(i.id) === String(itemId));
+  if (idx === -1) return;
+  const newVal = !items[idx].noReorder;
+  try {
+    await api('inv_toggle_reorder', { itemId, noReorder: newVal });
+    items[idx].noReorder = newVal;
+    renderAll();
+    toast(newVal ? '🚫 لن يظهر في النواقص' : '✅ سيظهر في النواقص مجدداً');
+  } catch(e) {
+    items[idx].noReorder = newVal;
+    renderAll();
+    toast('⚠️ تم التحديث محلياً');
+  }
+}
+
 async function syncData() {
   if (syncing) return;
   syncing = true;
@@ -634,7 +665,7 @@ function hideSplash() {
 // ─────────────────────────────────────────────
 // STATUS HELPERS
 // ─────────────────────────────────────────────
-function isLow(it)  { return it.cur < it.par; }
+function isLow(it)  { return it.cur < it.par && !it.noReorder; }
 function pct(it)    { return it.par === 0 ? 100 : Math.min(100, Math.round(it.cur / it.par * 100)); }
 function scls(it)   { const p=pct(it); if(it.cur===0||p<40) return 'low'; if(p<70) return 'warn'; return ''; }
 function fcls(it)   { const p=pct(it); if(it.cur===0||p<40) return 'pf-low'; if(p<70) return 'pf-warn'; return 'pf-ok'; }
@@ -772,6 +803,7 @@ function renderList(cat) {
           ${it.en ? `<div class="item-en">${it.en}</div>` : ''}
           ${it.brand ? `<div class="item-brand">${it.brand}</div>` : ''}
           ${tr ? `<div class="transit-tag">🚚 في الطريق</div>` : ''}
+          ${it.noReorder ? `<div class="transit-tag" style="background:#f3e5f5;color:#7b1fa2;border-color:#ce93d8">🚫 لا يُطلب</div>` : ''}
         </div>
         <div class="item-controls">
           <div class="ctrl-row">
@@ -818,10 +850,11 @@ function renderOrders() {
           <div class="nawaqes-name">${ord.itemName}</div>
           <div class="nawaqes-meta">طُلب ${ord.qtyRequested} — ${ord.orderedBy} — ${fmtDateShort(ord.orderedAt)}</div>
         </div>
-        <div class="nawaqes-right">
+        <div class="nawaqes-right" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
           ${currentUser==='emad'
             ? `<button class="btn btn-success btn-sm" onclick="openReceiveModal('${ord.id}')">✅ استلمت</button>`
             : `<span class="badge badge-transit">🚚 جارٍ</span>`}
+          <button onclick="cancelOrder('${ord.id}','${ord.itemId}')" style="background:none;border:1px solid #ffcdd2;border-radius:8px;padding:3px 8px;font-size:11px;color:#cc5f5f;cursor:pointer;font-family:'Cairo',sans-serif">❌ إلغاء</button>
         </div>
       </div>`;
     });
