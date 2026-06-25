@@ -729,6 +729,19 @@ async function syncData() {
   if (syncing) return;
   syncing = true;
   toast('⏳ جاري التزامن...');
+
+  // Safety timeout — 15s max
+  let done = false;
+  const safetyTimer = setTimeout(() => {
+    if (done) return;
+    done = true;
+    syncing = false;
+    if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
+    renderAll();
+    hideSplash();
+    toast('⚠️ تعذر الاتصال');
+  }, 15000);
+
   try {
     const res = await api('inv_get_all');
     if (res.items && res.items.length > 0) {
@@ -740,7 +753,6 @@ async function syncData() {
     orders = res.orders || [];
     events = res.events || [];
   } catch(e) {
-    // inv_get_all not deployed yet — fall back to 3 separate calls
     try {
       const r1 = await api('inv_get_items');
       if (r1.items && r1.items.length > 0) {
@@ -757,9 +769,12 @@ async function syncData() {
       if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
       orders = orders || [];
       events = events || [];
-      toast('⚠️ وضع غير متصل');
     }
   }
+
+  if (done) return; // safety timer already fired
+  done = true;
+  clearTimeout(safetyTimer);
   renderAll();
   hideSplash();
   toast('✅ تم التحديث');
