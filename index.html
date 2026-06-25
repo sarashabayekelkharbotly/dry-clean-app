@@ -590,20 +590,26 @@ let currentUserName = null;
 let currentUserRole = null;
 
 async function initAuth() {
-  // Check localStorage for saved session
   const saved = localStorage.getItem('owh_session');
   if (saved) {
     try {
       const s = JSON.parse(saved);
-      currentUser     = s.username;
-      currentUserName = s.displayName;
-      currentUserRole = s.role;
-      hideLoginScreen();
-      return;
-    } catch(e) { localStorage.removeItem('owh_session'); }
+      if (s && s.username && s.displayName) {
+        currentUser     = s.username;
+        currentUserName = s.displayName;
+        currentUserRole = s.role;
+        hideLoginScreen();
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('owh_session');
   }
-  // Show login
-  document.getElementById('loginScreen').style.display = 'flex';
+  // No valid session — show login screen
+  const ls = document.getElementById('loginScreen');
+  if (ls) {
+    ls.style.display = 'flex';
+    ls.style.opacity = '1';
+  }
 }
 
 async function doLogin() {
@@ -646,8 +652,9 @@ function showLoginError(msg) {
 
 function hideLoginScreen() {
   const el = document.getElementById('loginScreen');
-  if (el) { el.style.opacity = '0'; setTimeout(() => el.style.display='none', 300); }
-  document.getElementById('switchUserBtn').style.display = 'block';
+  if (el) { el.style.opacity = '0'; setTimeout(() => { el.style.display='none'; }, 300); }
+  const sb = document.getElementById('switchUserBtn');
+  if (sb) sb.style.display = 'block';
   onAuthReady();
 }
 
