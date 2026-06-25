@@ -1388,9 +1388,12 @@ function onAuthReady() {
   const lock = document.getElementById('appLock');
   if (lock) lock.style.display = 'none';
   const u = currentUser ? currentUser.toLowerCase() : 'emad';
-  if (u === 'emad')   setUser('emad');
-  else if (u === 'sarah')  setUser('sarah');
-  else if (u === 'khaled') setUser('khaled');
+  const nameMap = { emad: 'عماد', sarah: 'سارة', khaled: 'خالد' };
+  const displayName = currentUserName || nameMap[u] || 'عماد';
+  currentUser = u;
+  currentUserName = displayName;
+  const lbl = document.getElementById('user-label');
+  if (lbl) lbl.textContent = displayName;
 
   try {
     ['nawaqes-content','list-cleaning','list-snacks','orders-content','stats-content'].forEach(id => {
