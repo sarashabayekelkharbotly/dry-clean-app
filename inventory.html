@@ -1329,10 +1329,9 @@ async function saveEdit() {
   closeModal('edit-modal');
   renderAll();
   toast(`✅ تم تعديل ${it.ar}`);
-  // Update in sheet by re-writing the item
   try {
-    await api('inv_add_item', { item: it }); // sheet will have duplicate; acceptable for now
-  } catch(e) { /* silent */ }
+    await api('inv_update_item', { item: it });
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
 }
 
 // ADD ITEM
