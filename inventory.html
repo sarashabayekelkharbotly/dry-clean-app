@@ -561,7 +561,14 @@ window.addEventListener('load',function(){
     <div class="form-group"><label class="form-label">الاسم بالإنجليزية (اختياري)</label><input class="form-input" id="n-en" type="text"></div>
     <div class="form-group"><label class="form-label">البراند (اختياري)</label><input class="form-input" id="n-brand" type="text"></div>
     <div class="form-group"><label class="form-label">الفئة</label>
-      <select class="form-select" id="n-cat"><option value="cleaning">🧹 مستلزمات</option><option value="snacks">🍪 سلة ترحيب</option></select>
+      <select class="form-select" id="n-cat">
+        <option value="cleaning">🧹 منظفات</option>
+        <option value="washing">🫧 غسيل ملابس وأطباق</option>
+        <option value="personal">🌸 عناية شخصية</option>
+        <option value="paper">🧻 ورق ومناديل</option>
+        <option value="freshener">🌿 معطرات</option>
+        <option value="basket">🎁 سلة ترحيب</option>
+      </select>
     </div>
     <div class="form-group"><label class="form-label">الإيموجي</label><input class="form-input" id="n-emoji" type="text" placeholder="🧴" maxlength="2"></div>
     <div class="form-row">
@@ -685,6 +692,15 @@ const DEFAULT_ITEMS = [
 // STATE
 // ─────────────────────────────────────────────
 // currentUser and currentUserName set by auth
+const CATS = {
+  cleaning:  { label: 'منظفات',              emoji: '🧹', color: '#cc5f5f' },
+  washing:   { label: 'غسيل ملابس وأطباق',   emoji: '🫧', color: '#5f9acc' },
+  personal:  { label: 'عناية شخصية',         emoji: '🌸', color: '#cc7fb0' },
+  paper:     { label: 'ورق ومناديل',          emoji: '🧻', color: '#8d6e63' },
+  freshener: { label: 'معطرات',               emoji: '🌿', color: '#66bb6a' },
+  basket:    { label: 'سلة ترحيب',            emoji: '🎁', color: '#ffa726' },
+};
+
 let items = [];
 let orders = [];
 let events = [];
@@ -926,7 +942,10 @@ function renderNawaqes() {
 }
 
 function renderList(cat) {
-  const catItems = items.filter(i => i.cat === cat);
+  // 'cleaning' tab shows all non-basket categories; 'snacks' shows basket
+  const catItems = cat === 'cleaning'
+    ? items.filter(i => i.cat !== 'basket')
+    : items.filter(i => i.cat === 'basket');
   const elId = cat === 'cleaning' ? 'list-cleaning' : 'list-snacks';
   const ro = isReadonly();
 
@@ -1025,6 +1044,7 @@ function renderOrders() {
 }
 
 let selectedStatMonth = null;
+let statsView = 'monthly'; // 'monthly' | 'alltime'
 let pricesBackfilled = false;
 
 async function backfillPrices() {
@@ -1032,223 +1052,318 @@ async function backfillPrices() {
   if (btn) { btn.textContent = '⏳ جاري...'; btn.disabled = true; }
   try {
     const res = await api('inv_backfill_prices');
-    if (res.ok) {
-      pricesBackfilled = true;
-      toast(`✅ تم تحديث أسعار ${res.updated} صنف`);
-      await syncData();
-    }
-  } catch(e) {
-    toast('❌ خطأ');
-    if (btn) { btn.textContent = '🔄 تحديث'; btn.disabled = false; }
-  }
+    if (res.ok) { pricesBackfilled = true; toast(`✅ تم تحديث أسعار ${res.updated} صنف`); await syncData(); }
+  } catch(e) { toast('❌ خطأ'); if (btn) { btn.textContent = '🔄 تحديث'; btn.disabled = false; } }
+}
+
+async function migrateCategories() {
+  const btn = document.getElementById('migrate-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.disabled = true; }
+  try {
+    const res = await api('inv_migrate_categories');
+    if (res.ok) { toast(`✅ تم تحديث ${res.updated} صنف`); await syncData(); }
+  } catch(e) { toast('❌ خطأ'); if (btn) { btn.textContent = '🔄 تحديث الفئات'; btn.disabled = false; } }
 }
 
 function orderTotal(o) {
-  return parseFloat((o.total || (o.unitPrice||0) * ((o.status==='received'?o.qtyReceived:o.qtyRequested)||0) || 0).toFixed(2));
+  const qty = o.status === 'received' ? (o.qtyReceived||0) : (o.qtyRequested||0);
+  return parseFloat(((o.unitPrice||0) * qty).toFixed(2));
+}
+
+function stackedBar(data, maxVal, height) {
+  // data = [{cat, value}], maxVal = max for scaling
+  const total = data.reduce((s,d)=>s+d.value,0);
+  if (total === 0) return '<div style="height:'+height+'px;background:var(--surface3);border-radius:4px"></div>';
+  const scale = Math.min(total/maxVal, 1);
+  let segments = data.filter(d=>d.value>0).map(d=>{
+    const pct = (d.value/total*100).toFixed(1);
+    const color = CATS[d.cat]?.color || '#ccc';
+    return `<div style="flex:${d.value};background:${color};height:100%" title="${CATS[d.cat]?.label}: ${d.value.toFixed(0)} ج.م (${pct}%)"></div>`;
+  }).join('');
+  return `<div style="height:${height}px;border-radius:4px;overflow:hidden;display:flex;width:${(scale*100).toFixed(0)}%">${segments}</div>`;
 }
 
 function renderStats() {
   const el = document.getElementById('stats-content');
   const pricedOrders = orders.filter(o => (o.unitPrice||0) > 0);
+  const catKeys = Object.keys(CATS);
 
-  // ── Build month map ──
+  // Build month map
   const byMonth = {};
   pricedOrders.forEach(o => {
     const k = (o.receivedAt||o.orderedAt||'').slice(0,7);
     if (!k) return;
-    if (!byMonth[k]) byMonth[k] = { total:0, cleaning:0, snacks:0, count:0, orders:[] };
+    if (!byMonth[k]) {
+      byMonth[k] = { total:0, count:0, orders:[] };
+      catKeys.forEach(c => byMonth[k][c] = 0);
+    }
     const t = orderTotal(o);
     const item = items.find(i => String(i.id)===String(o.itemId));
     const cat = item?.cat || 'cleaning';
+    const mappedCat = catKeys.includes(cat) ? cat : 'cleaning';
     byMonth[k].total += t;
-    byMonth[k][cat] = (byMonth[k][cat]||0) + t;
+    byMonth[k][mappedCat] = (byMonth[k][mappedCat]||0) + t;
     byMonth[k].count++;
-    byMonth[k].orders.push(o);
+    byMonth[k].orders.push({...o, resolvedCat: mappedCat});
   });
+
   const allMonths = Object.keys(byMonth).sort((a,b)=>b.localeCompare(a)).slice(0,12);
-  const totalSpent = Object.values(byMonth).reduce((s,m)=>s+m.total, 0);
+  const totalSpent = Object.values(byMonth).reduce((s,m)=>s+m.total,0);
   const avgMonthly = allMonths.length ? totalSpent/allMonths.length : 0;
 
-  if (!selectedStatMonth || !byMonth[selectedStatMonth]) {
-    selectedStatMonth = allMonths[0] || null;
-  }
+  if (!selectedStatMonth || !byMonth[selectedStatMonth]) selectedStatMonth = allMonths[0] || null;
 
-  // ── Missing prices banner ──
-  const missingPrices = items.filter(i => !(i.lastPrice > 0)).length;
+  // ── Banners ──
   let html = '';
+  const missingPrices = items.filter(i=>!(i.lastPrice>0)).length;
   if (missingPrices > 0 && !pricesBackfilled) {
-    html += `<div class="alert-card warn" style="margin-bottom:14px">
-      <div style="flex:1;font-size:12px;color:#7d5f00;font-family:'Cairo',sans-serif">${missingPrices} صنف بدون سعر محفوظ</div>
-      <button id="backfill-btn" onclick="backfillPrices()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:'Cairo',sans-serif;cursor:pointer;font-weight:700">🔄 تحديث</button>
+    html += `<div class="alert-card warn" style="margin-bottom:10px">
+      <div style="flex:1;font-size:12px;color:#7d5f00">${missingPrices} صنف بدون سعر</div>
+      <button id="backfill-btn" onclick="backfillPrices()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-family:'Cairo',sans-serif;cursor:pointer;font-weight:700">🔄 تحديث الأسعار</button>
+    </div>`;
+  }
+  const needsMigration = items.filter(i=>i.cat==='snacks').length;
+  if (needsMigration > 0) {
+    html += `<div class="alert-card warn" style="margin-bottom:10px">
+      <div style="flex:1;font-size:12px;color:#7d5f00">تحتاج الفئات إلى تحديث</div>
+      <button id="migrate-btn" onclick="migrateCategories()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-family:'Cairo',sans-serif;cursor:pointer;font-weight:700">🔄 تحديث الفئات</button>
     </div>`;
   }
 
-  // ── Q1 + Q4: Total + average ──
-  html += `<div class="stats-grid" style="margin-bottom:20px">
-    <div class="stat-card"><div class="stat-value" style="color:var(--primary)">${totalSpent.toFixed(0)}<span style="font-size:10px;margin-right:2px">ج.م</span></div><div class="stat-label">إجمالي الإنفاق</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${avgMonthly.toFixed(0)}<span style="font-size:10px;margin-right:2px">ج.م</span></div><div class="stat-label">متوسط شهري</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${pricedOrders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
+  // ── View toggle ──
+  html += `<div style="display:flex;gap:8px;margin-bottom:16px">
+    <button onclick="statsView='monthly';renderStats()" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid ${statsView==='monthly'?'var(--primary)':'var(--border)'};background:${statsView==='monthly'?'var(--primary)':'white'};color:${statsView==='monthly'?'white':'var(--text2)'};font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer">📅 شهري</button>
+    <button onclick="statsView='alltime';renderStats()" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid ${statsView==='alltime'?'var(--primary)':'var(--border)'};background:${statsView==='alltime'?'var(--primary)':'white'};color:${statsView==='alltime'?'white':'var(--text2)'};font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer">📊 كل الأوقات</button>
   </div>`;
 
-  // ── Q10: Inventory value ──
-  const invValue = items.reduce((s,i) => s + ((i.lastPrice||0) * (i.cur||0)), 0);
-  html += `<div class="insight-card" style="margin-bottom:20px">
-    <div class="insight-title">📦 قيمة المخزون الحالي</div>
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:24px;font-weight:900;color:var(--primary)">${invValue.toFixed(0)} <span style="font-size:13px">ج.م</span></div>
-      <div style="text-align:left">
-        ${items.filter(i=>i.lastPrice>0).map(i=>`<div style="font-size:10px;color:var(--text3)">${i.ar}: ${((i.lastPrice||0)*(i.cur||0)).toFixed(0)} ج.م</div>`).slice(0,4).join('')}
-        ${items.filter(i=>i.lastPrice>0).length > 4 ? `<div style="font-size:10px;color:var(--text3)">و${items.filter(i=>i.lastPrice>0).length-4} أصناف أخرى...</div>` : ''}
-      </div>
-    </div>
-  </div>`;
-
-  // ── Q8: Overstocked items ──
-  const overstocked = items.filter(i => i.cur > i.par * 1.5 && i.par > 0);
-  if (overstocked.length > 0) {
-    html += `<div class="insight-card" style="margin-bottom:20px">
-      <div class="insight-title">⚠️ أصناف مخزونها أعلى من اللازم</div>
-      ${overstocked.map(i => `<div class="insight-row">
-        <div><div class="insight-name">${i.emoji} ${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
-        <div class="insight-val" style="color:#e65100">+${i.cur - i.par} زيادة</div>
-      </div>`).join('')}
-    </div>`;
-  }
-
-  if (allMonths.length === 0) {
-    html += `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">لا توجد طلبات بأسعار بعد</div>`;
-    el.innerHTML = html;
-    return;
-  }
-
-  // ── Month pills ──
-  html += `<div class="month-pills">`;
-  allMonths.forEach(k => {
-    const [y,m] = k.split('-');
-    const label = new Date(y, parseInt(m)-1, 1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
-    html += `<button class="month-pill${k===selectedStatMonth?' active':''}" onclick="selectStatMonth('${k}')">${label}</button>`;
-  });
-  html += `</div>`;
-
-  // ── Q4: Monthly trend bars (clickable) ──
-  const maxM = Math.max(...allMonths.map(k=>byMonth[k].total), 1);
-  const prevMonth = allMonths[1] || null;
-  html += `<div class="insight-card" style="margin-bottom:20px">
-    <div class="insight-title">📊 الإنفاق الشهري</div>`;
-  allMonths.slice().reverse().forEach(k => {
-    const [y,m] = k.split('-');
-    const label = new Date(y, parseInt(m)-1, 1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
-    const v = byMonth[k].total;
-    const isSelected = k === selectedStatMonth;
-    html += `<div class="stats-bar-row" onclick="selectStatMonth('${k}')" style="cursor:pointer;padding:5px 0">
-      <div class="stats-bar-top">
-        <span class="stats-bar-name" style="font-weight:${isSelected?'700':'500'};color:${isSelected?'var(--primary)':'var(--text1)'}">${label}</span>
-        <span class="stats-bar-val" style="font-weight:${isSelected?'700':'400'};color:${isSelected?'var(--primary)':'var(--text2)'}">${v.toFixed(0)} ج.م</span>
-      </div>
-      <div class="bar-wrap"><div class="bar-fill" style="width:${(v/maxM*100).toFixed(0)}%;background:${isSelected?'var(--primary)':'#e8c8c8'}"></div></div>
+  // ── Category legend ──
+  html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">`;
+  catKeys.forEach(c => {
+    html += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)">
+      <div style="width:10px;height:10px;border-radius:2px;background:${CATS[c].color};flex-shrink:0"></div>${CATS[c].emoji} ${CATS[c].label}
     </div>`;
   });
   html += `</div>`;
 
-  // ── Selected month detail ──
-  if (selectedStatMonth && byMonth[selectedStatMonth]) {
+  if (statsView === 'monthly') {
+    // ── Monthly view ──
+
+    // Month pills
+    html += `<div class="month-pills" style="margin-bottom:16px">`;
+    allMonths.forEach(k => {
+      const [y,m] = k.split('-');
+      const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+      html += `<button class="month-pill${k===selectedStatMonth?' active':''}" onclick="selectStatMonth('${k}')">${label}</button>`;
+    });
+    html += `</div>`;
+
+    if (!selectedStatMonth || !byMonth[selectedStatMonth]) {
+      html += `<div style="text-align:center;padding:30px;color:var(--text3)">لا توجد بيانات</div>`;
+      el.innerHTML = html; return;
+    }
+
     const mData = byMonth[selectedStatMonth];
     const [sy,sm] = selectedStatMonth.split('-');
-    const monthLabel = new Date(sy, parseInt(sm)-1, 1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+    const monthLabel = new Date(sy,parseInt(sm)-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
     const prevKey = allMonths[allMonths.indexOf(selectedStatMonth)+1] || null;
-    const prevTotal = prevKey ? byMonth[prevKey]?.total || 0 : null;
+    const prevTotal = prevKey ? byMonth[prevKey]?.total||0 : null;
     const diff = prevTotal !== null ? mData.total - prevTotal : null;
-    const diffPct = prevTotal ? ((diff/prevTotal)*100).toFixed(0) : null;
 
-    html += `<div class="insight-card" style="margin-bottom:12px">
-      <div class="insight-title">📅 ${monthLabel}</div>
-      <div class="stats-grid" style="margin-bottom:0">
-        <div class="stat-card" style="border:none;padding:8px 4px">
-          <div class="stat-value" style="color:var(--primary);font-size:20px">${mData.total.toFixed(0)}<span style="font-size:10px">ج.م</span></div>
-          <div class="stat-label">إجمالي الشهر</div>
-          ${diff !== null ? `<div style="font-size:10px;margin-top:2px" class="${diff>0?'trend-up':'trend-down'}">${diff>0?'▲':'▼'} ${Math.abs(diff).toFixed(0)} ج.م عن الشهر السابق</div>` : ''}
-        </div>
-        <div class="stat-card" style="border:none;padding:8px 4px"><div class="stat-value" style="color:var(--ok);font-size:18px">${mData.cleaning.toFixed(0)}<span style="font-size:10px">ج.م</span></div><div class="stat-label">🧹 مستلزمات</div></div>
-        <div class="stat-card" style="border:none;padding:8px 4px"><div class="stat-value" style="color:#7c6fcd;font-size:18px">${mData.snacks.toFixed(0)}<span style="font-size:10px">ج.م</span></div><div class="stat-label">🍪 سلة ترحيب</div></div>
-        <div class="stat-card" style="border:none;padding:8px 4px"><div class="stat-value" style="font-size:18px">${mData.count}</div><div class="stat-label">عدد الطلبات</div></div>
+    // Summary cards
+    html += `<div class="stats-grid" style="margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--primary)">${mData.total.toFixed(0)}<span style="font-size:10px"> ج.م</span></div>
+        <div class="stat-label">الإنفاق</div>
+        ${diff!==null?`<div style="font-size:10px;margin-top:2px;color:${diff>0?'#e53935':'#43a047'}">${diff>0?'▲':'▼'} ${Math.abs(diff).toFixed(0)} ج.م</div>`:''}
       </div>
+      <div class="stat-card"><div class="stat-value">${mData.count}</div><div class="stat-label">طلبات هذا الشهر</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${avgMonthly.toFixed(0)}<span style="font-size:10px"> ج.م</span></div><div class="stat-label">المتوسط الشهري</div></div>
     </div>`;
 
-    // ── Q3: Top items this month ──
-    const mItems = {};
-    mData.orders.forEach(o => { mItems[o.itemName] = (mItems[o.itemName]||0) + orderTotal(o); });
-    const mTopItems = Object.entries(mItems).sort((a,b)=>b[1]-a[1]);
-    if (mTopItems.length > 0) {
-      const maxS = mTopItems[0][1] || 1;
-      html += `<div class="insight-card" style="margin-bottom:12px">
-        <div class="insight-title">💸 الأكثر إنفاقاً هذا الشهر</div>`;
-      mTopItems.forEach(([name, spent]) => {
+    // Category breakdown this month
+    const catData = catKeys.map(c=>({cat:c, value:mData[c]||0})).filter(d=>d.value>0).sort((a,b)=>b.value-a.value);
+    if (catData.length > 0) {
+      const maxCat = catData[0].value;
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">💸 الإنفاق حسب الفئة — ${monthLabel}</div>`;
+      catData.forEach(d => {
         html += `<div class="stats-bar-row">
-          <div class="stats-bar-top"><span class="stats-bar-name">${name}</span><span class="insight-val">${spent.toFixed(0)} ج.م</span></div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxS*100).toFixed(0)}%"></div></div>
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${CATS[d.cat].emoji} ${CATS[d.cat].label}</span>
+            <span class="insight-val">${d.value.toFixed(0)} ج.م <span style="font-weight:400;color:var(--text3);font-size:10px">${(d.value/mData.total*100).toFixed(0)}%</span></span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(d.value/maxCat*100).toFixed(0)}%;background:${CATS[d.cat].color}"></div></div>
         </div>`;
       });
       html += `</div>`;
     }
 
-    // ── Q5: Price changes vs previous month ──
+    // Top items this month
+    const mItems = {};
+    mData.orders.forEach(o => { mItems[o.itemName] = (mItems[o.itemName]||0)+orderTotal(o); });
+    const mTopItems = Object.entries(mItems).sort((a,b)=>b[1]-a[1]);
+    if (mTopItems.length > 0) {
+      const maxS = mTopItems[0][1]||1;
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">🏆 الأكثر إنفاقاً — ${monthLabel}</div>`;
+      mTopItems.forEach(([name,spent]) => {
+        const item = items.find(i=>i.ar===name);
+        const cat = item?.cat||'cleaning';
+        html += `<div class="stats-bar-row">
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${item?.emoji||''} ${name}</span>
+            <span class="insight-val">${spent.toFixed(0)} ج.م</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxS*100).toFixed(0)}%;background:${CATS[cat]?.color||'var(--primary)'}"></div></div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // Price changes vs prev month
     if (prevKey && byMonth[prevKey]) {
-      const prevOrders = byMonth[prevKey].orders;
-      const priceChanges = [];
+      const prevOrds = byMonth[prevKey].orders;
+      const changes = [];
       mData.orders.forEach(o => {
-        const prev = prevOrders.find(p => String(p.itemId)===String(o.itemId) && p.unitPrice > 0);
-        if (prev && o.unitPrice > 0 && Math.abs(o.unitPrice - prev.unitPrice) > 0.01) {
-          priceChanges.push({ name: o.itemName, cur: o.unitPrice, prev: prev.unitPrice, diff: o.unitPrice - prev.unitPrice });
+        const prev = prevOrds.find(p=>String(p.itemId)===String(o.itemId)&&p.unitPrice>0);
+        if (prev && o.unitPrice>0 && Math.abs(o.unitPrice-prev.unitPrice)>0.01) {
+          changes.push({name:o.itemName, cur:o.unitPrice, prev:prev.unitPrice, diff:o.unitPrice-prev.unitPrice});
         }
       });
-      if (priceChanges.length > 0) {
-        html += `<div class="insight-card" style="margin-bottom:12px">
+      if (changes.length > 0) {
+        html += `<div class="insight-card" style="margin-bottom:16px">
           <div class="insight-title">📈 تغيرات الأسعار عن الشهر السابق</div>`;
-        priceChanges.forEach(p => {
+        changes.forEach(p => {
           html += `<div class="insight-row">
-            <div><div class="insight-name">${p.name}</div><div class="insight-sub">${p.prev.toFixed(2)} ← ${p.cur.toFixed(2)} ج.م</div></div>
-            <div class="${p.diff>0?'trend-up':'trend-down'}" style="font-size:12px;font-weight:700">${p.diff>0?'▲':'▼'} ${Math.abs(p.diff).toFixed(2)} ج.م</div>
+            <div><div class="insight-name">${p.name}</div><div class="insight-sub">${p.prev.toFixed(2)} ← ${p.cur.toFixed(2)} ج.م للوحدة</div></div>
+            <div style="font-size:12px;font-weight:700;color:${p.diff>0?'#e53935':'#43a047'}">${p.diff>0?'▲':'▼'} ${Math.abs(p.diff).toFixed(2)}</div>
           </div>`;
         });
         html += `</div>`;
       }
     }
-  }
 
-  // ── Q7: Most frequently reordered ──
-  const reorderCount = {};
-  orders.filter(o=>o.status==='received').forEach(o => {
-    reorderCount[o.itemName] = (reorderCount[o.itemName]||0) + 1;
-  });
-  const topReorder = Object.entries(reorderCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  if (topReorder.length > 0) {
-    html += `<div class="insight-card" style="margin-bottom:12px">
-      <div class="insight-title">🔄 الأكثر تكراراً في الطلب</div>`;
-    topReorder.forEach(([name, count]) => {
-      const item = items.find(i=>i.ar===name);
-      html += `<div class="insight-row">
-        <div><div class="insight-name">${item?.emoji||''} ${name}</div><div class="insight-sub">طُلب ${count} ${count===1?'مرة':'مرات'}</div></div>
-        <div class="insight-val">${count}x</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
+  } else {
+    // ── All time view ──
 
-  // ── Q3 All time: top items by spending ──
-  const byItem = {};
-  pricedOrders.forEach(o => { byItem[o.itemName] = (byItem[o.itemName]||0) + orderTotal(o); });
-  const topItems = Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  if (topItems.length > 0) {
-    const maxS = topItems[0][1] || 1;
-    html += `<div class="insight-card">
-      <div class="insight-title">💰 الأكثر إنفاقاً (كل الأوقات)</div>`;
-    topItems.forEach(([name, spent]) => {
-      html += `<div class="stats-bar-row">
-        <div class="stats-bar-top"><span class="stats-bar-name">${name}</span><span class="insight-val">${spent.toFixed(0)} ج.م</span></div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxS*100).toFixed(0)}%"></div></div>
-      </div>`;
+    // Summary cards
+    html += `<div class="stats-grid" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-value" style="color:var(--primary)">${totalSpent.toFixed(0)}<span style="font-size:10px"> ج.م</span></div><div class="stat-label">إجمالي الإنفاق</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${avgMonthly.toFixed(0)}<span style="font-size:10px"> ج.م</span></div><div class="stat-label">متوسط شهري</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${pricedOrders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
+    </div>`;
+
+    // Stacked bar chart by month
+    if (allMonths.length > 0) {
+      const maxM = Math.max(...allMonths.map(k=>byMonth[k].total),1);
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">📊 الإنفاق الشهري حسب الفئة</div>`;
+      allMonths.slice().reverse().forEach(k => {
+        const [y,m] = k.split('-');
+        const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+        const mD = byMonth[k];
+        const catD = catKeys.map(c=>({cat:c,value:mD[c]||0}));
+        html += `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:12px;color:var(--text2)">${label}</span>
+            <span style="font-size:12px;font-weight:700;color:var(--text1)">${mD.total.toFixed(0)} ج.م</span>
+          </div>
+          <div style="height:16px;border-radius:4px;overflow:hidden;display:flex;width:${(mD.total/maxM*100).toFixed(0)}%">
+            ${catKeys.filter(c=>mD[c]>0).map(c=>`<div style="flex:${mD[c]};background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`).join('')}
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // Inventory value
+    const itemsWithVal = items.filter(i=>i.lastPrice>0&&i.cur>0).map(i=>({
+      name:i.ar, emoji:i.emoji, cat:i.cat, value:(i.lastPrice||0)*(i.cur||0)
+    })).sort((a,b)=>b.value-a.value);
+    const invValue = itemsWithVal.reduce((s,i)=>s+i.value,0);
+    if (invValue > 0) {
+      const maxV = itemsWithVal[0]?.value||1;
+      // Cat totals for inventory
+      const invByCat = {};
+      itemsWithVal.forEach(i=>{ invByCat[i.cat]=(invByCat[i.cat]||0)+i.value; });
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">📦 قيمة المخزون الحالي — ${invValue.toFixed(0)} ج.م</div>
+        <div style="height:20px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px">
+          ${catKeys.filter(c=>invByCat[c]>0).map(c=>`<div style="flex:${invByCat[c]};background:${CATS[c].color}" title="${CATS[c].label}: ${(invByCat[c]||0).toFixed(0)} ج.م"></div>`).join('')}
+        </div>`;
+      itemsWithVal.slice(0,8).forEach(i=>{
+        html += `<div class="stats-bar-row">
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${i.emoji} ${i.name}</span>
+            <span class="insight-val">${i.value.toFixed(0)} ج.م</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(i.value/maxV*100).toFixed(0)}%;background:${CATS[i.cat]?.color||'var(--primary)'}"></div></div>
+        </div>`;
+      });
+      if (itemsWithVal.length>8) html+=`<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">و ${itemsWithVal.length-8} أصناف أخرى</div>`;
+      html += `</div>`;
+    }
+
+    // Overstocked
+    const overstocked = items.filter(i=>i.cur>i.par*2&&i.par>0&&!i.noReorder).sort((a,b)=>(b.cur/b.par)-(a.cur/a.par));
+    if (overstocked.length>0) {
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">⚠️ مخزون أعلى من اللازم <span style="font-size:10px;font-weight:400;color:var(--text3)">(أكثر من ضعف الثابت)</span></div>`;
+      overstocked.forEach(i=>{
+        const pct=Math.round(i.cur/i.par*100);
+        html+=`<div class="insight-row">
+          <div><div class="insight-name">${i.emoji} ${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
+          <div style="text-align:left"><div class="insight-val" style="color:#e65100">${pct}%</div><div style="font-size:10px;color:var(--text3)">من الثابت</div></div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+
+    // All time top items
+    const byItem={};
+    pricedOrders.forEach(o=>{byItem[o.itemName]=(byItem[o.itemName]||0)+orderTotal(o);});
+    const topItems=Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if (topItems.length>0) {
+      const maxS=topItems[0][1]||1;
+      html+=`<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">💰 الأكثر إنفاقاً (كل الأوقات)</div>`;
+      topItems.forEach(([name,spent])=>{
+        const item=items.find(i=>i.ar===name);
+        const cat=item?.cat||'cleaning';
+        html+=`<div class="stats-bar-row">
+          <div class="stats-bar-top"><span class="stats-bar-name">${item?.emoji||''} ${name}</span><span class="insight-val">${spent.toFixed(0)} ج.م</span></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxS*100).toFixed(0)}%;background:${CATS[cat]?.color||'var(--primary)'}"></div></div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+
+    // Reorder frequency
+    const reorderCount={}, reorderDates={};
+    orders.filter(o=>o.status==='received').forEach(o=>{
+      reorderCount[o.itemName]=(reorderCount[o.itemName]||0)+1;
+      if(!reorderDates[o.itemName]) reorderDates[o.itemName]=[];
+      if(o.receivedAt) reorderDates[o.itemName].push(o.receivedAt);
     });
-    html += `</div>`;
+    const topReorder=Object.entries(reorderCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    if (topReorder.length>0) {
+      html+=`<div class="insight-card">
+        <div class="insight-title">🔄 الأكثر تكراراً في الطلب</div>`;
+      topReorder.forEach(([name,count])=>{
+        const item=items.find(i=>i.ar===name);
+        const dates=(reorderDates[name]||[]).sort();
+        let avgDays='';
+        if(dates.length>1){
+          const days=Math.round((new Date(dates[dates.length-1])-new Date(dates[0]))/(1000*60*60*24*(count-1)));
+          if(days>0) avgDays=`كل ${days} يوم تقريباً`;
+        }
+        html+=`<div class="insight-row">
+          <div><div class="insight-name">${item?.emoji||''} ${name}</div><div class="insight-sub">${avgDays||`طُلب ${count} مرة`}</div></div>
+          <div style="text-align:left"><div class="insight-val">${count}x</div></div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
   }
 
   el.innerHTML = html;
@@ -1256,6 +1371,7 @@ function renderStats() {
 
 function selectStatMonth(key) {
   selectedStatMonth = key;
+  statsView = 'monthly';
   renderStats();
 }
 
