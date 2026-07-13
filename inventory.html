@@ -1401,80 +1401,37 @@ function renderStats() {
       <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${pricedOrders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
     </div>`;
 
-    // Spending — vertical stacked bar chart (max 12 months)
+    // Spending — vertical stacked bar chart with labels (max 12 months)
     if (allMonths.length > 0) {
       const spendMonths = allMonths.slice(0,12).slice().reverse();
       const maxM = Math.max(...spendMonths.map(k=>byMonth[k].total),1);
-      const barWS = Math.floor(Math.min(52, (320/Math.max(spendMonths.length,1))-4));
+      const barWS = 60; // fixed width per bar
+      const chartH = 220; // chart plot area height in px
       const totalSpendAll = spendMonths.reduce((s,k)=>s+byMonth[k].total,0);
       html += `<div class="insight-card" style="margin-bottom:16px">
         <div class="insight-title">الإنفاق الشهري — ${totalSpendAll.toFixed(0)} ج.م إجمالي</div>
-        <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding-bottom:24px;overflow-x:auto">`;
+        <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:8px">`;
       spendMonths.forEach(k => {
         const mD = byMonth[k];
-        const totalH = Math.max((mD.total/maxM)*100,2);
+        const totalPx = Math.max((mD.total/maxM)*chartH, 4);
         const [y,m] = k.split('-');
         const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'short'});
-        const segs = catKeys.filter(c=>mD[c]>0).map(c=>{
-          const h=(mD[c]/maxM)*100;
-          return `<div style="width:100%;height:${h.toFixed(1)}%;background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`;
+        // Build segments with per-segment labels
+        const catsHere = catKeys.filter(c=>mD[c]>0);
+        const segs = catsHere.map(c=>{
+          const segPx = (mD[c]/mD.total)*totalPx;
+          const showLabel = segPx >= 16; // only show label if segment is tall enough
+          return `<div style="width:100%;height:${segPx.toFixed(1)}px;background:${CATS[c].color};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م">${showLabel ? mD[c].toFixed(0) : ''}</div>`;
         }).join('');
         html += `<div onclick="selectStatMonth('${k}');statsView='monthly';renderStats()" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;flex-shrink:0;width:${barWS}px">
-          <div style="font-size:9px;color:var(--text3);margin-bottom:2px">${mD.total.toFixed(0)}</div>
-          <div style="width:100%;height:100px;display:flex;flex-direction:column;justify-content:flex-end">
-            <div style="width:100%;height:${totalH.toFixed(1)}%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden">${segs}</div>
+          <div style="font-size:11px;color:var(--text1);font-weight:700;margin-bottom:4px">${mD.total.toFixed(0)}</div>
+          <div style="width:100%;height:${chartH}px;display:flex;flex-direction:column;justify-content:flex-end;background:var(--surface3);border-radius:4px">
+            <div style="width:100%;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden">${segs}</div>
           </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:3px;text-align:center">${label}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px;text-align:center;font-weight:600">${label}</div>
         </div>`;
       });
       html += `</div></div>`;
-    }
-
-    // Inventory value
-    const itemsWithVal = items.filter(i=>i.lastPrice>0&&i.cur>0).map(i=>({
-      name:i.ar, emoji:i.emoji, cat:i.cat, value:(i.lastPrice||0)*(i.cur||0)
-    })).sort((a,b)=>b.value-a.value);
-    const invValue = itemsWithVal.reduce((s,i)=>s+i.value,0);
-    if (invValue > 0) {
-      const maxV = itemsWithVal[0]?.value||1;
-      // Cat totals for inventory
-      const invByCat = {};
-      const catAlias2 = { snacks: 'basket' };
-      itemsWithVal.forEach(i=>{ 
-        const c = catAlias2[i.cat]||(catKeys.includes(i.cat)?i.cat:'cleaning');
-        invByCat[c]=(invByCat[c]||0)+i.value; 
-      });
-      html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">📦 قيمة المخزون الحالي — ${invValue.toFixed(0)} ج.م</div>
-        <div style="height:20px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px">
-          ${catKeys.filter(c=>invByCat[c]>0).map(c=>`<div style="flex:${invByCat[c]};background:${CATS[c].color}" title="${CATS[c].label}: ${(invByCat[c]||0).toFixed(0)} ج.م"></div>`).join('')}
-        </div>`;
-      itemsWithVal.slice(0,8).forEach(i=>{
-        html += `<div class="stats-bar-row">
-          <div class="stats-bar-top">
-            <span class="stats-bar-name">${i.emoji} ${i.name}</span>
-            <span class="insight-val">${i.value.toFixed(0)} ج.م</span>
-          </div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${(i.value/maxV*100).toFixed(0)}%;background:${CATS[i.cat]?.color||'var(--primary)'}"></div></div>
-        </div>`;
-      });
-      if (itemsWithVal.length>8) html+=`<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">و ${itemsWithVal.length-8} أصناف أخرى</div>`;
-      html += `</div>`;
-    }
-
-    // Overstocked
-    const overstocked = items.filter(i=>i.cur>i.par*2&&i.par>0&&!i.noReorder).sort((a,b)=>(b.cur/b.par)-(a.cur/a.par));
-    if (overstocked.length>0) {
-      html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">⚠️ مخزون أعلى من اللازم <span style="font-size:10px;font-weight:400;color:var(--text3)">(أكثر من ضعف الثابت)</span></div>`;
-      overstocked.forEach(i=>{
-        const pct=Math.round(i.cur/i.par*100);
-        html+=`<div class="insight-row">
-          <div><div class="insight-name">${i.emoji} ${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
-          <div style="text-align:left"><div class="insight-val" style="color:#e65100">${pct}%</div><div style="font-size:10px;color:var(--text3)">من الثابت</div></div>
-        </div>`;
-      });
-      html+=`</div>`;
     }
 
     // ── All time consumption ──
@@ -1508,24 +1465,28 @@ function renderStats() {
       const totalConsumedAllTime = consumeMonths.reduce((s,k)=>s+consumeByMonth[k].total, 0);
       const barWC = Math.floor(Math.min(52, (320/Math.max(consumeMonths.length,1))-4));
 
+      const barWC2 = 60;
+      const chartH2 = 220;
       html += `<div class="insight-card" style="margin-bottom:16px">
         <div class="insight-title">الاستهلاك الشهري — ${totalConsumedAllTime.toFixed(0)} ج.م إجمالي</div>
-        <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding-bottom:24px;overflow-x:auto">`;
+        <div style="display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:8px">`;
       consumeMonths.forEach(k => {
         const mD = consumeByMonth[k];
-        const totalH = Math.max((mD.total/maxCM)*100, 2);
+        const totalPx = Math.max((mD.total/maxCM)*chartH2, 4);
         const [y,m] = k.split('-');
         const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'short'});
-        const segs = catKeys.filter(c=>mD[c]>0).map(c=>{
-          const h=(mD[c]/maxCM)*100;
-          return `<div style="width:100%;height:${h.toFixed(1)}%;background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`;
+        const catsHere = catKeys.filter(c=>mD[c]>0);
+        const segs = catsHere.map(c=>{
+          const segPx = (mD[c]/mD.total)*totalPx;
+          const showLabel = segPx >= 16;
+          return `<div style="width:100%;height:${segPx.toFixed(1)}px;background:${CATS[c].color};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م">${showLabel ? mD[c].toFixed(0) : ''}</div>`;
         }).join('');
-        html += `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${barWC}px">
-          <div style="font-size:9px;color:var(--text3);margin-bottom:2px">${mD.total.toFixed(0)}</div>
-          <div style="width:100%;height:100px;display:flex;flex-direction:column;justify-content:flex-end">
-            <div style="width:100%;height:${totalH.toFixed(1)}%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden">${segs}</div>
+        html += `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${barWC2}px">
+          <div style="font-size:11px;color:var(--text1);font-weight:700;margin-bottom:4px">${mD.total.toFixed(0)}</div>
+          <div style="width:100%;height:${chartH2}px;display:flex;flex-direction:column;justify-content:flex-end;background:var(--surface3);border-radius:4px">
+            <div style="width:100%;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden">${segs}</div>
           </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:3px;text-align:center">${label}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px;text-align:center;font-weight:600">${label}</div>
         </div>`;
       });
       html += `</div></div>`;
@@ -1559,6 +1520,56 @@ function renderStats() {
         </div>`;
       });
       html += `</div>`;
+    }
+
+    // Inventory value
+    const itemsWithVal = items.filter(i=>i.lastPrice>0&&i.cur>0).map(i=>({
+      name:i.ar, emoji:i.emoji, cat:i.cat, value:(i.lastPrice||0)*(i.cur||0)
+    })).sort((a,b)=>b.value-a.value);
+    const invValue = itemsWithVal.reduce((s,i)=>s+i.value,0);
+    if (invValue > 0) {
+      const maxV = itemsWithVal[0]?.value||1;
+      // Cat totals for inventory
+      const invByCat = {};
+      const catAlias2 = { snacks: 'basket' };
+      itemsWithVal.forEach(i=>{ 
+        const c = catAlias2[i.cat]||(catKeys.includes(i.cat)?i.cat:'cleaning');
+        invByCat[c]=(invByCat[c]||0)+i.value; 
+      });
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">📦 قيمة المخزون الحالي — ${invValue.toFixed(0)} ج.م</div>
+        <div style="height:28px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:6px">
+          ${catKeys.filter(c=>invByCat[c]>0).map(c=>`<div style="flex:${invByCat[c]};background:${CATS[c].color};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700" title="${CATS[c].label}: ${(invByCat[c]||0).toFixed(0)} ج.م">${((invByCat[c]||0)/invValue*100)>=8 ? (invByCat[c]||0).toFixed(0) : ''}</div>`).join('')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3);margin-bottom:12px">
+          ${catKeys.filter(c=>invByCat[c]>0).map(c=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CATS[c].color};vertical-align:middle;margin-left:3px"></span>${CATS[c].label}: ${(invByCat[c]||0).toFixed(0)} ج.م</span>`).join('')}
+        </div>`;
+      itemsWithVal.slice(0,8).forEach(i=>{
+        html += `<div class="stats-bar-row">
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${i.emoji} ${i.name}</span>
+            <span class="insight-val">${i.value.toFixed(0)} ج.م</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(i.value/maxV*100).toFixed(0)}%;background:${CATS[i.cat]?.color||'var(--primary)'}"></div></div>
+        </div>`;
+      });
+      if (itemsWithVal.length>8) html+=`<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">و ${itemsWithVal.length-8} أصناف أخرى</div>`;
+      html += `</div>`;
+    }
+
+    // Overstocked
+    const overstocked = items.filter(i=>i.cur>i.par*2&&i.par>0&&!i.noReorder).sort((a,b)=>(b.cur/b.par)-(a.cur/a.par));
+    if (overstocked.length>0) {
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">⚠️ مخزون أعلى من اللازم <span style="font-size:10px;font-weight:400;color:var(--text3)">(أكثر من ضعف الثابت)</span></div>`;
+      overstocked.forEach(i=>{
+        const pct=Math.round(i.cur/i.par*100);
+        html+=`<div class="insight-row">
+          <div><div class="insight-name">${i.emoji} ${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
+          <div style="text-align:left"><div class="insight-val" style="color:#e65100">${pct}%</div><div style="font-size:10px;color:var(--text3)">من الثابت</div></div>
+        </div>`;
+      });
+      html+=`</div>`;
     }
 
     // All time top items
