@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OWH">
 <title>Our Welcome Home — سجل الغسيل</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="preconnect" href="https://sheets.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -723,7 +726,21 @@ function onAuthReady() {
   document.getElementById('newDate').valueAsDate = new Date();
   const userEl = document.getElementById('currentUserDisplay');
   if (userEl) userEl.textContent = currentUserName || '';
-  loadAllData();
+  if (loadDcCache()) {
+    // Instant render from cache, then refresh silently in the background
+    try {
+      rebuildCatalogFromColorOptions();
+      populateItemTypeDropdown();
+      renderHome();
+      renderReview();
+      renderStats();
+      renderManageList();
+    } catch(e) { console.error('cache render', e); }
+    setFreshness('stale');
+    loadAllData(true);
+  } else {
+    loadAllData();
+  }
 }
 
 // ============================================================
@@ -833,12 +850,7 @@ async function deleteItemType(idx) {
     renderManageList();
     showToast('✅ تم الحذف');
   } catch(e) {
-    // Remove locally even if sheet fails
-    delete colorOptions[item.name];
-    rebuildCatalogFromColorOptions();
-    populateItemTypeDropdown();
-    renderManageList();
-    showToast('⚠️ تم الحذف محلياً — تحقق من الشيت');
+    showToast('❌ فشل الحذف — تحقق من الإنترنت وحاول مرة أخرى');
   }
 }
 
@@ -852,10 +864,7 @@ async function deleteColor(itemIdx, color) {
     renderManageList();
     showToast(`✅ تم حذف ${color}`);
   } catch(e) {
-    colorOptions[item.name] = (colorOptions[item.name] || []).filter(c => c !== color);
-    rebuildCatalogFromColorOptions();
-    renderManageList();
-    showToast('⚠️ تم الحذف محلياً');
+    showToast('❌ فشل الحذف — تحقق من الإنترنت وحاول مرة أخرى');
   }
 }
 
@@ -894,6 +903,73 @@ async function confirmAddColor() {
 // ============================================================
 // DATA LOADING
 // ============================================================
+// ---- Local cache (stale-while-revalidate) + freshness indicator ----
+const DC_CACHE_KEY = 'owh_dc_cache_v1';
+let lastSyncTs = 0;
+
+function saveDcCache() {
+  try {
+    localStorage.setItem(DC_CACHE_KEY, JSON.stringify({ itemPrices, colorOptions, allSubmissions, allItems, ts: lastSyncTs }));
+  } catch(e) { console.error('saveDcCache', e); }
+}
+
+function loadDcCache() {
+  try {
+    const raw = localStorage.getItem(DC_CACHE_KEY);
+    if (!raw) return false;
+    const c = JSON.parse(raw);
+    if (!c.allSubmissions) return false;
+    itemPrices     = c.itemPrices     || {};
+    colorOptions   = c.colorOptions   || {};
+    allSubmissions = c.allSubmissions || [];
+    allItems       = c.allItems       || [];
+    lastSyncTs     = c.ts || 0;
+    return true;
+  } catch(e) { console.error('loadDcCache', e); return false; }
+}
+
+// states: 'live' | 'stale' | 'offline'
+function setFreshness(state) {
+  let el = document.getElementById('freshness-bar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'freshness-bar';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;text-align:center;font-size:11px;font-family:Cairo,sans-serif;padding:2px 8px;transition:all .3s;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  if (state === 'live') {
+    el.textContent = '';
+    el.style.display = 'none';
+  } else if (state === 'stale') {
+    el.style.display = 'block';
+    el.style.background = 'rgba(0,0,0,0.55)';
+    el.style.color = '#fff';
+    el.textContent = '⏳ جاري التحديث... (آخر تحديث ' + agoText(lastSyncTs) + ')';
+  } else if (state === 'offline') {
+    el.style.display = 'block';
+    el.style.background = '#e67e22';
+    el.style.color = '#fff';
+    el.textContent = '⚠️ غير متزامن — آخر تحديث ' + agoText(lastSyncTs);
+  }
+}
+
+function agoText(ts) {
+  if (!ts) return '—';
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1)   return 'الآن';
+  if (m < 60)  return 'منذ ' + m + ' دقيقة';
+  const h = Math.round(m / 60);
+  if (h < 24)  return 'منذ ' + h + ' ساعة';
+  return 'منذ ' + Math.round(h / 24) + ' يوم';
+}
+
+// Re-sync when the user returns to the tab (if data is older than 60s)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentUser && Date.now() - lastSyncTs > 60000) {
+    loadAllData(true);
+  }
+});
+
 async function fetchSheet(range) {
   const url = `${BASE_URL}/${encodeURIComponent(range)}?key=${API_KEY}`;
   const res = await fetch(url);
@@ -902,14 +978,15 @@ async function fetchSheet(range) {
   return data.values || [];
 }
 
-async function loadAllData() {
+async function loadAllData(silent = false) {
   try {
     // Fetch all 4 ranges in ONE request using batchGet
+    // Ranges are open-ended (no row cap) so data is never silently cut off as sheets grow
     const ranges = [
-      'ItemPrices!A2:B20',
-      'ColorOptions!A2:B200',
-      'Submissions!A2:F500',
-      'Items!A2:J2000'
+      'ItemPrices!A2:B',
+      'ColorOptions!A2:B',
+      'Submissions!A2:F',
+      'Items!A2:J'
     ];
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?key=${API_KEY}&` +
       ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
@@ -954,9 +1031,13 @@ async function loadAllData() {
     renderReview();
     renderStats();
     renderManageList();
-    showToast('✅ تم تحديث البيانات');
+    lastSyncTs = Date.now();
+    saveDcCache();
+    setFreshness('live');
+    if (!silent) showToast('✅ تم تحديث البيانات');
   } catch(e) {
-    showToast('❌ خطأ في تحميل البيانات');
+    setFreshness('offline');
+    if (!silent) showToast('❌ خطأ في تحميل البيانات');
     console.error(e);
   }
 }
@@ -965,6 +1046,7 @@ async function loadAllData() {
 // HOME PAGE
 // ============================================================
 function renderHome() {
+  try { if (allSubmissions.length > 0 || allItems.length > 0) saveDcCache(); } catch(e) {}
   const container = document.getElementById('homeContent');
   const sent = allSubmissions.filter(s => (s.status||'sent') === 'sent' || !s.status);
   const now = new Date();
@@ -1191,22 +1273,35 @@ async function saveEdit() {
     const subIdx = allSubmissions.findIndex(s => s.id === editSubId);
     const ts = newDate + ' 12:00';
 
-    // Update submission row: apt, timestamp, submitter, status
-    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:2, value: newApt });
-    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:3, value: ts });
-    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:5, value: newSubmitter });
-    await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:6, value: newStatus });
-
-    // Delete all old items for this submission then re-append
-    await callScript({ action:'delete_submission_items', submissionId: editSubId });
-
-    // Recalculate totals and append new items
+    // Recalculate totals and build new item rows
     const itemRows = editItems.map(item => {
       const total = (item.qty||1) * (item.unitPrice||0);
       return [item.itemId||generateId(), editSubId, ts, item.type, item.color, item.qty, item.unitPrice, total, item.status||'sent', ''];
     });
-    if (itemRows.length > 0) {
-      await callScript({ action:'append', sheet:'Items', rows: itemRows });
+
+    // FAST PATH: one atomic Apps Script call (requires 'update_submission_full'
+    // action in Apps Script). Falls back to the old multi-call path if not deployed yet.
+    let batched = false;
+    try {
+      const r = await callScript({
+        action: 'update_submission_full',
+        submissionId: editSubId,
+        apt: newApt, timestamp: ts, submitter: newSubmitter, status: newStatus,
+        itemRows
+      });
+      if (r && r.ok) batched = true;
+    } catch(e) { /* fall through to legacy path */ }
+
+    if (!batched) {
+      // LEGACY PATH: sequential calls (slower, kept for compatibility)
+      await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:2, value: newApt });
+      await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:3, value: ts });
+      await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:5, value: newSubmitter });
+      await callScript({ action:'update_by_id', sheet:'Submissions', id: editSubId, col:6, value: newStatus });
+      await callScript({ action:'delete_submission_items', submissionId: editSubId });
+      if (itemRows.length > 0) {
+        await callScript({ action:'append', sheet:'Items', rows: itemRows });
+      }
     }
 
     // Update local state
@@ -1254,17 +1349,32 @@ async function confirmDelete() {
 
   showToast('⏳ جاري الحذف...');
   try {
-    const rowNum = subIdx + 2;
-    await callScript({ action: 'delete_submission', rowNum });
+    // FAST/SAFE PATH: delete by ID (requires 'delete_submission_by_id' in Apps Script).
+    // Deleting by row number is dangerous — if another user added/removed a row since
+    // our last sync, the wrong submission gets deleted.
+    let deleted = false;
+    try {
+      const r = await callScript({ action: 'delete_submission_by_id', submissionId: idToDelete });
+      if (r && r.ok) deleted = true;
+    } catch(e) { /* fall through to legacy path */ }
+
+    if (!deleted) {
+      // LEGACY PATH: row-number delete (only safe if data is fresh)
+      const rowNum = subIdx + 2;
+      await callScript({ action: 'delete_submission', rowNum });
+    }
+    // Remove the submission's items from the sheet too (orphan cleanup)
+    try { await callScript({ action: 'delete_submission_items', submissionId: idToDelete }); } catch(e) {}
+
     allSubmissions.splice(subIdx, 1);
+    allItems = allItems.filter(i => i.submissionId !== idToDelete);
     renderHome();
     renderReview();
     showToast('✅ تم حذف الطلب');
   } catch(e) {
-    allSubmissions.splice(subIdx, 1);
-    renderHome();
-    renderReview();
-    showToast('⚠️ تم الحذف محلياً — تحقق من الشيت');
+    // Do NOT remove locally — the sheet still has it; hiding it here would
+    // desync the app from the data. Ask the user to retry instead.
+    showToast('❌ فشل الحذف — تحقق من الإنترنت وحاول مرة أخرى');
   }
   pendingDeleteId = null;
 }
