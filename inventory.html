@@ -1174,13 +1174,13 @@ function renderStats() {
   </div>`;
 
   // ── Category legend ──
-  html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">`;
+  html += `<div style="position:sticky;top:60px;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;flex-wrap:wrap;gap:6px 10px">`;
   catKeys.forEach(c => {
     html += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)">
       <div style="width:10px;height:10px;border-radius:2px;background:${CATS[c].color};flex-shrink:0"></div>${CATS[c].label}
     </div>`;
   });
-  html += `</div>`;
+  html += `</div></div>`;
 
   if (statsView === 'monthly') {
     // ── Monthly view ──
@@ -1311,7 +1311,7 @@ function renderStats() {
       html += `</div>`;
     }
 
-    // ── Order frequency this month ──
+    // ── Order frequency this month (compact) ──
     const monthOrderCount = {};
     mData.orders.forEach(o => {
       const id = String(o.itemId);
@@ -1321,31 +1321,33 @@ function renderStats() {
     const multiOrdered = Object.values(monthOrderCount).filter(o=>o.count>1).sort((a,b)=>b.count-a.count);
     const orderedIds = new Set(Object.keys(monthOrderCount));
     const notOrdered = items.filter(i => !i.noReorder && i.par > 0 && !orderedIds.has(String(i.id)));
-    if (multiOrdered.length > 0 || notOrdered.length > 0) {
-      html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">تكرار الطلبات — ${monthLabel}</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${mData.count} طلب هذا الشهر</div>`;
-      if (multiOrdered.length > 0) {
-        html += `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">طُلب أكثر من مرة</div>`;
-        multiOrdered.forEach(o => {
-          html += `<div class="insight-row">
-            <div class="insight-name">${o.name}</div>
-            <div class="insight-val">${o.count}x</div>
-          </div>`;
-        });
-      }
-      if (notOrdered.length > 0) {
-        html += `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;margin-top:12px">لم يُطلب هذا الشهر</div>`;
-        notOrdered.slice(0,10).forEach(i => {
-          html += `<div class="insight-row">
-            <div><div class="insight-name">${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
-            <div style="font-size:11px;font-weight:700;color:${i.cur<i.par?'#e53935':'var(--text3)'};">${i.cur<i.par?'ناقص':'كافي'}</div>
-          </div>`;
-        });
-        if (notOrdered.length > 10) html += `<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">و ${notOrdered.length-10} أصناف أخرى</div>`;
-      }
-      html += `</div>`;
+
+    html += `<div class="insight-card" style="margin-bottom:16px">
+      <div class="insight-title">تكرار الطلبات — ${monthLabel}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${mData.count} طلب إجمالي هذا الشهر</div>`;
+
+    if (multiOrdered.length > 0) {
+      const multiText = multiOrdered.map(o => `${o.name} (${o.count}x)`).join('، ');
+      html += `<div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">طُلب أكثر من مرة</div>
+        <div style="font-size:12px;color:var(--text1);line-height:1.6">${multiText}</div>
+      </div>`;
     }
+    if (notOrdered.length > 0) {
+      const notText = notOrdered.map(i => {
+        const flag = i.cur < i.par ? '⚠️ ' : '';
+        return `${flag}${i.ar} (${i.cur}/${i.par})`;
+      }).join('، ');
+      html += `<div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">لم يُطلب هذا الشهر</div>
+        <div style="font-size:12px;color:var(--text1);line-height:1.6">${notText}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">⚠️ = المخزون الحالي أقل من الثابت</div>
+      </div>`;
+    }
+    if (multiOrdered.length === 0 && notOrdered.length === 0) {
+      html += `<div style="font-size:12px;color:var(--text3);text-align:center;padding:10px">كل الأصناف طُلبت مرة واحدة</div>`;
+    }
+    html += `</div>`;
 
     // ── Q6: Consumption this month ──
     // Use consume events + negative adjust/par_change events (Emad's − taps)
@@ -1399,27 +1401,33 @@ function renderStats() {
       <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${pricedOrders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
     </div>`;
 
-    // Stacked bar chart by month
+    // Spending — vertical stacked bar chart (max 12 months)
     if (allMonths.length > 0) {
-      const maxM = Math.max(...allMonths.map(k=>byMonth[k].total),1);
+      const spendMonths = allMonths.slice(0,12).slice().reverse();
+      const maxM = Math.max(...spendMonths.map(k=>byMonth[k].total),1);
+      const barWS = Math.floor(Math.min(52, (320/Math.max(spendMonths.length,1))-4));
+      const totalSpendAll = spendMonths.reduce((s,k)=>s+byMonth[k].total,0);
       html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">📊 الإنفاق الشهري حسب الفئة</div>`;
-      allMonths.slice().reverse().forEach(k => {
-        const [y,m] = k.split('-');
-        const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+        <div class="insight-title">الإنفاق الشهري — ${totalSpendAll.toFixed(0)} ج.م إجمالي</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding-bottom:24px;overflow-x:auto">`;
+      spendMonths.forEach(k => {
         const mD = byMonth[k];
-        const catD = catKeys.map(c=>({cat:c,value:mD[c]||0}));
-        html += `<div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-            <span style="font-size:12px;color:var(--text2)">${label}</span>
-            <span style="font-size:12px;font-weight:700;color:var(--text1)">${mD.total.toFixed(0)} ج.م</span>
+        const totalH = Math.max((mD.total/maxM)*100,2);
+        const [y,m] = k.split('-');
+        const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'short'});
+        const segs = catKeys.filter(c=>mD[c]>0).map(c=>{
+          const h=(mD[c]/maxM)*100;
+          return `<div style="width:100%;height:${h.toFixed(1)}%;background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`;
+        }).join('');
+        html += `<div onclick="selectStatMonth('${k}');statsView='monthly';renderStats()" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;flex-shrink:0;width:${barWS}px">
+          <div style="font-size:9px;color:var(--text3);margin-bottom:2px">${mD.total.toFixed(0)}</div>
+          <div style="width:100%;height:100px;display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="width:100%;height:${totalH.toFixed(1)}%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden">${segs}</div>
           </div>
-          <div style="height:16px;border-radius:4px;overflow:hidden;display:flex;width:${(mD.total/maxM*100).toFixed(0)}%">
-            ${catKeys.filter(c=>mD[c]>0).map(c=>`<div style="flex:${mD[c]};background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`).join('')}
-          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:3px;text-align:center">${label}</div>
         </div>`;
       });
-      html += `</div>`;
+      html += `</div></div>`;
     }
 
     // Inventory value
