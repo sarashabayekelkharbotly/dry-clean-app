@@ -1791,9 +1791,29 @@ async function updateSheetCell(range, value) {
   return res.json();
 }
 async function callScript(body) {
-  const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error('Script failed');
-  return res.json();
+  return callScriptWithRetry(body, 1);
+}
+
+// Apps Script has "cold start" latency — the first call after a period of
+// inactivity can take much longer than usual, then subsequent calls are
+// fast. One silent retry with a longer timeout smooths this over instead
+// of surfacing a failure the user would just retry manually anyway.
+async function callScriptWithRetry(body, attemptsLeft, timeoutMs = 25000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body), signal: controller.signal
+    });
+    if (!res.ok) throw new Error('Script failed');
+    return await res.json();
+  } catch (e) {
+    if (attemptsLeft > 0) return callScriptWithRetry(body, attemptsLeft - 1, timeoutMs);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Close modals on overlay click
