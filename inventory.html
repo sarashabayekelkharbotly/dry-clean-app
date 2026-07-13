@@ -1069,12 +1069,13 @@ function renderStats() {
   }
 
   if (topItems.length > 0) {
-    html += `<div class="section-title" style="margin-top:14px">الأصناف الأكثر استهلاكاً</div>
+    const maxSpent = topItems[0][1] || 1;
+    html += `<div class="section-title" style="margin-top:14px">الأكثر إنفاقاً</div>
     <div class="nawaqes-card" style="padding:14px 16px">`;
-    topItems.forEach(([name,qty]) => {
+    topItems.forEach(([name, spent]) => {
       html += `<div class="stats-bar-row">
-        <div class="stats-bar-top"><span class="stats-bar-name">${name}</span><span class="stats-bar-val">${qty} وحدة</span></div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${(qty/maxQty*100).toFixed(0)}%"></div></div>
+        <div class="stats-bar-top"><span class="stats-bar-name">${name}</span><span class="stats-bar-val">${spent.toFixed(0)} ج.م</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxSpent*100).toFixed(0)}%"></div></div>
       </div>`;
     });
     html += `</div>`;
