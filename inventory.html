@@ -1009,6 +1009,23 @@ function renderOrders() {
 }
 
 let selectedStatMonth = null;
+let pricesBackfilled = false;
+
+async function backfillPrices() {
+  const btn = document.getElementById('backfill-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.disabled = true; }
+  try {
+    const res = await api('inv_backfill_prices');
+    if (res.ok) {
+      pricesBackfilled = true;
+      toast(`✅ تم تحديث أسعار ${res.updated} صنف — جاري إعادة التحميل...`);
+      await syncData();
+    }
+  } catch(e) {
+    toast('❌ خطأ في التحديث');
+    if (btn) { btn.textContent = '🔄 تحديث الأسعار'; btn.disabled = false; }
+  }
+}
 
 function renderStats() {
   const el = document.getElementById('stats-content');
@@ -1041,7 +1058,18 @@ function renderStats() {
   pillsHtml += `</div>`;
 
   // Summary cards (all time)
-  let html = `
+  // Check if any items still have no lastPrice
+  const missingPrices = items.filter(i => !i.lastPrice || i.lastPrice === 0).length;
+
+  let html = '';
+  if (missingPrices > 0 && !pricesBackfilled) {
+    html += `<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="font-size:12px;color:#8d6e00;font-family:'Cairo',sans-serif">${missingPrices} صنف بدون سعر محفوظ</div>
+      <button id="backfill-btn" onclick="backfillPrices()" style="background:#f59f00;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-family:'Cairo',sans-serif;cursor:pointer;white-space:nowrap">🔄 تحديث الأسعار</button>
+    </div>`;
+  }
+
+  html += `
   <div class="stats-grid" style="margin-bottom:16px">
     <div class="stat-card"><div class="stat-value" style="color:var(--primary)">${totalSpent.toFixed(0)} ج.م</div><div class="stat-label">إجمالي الإنفاق</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${avgMonthly.toFixed(0)} ج.م</div><div class="stat-label">متوسط شهري</div></div>
