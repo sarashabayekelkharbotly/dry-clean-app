@@ -694,7 +694,9 @@ const DEFAULT_ITEMS = [
 // STATE
 // ─────────────────────────────────────────────
 // currentUser and currentUserName set by auth
-const CATS = {
+// Fallback only — the live category definitions come from the
+// InvCategories tab in the sheet (via applyCategories on each sync)
+let CATS = {
   cleaning:  { label: 'منظفات',              emoji: '🧹', color: '#cc5f5f' },
   washing:   { label: 'غسيل ملابس وأطباق',   emoji: '🫧', color: '#5f9acc' },
   personal:  { label: 'عناية شخصية',         emoji: '🌸', color: '#cc7fb0' },
@@ -702,6 +704,36 @@ const CATS = {
   freshener: { label: 'معطرات',               emoji: '🌿', color: '#66bb6a' },
   basket:    { label: 'سلة ترحيب',            emoji: '🎁', color: '#ffa726' },
 };
+let categoriesList = [];
+
+// Rebuild CATS (labels, colors, order) and the add-item dropdown
+// from the InvCategories sheet data
+function applyCategories(list) {
+  if (!list || !list.length) return;
+  const next = {};
+  list.slice()
+    .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
+    .forEach(c => {
+      const key = String(c.key || '').trim();
+      if (key) next[key] = { label: c.label || key, emoji: c.emoji || '📦', color: c.color || '#999' };
+    });
+  // Safety net: a category still used by items but deleted/misspelled in
+  // the sheet gets a gray placeholder instead of crashing the stats page
+  items.forEach(i => {
+    const k = String(i.cat || '').trim();
+    if (k && !next[k]) next[k] = { label: k, emoji: '📦', color: '#999' };
+  });
+  if (Object.keys(next).length === 0) return;
+  CATS = next;
+  // Rebuild the add-item category dropdown
+  const sel = document.getElementById('n-cat');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = Object.keys(CATS).map(k =>
+      `<option value="${k}">${CATS[k].emoji} ${CATS[k].label}</option>`).join('');
+    if (CATS[cur]) sel.value = cur;
+  }
+}
 
 let items = [];
 let orders = [];
@@ -720,7 +752,7 @@ const CACHE_KEY = 'owh_inv_cache_v1';
 
 function saveCache() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, ts: lastSyncTs }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, categoriesList, ts: lastSyncTs }));
   } catch(e) { console.error('saveCache', e); }
 }
 
@@ -734,6 +766,8 @@ function loadCache() {
     orders    = c.orders    || [];
     events    = c.events    || [];
     snapshots = c.snapshots || {};
+    categoriesList = c.categoriesList || [];
+    applyCategories(categoriesList);
     lastSyncTs = c.ts || 0;
     return true;
   } catch(e) { console.error('loadCache', e); return false; }
@@ -860,6 +894,8 @@ async function syncData(silent = false) {
     orders = res.orders || [];
     events = res.events || [];
     if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
+    if (res.categories && res.categories.length) categoriesList = res.categories;
+    applyCategories(categoriesList);
     lastSyncTs = Date.now();
     saveCache();
     syncOk = true;
