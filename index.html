@@ -10,7 +10,6 @@
 <title>Our Welcome Home — سجل الغسيل</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="preconnect" href="https://sheets.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -677,8 +676,6 @@ function showSwitchUser() {
 // CONFIG
 // ============================================================
 const SHEET_ID   = '18053VBWoCoEqkBGJfUP2nB1nX3IGRBQ3qEDiR2sf35U';
-const API_KEY    = 'AIzaSyCHqfBKYYE2qpjmNlzgposZrHtVchEpAmo';
-const BASE_URL   = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
 
 // ============================================================
@@ -970,59 +967,17 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-async function fetchSheet(range) {
-  const url = `${BASE_URL}/${encodeURIComponent(range)}?key=${API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
-  const data = await res.json();
-  return data.values || [];
-}
-
 async function loadAllData(silent = false) {
   try {
-    // Fetch all 4 ranges in ONE request using batchGet
-    // Ranges are open-ended (no row cap) so data is never silently cut off as sheets grow
-    const ranges = [
-      'ItemPrices!A2:B',
-      'ColorOptions!A2:B',
-      'Submissions!A2:F',
-      'Items!A2:J'
-    ];
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?key=${API_KEY}&` +
-      ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('batchGet failed: ' + res.status);
-    const data = await res.json();
-    const [priceVals, colorVals, subVals, itemVals] = data.valueRanges.map(r => r.values || []);
+    // Single Apps Script call, authenticated as the script owner —
+    // works with a fully private spreadsheet, no public API key needed
+    const data = await callScript({ action: 'dc_get_all' });
+    if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
 
-    // Prices
-    itemPrices = {};
-    priceVals.forEach(r => { if(r[0]) itemPrices[r[0].trim()] = parseFloat(r[1]||0); });
-
-    // Colors
-    colorOptions = {};
-    colorVals.forEach(r => {
-      if(r[0] && r[1]) {
-        const type = r[0].trim();
-        const color = r[1].trim();
-        if(!colorOptions[type]) colorOptions[type] = [];
-        colorOptions[type].push(color);
-      }
-    });
-
-    // Submissions
-    allSubmissions = subVals.filter(r => r[0]).map(r => ({
-      id: r[0]||'', apt: r[1]||'', timestamp: r[2]||'',
-      paid: (r[3]||'') === 'paid', submittedBy: r[4]||'', status: r[5]||'sent'
-    }));
-
-    // Items
-    allItems = itemVals.filter(r => r[0]).map(r => ({
-      itemId: r[0]||'', submissionId: r[1]||'', timestamp: r[2]||'',
-      type: r[3]||'', color: r[4]||'', qty: parseFloat(r[5]||0),
-      unitPrice: parseFloat(r[6]||0), total: parseFloat(r[7]||0),
-      status: r[8]||'sent', note: r[9]||''
-    }));
+    itemPrices     = data.itemPrices || {};
+    colorOptions   = data.colorOptions || {};
+    allSubmissions = data.submissions || [];
+    allItems       = data.items || [];
 
     // Rebuild catalog now that everything is loaded
     rebuildCatalogFromColorOptions();
