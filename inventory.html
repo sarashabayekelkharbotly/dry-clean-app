@@ -703,6 +703,7 @@ const CATS = {
 
 let items = [];
 let orders = [];
+let snapshots = {}; // { 'YYYY-MM': [{itemId, itemName, qty, lastPrice}] }
 let events = [];
 let pendingOrderItems = [];
 let pendingReceiveOrderId = null;
@@ -784,6 +785,11 @@ async function syncData() {
     }
     orders = res.orders || [];
     events = res.events || [];
+    // Load snapshots for Q6
+    try {
+      const snapRes = await api('inv_get_snapshots');
+      if (snapRes.ok) snapshots = snapRes.snapshots || {};
+    } catch(e) {}
   } catch(e) {
     try {
       const r1 = await api('inv_get_items');
@@ -1099,8 +1105,10 @@ function renderStats() {
     }
     const t = orderTotal(o);
     const item = items.find(i => String(i.id)===String(o.itemId));
-    const cat = item?.cat || 'cleaning';
-    const mappedCat = catKeys.includes(cat) ? cat : 'cleaning';
+    const rawCat = item?.cat || 'cleaning';
+    // Map old category keys to new ones
+    const catAlias = { snacks: 'basket' };
+    const mappedCat = catAlias[rawCat] || (catKeys.includes(rawCat) ? rawCat : 'cleaning');
     byMonth[k].total += t;
     byMonth[k][mappedCat] = (byMonth[k][mappedCat]||0) + t;
     byMonth[k].count++;
@@ -1180,8 +1188,13 @@ function renderStats() {
       <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${avgMonthly.toFixed(0)}<span style="font-size:10px"> ج.م</span></div><div class="stat-label">المتوسط الشهري</div></div>
     </div>`;
 
-    // Category breakdown this month
-    const catData = catKeys.map(c=>({cat:c, value:mData[c]||0})).filter(d=>d.value>0).sort((a,b)=>b.value-a.value);
+    // Category breakdown this month — recalculate using resolvedCat
+    const catTotals = {};
+    mData.orders.forEach(o => {
+      const c = o.resolvedCat || 'cleaning';
+      catTotals[c] = (catTotals[c]||0) + orderTotal(o);
+    });
+    const catData = catKeys.map(c=>({cat:c, value:catTotals[c]||0})).filter(d=>d.value>0).sort((a,b)=>b.value-a.value);
     if (catData.length > 0) {
       const maxCat = catData[0].value;
       html += `<div class="insight-card" style="margin-bottom:16px">
@@ -1220,27 +1233,53 @@ function renderStats() {
       html += `</div>`;
     }
 
-    // Price changes vs prev month
-    if (prevKey && byMonth[prevKey]) {
-      const prevOrds = byMonth[prevKey].orders;
-      const changes = [];
-      mData.orders.forEach(o => {
-        const prev = prevOrds.find(p=>String(p.itemId)===String(o.itemId)&&p.unitPrice>0);
-        if (prev && o.unitPrice>0 && Math.abs(o.unitPrice-prev.unitPrice)>0.01) {
-          changes.push({name:o.itemName, cur:o.unitPrice, prev:prev.unitPrice, diff:o.unitPrice-prev.unitPrice});
-        }
-      });
-      if (changes.length > 0) {
-        html += `<div class="insight-card" style="margin-bottom:16px">
-          <div class="insight-title">📈 تغيرات الأسعار عن الشهر السابق</div>`;
-        changes.forEach(p => {
-          html += `<div class="insight-row">
-            <div><div class="insight-name">${p.name}</div><div class="insight-sub">${p.prev.toFixed(2)} ← ${p.cur.toFixed(2)} ج.م للوحدة</div></div>
-            <div style="font-size:12px;font-weight:700;color:${p.diff>0?'#e53935':'#43a047'}">${p.diff>0?'▲':'▼'} ${Math.abs(p.diff).toFixed(2)}</div>
-          </div>`;
-        });
-        html += `</div>`;
+    // ── Q5: Price changes — compare most recent price before vs during selected month ──
+    // Build full price history per item across all orders (sorted by date)
+    const priceHistory = {}; // itemId -> [{date, price, name}]
+    pricedOrders.forEach(o => {
+      const date = (o.receivedAt||o.orderedAt||'').slice(0,10);
+      if (!date || !o.unitPrice) return;
+      const id = String(o.itemId);
+      if (!priceHistory[id]) priceHistory[id] = [];
+      priceHistory[id].push({ date, price: o.unitPrice, name: o.itemName });
+    });
+    // Sort each item's history by date
+    Object.values(priceHistory).forEach(h => h.sort((a,b)=>a.date.localeCompare(b.date)));
+
+    // For selected month: find latest price IN this month, and latest price BEFORE this month
+    const monthStart = selectedStatMonth + '-01';
+    const monthEnd   = selectedStatMonth + '-31';
+    const changes = [];
+    // Only check items that were ordered THIS month
+    const orderedThisMonth = new Set(mData.orders.filter(o=>o.unitPrice>0).map(o=>String(o.itemId)));
+    orderedThisMonth.forEach(id => {
+      const history = priceHistory[id];
+      if (!history || history.length < 1) return;
+      // Latest price in selected month
+      const inMonth = history.filter(h => h.date >= monthStart && h.date <= monthEnd);
+      if (inMonth.length === 0) return;
+      const curPrice = inMonth[inMonth.length-1].price;
+      const itemName = inMonth[inMonth.length-1].name;
+      // Latest price strictly before selected month
+      const before = history.filter(h => h.date < monthStart);
+      if (before.length === 0) return; // no prior price to compare
+      const prevPrice = before[before.length-1].price;
+      if (Math.abs(curPrice - prevPrice) > 0.01) {
+        changes.push({ name: itemName, cur: curPrice, prev: prevPrice, diff: curPrice - prevPrice });
       }
+    });
+
+    if (changes.length > 0) {
+      changes.sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">📈 تغيرات الأسعار عن آخر طلب</div>`;
+      changes.forEach(p => {
+        html += `<div class="insight-row">
+          <div><div class="insight-name">${p.name}</div><div class="insight-sub">كان ${p.prev.toFixed(2)} ← أصبح ${p.cur.toFixed(2)} ج.م للوحدة</div></div>
+          <div style="font-size:12px;font-weight:700;color:${p.diff>0?'#e53935':'#43a047'}">${p.diff>0?'▲':'▼'} ${Math.abs(p.diff).toFixed(2)} ج.م</div>
+        </div>`;
+      });
+      html += `</div>`;
     }
 
   } else {
@@ -1285,7 +1324,11 @@ function renderStats() {
       const maxV = itemsWithVal[0]?.value||1;
       // Cat totals for inventory
       const invByCat = {};
-      itemsWithVal.forEach(i=>{ invByCat[i.cat]=(invByCat[i.cat]||0)+i.value; });
+      const catAlias2 = { snacks: 'basket' };
+      itemsWithVal.forEach(i=>{ 
+        const c = catAlias2[i.cat]||(catKeys.includes(i.cat)?i.cat:'cleaning');
+        invByCat[c]=(invByCat[c]||0)+i.value; 
+      });
       html += `<div class="insight-card" style="margin-bottom:16px">
         <div class="insight-title">📦 قيمة المخزون الحالي — ${invValue.toFixed(0)} ج.م</div>
         <div style="height:20px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px">
@@ -1326,10 +1369,12 @@ function renderStats() {
     if (topItems.length>0) {
       const maxS=topItems[0][1]||1;
       html+=`<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">💰 الأكثر إنفاقاً (كل الأوقات)</div>`;
+        <div class="insight-title">🏷️ الأصناف الأكثر تكلفة (كل الأوقات)</div>`;
       topItems.forEach(([name,spent])=>{
         const item=items.find(i=>i.ar===name);
-        const cat=item?.cat||'cleaning';
+        const rawCat2=item?.cat||'cleaning';
+        const catAlias3={snacks:'basket'};
+        const cat=catAlias3[rawCat2]||(catKeys.includes(rawCat2)?rawCat2:'cleaning');
         html+=`<div class="stats-bar-row">
           <div class="stats-bar-top"><span class="stats-bar-name">${item?.emoji||''} ${name}</span><span class="insight-val">${spent.toFixed(0)} ج.م</span></div>
           <div class="bar-wrap"><div class="bar-fill" style="width:${(spent/maxS*100).toFixed(0)}%;background:${CATS[cat]?.color||'var(--primary)'}"></div></div>
