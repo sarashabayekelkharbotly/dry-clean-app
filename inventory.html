@@ -1631,7 +1631,84 @@ function renderStats() {
       });
       html += `</div></div>`;
 
-      // Top consumed items all time by value
+      // ── الفجوة: spending vs consumption gap analysis ──
+      // Both sides are in ج.م (spending = money paid; consumption = qty × historical price),
+      // so the difference is directly meaningful. Shown as paired bars per month plus a
+      // plain-language read of what the gap direction means.
+      {
+        const gapMonths = Array.from(new Set([
+          ...Object.keys(byMonth),
+          ...Object.keys(consumeByMonth)
+        ])).sort((a,b)=>a.localeCompare(b)).slice(-12);
+
+        if (gapMonths.length > 0) {
+          const spentArr = gapMonths.map(k => (byMonth[k]?.total) || 0);
+          const consArr  = gapMonths.map(k => (consumeByMonth[k]?.total) || 0);
+          const maxPair  = Math.max(...spentArr, ...consArr, 1);
+          const totalSpentG = spentArr.reduce((s,v)=>s+v,0);
+          const totalConsG  = consArr.reduce((s,v)=>s+v,0);
+          const netGap = totalSpentG - totalConsG;
+          const chartHG = 150;
+          const colSpend = 'var(--primary)';
+          const colCons  = 'var(--ok)';
+
+          // Headline: net gap card
+          const gapAbs = Math.abs(netGap).toFixed(0);
+          const gapDir = netGap > 0
+            ? { txt: 'اشتريت أكثر مما استهلكت', hint: 'المخزون يزيد — تخزين أو شراء مبكر', col: 'var(--warn)' }
+            : netGap < 0
+            ? { txt: 'استهلكت أكثر مما اشتريت', hint: 'تسحب من مخزون سابق', col: 'var(--ok)' }
+            : { txt: 'الشراء والاستهلاك متوازنان', hint: '', col: 'var(--text2)' };
+
+          html += `<div class="insight-card" style="margin-bottom:16px">
+            <div class="insight-title">⚖️ الفجوة بين الشراء والاستهلاك</div>
+            <div style="display:flex;gap:8px;margin-bottom:14px">
+              <div style="flex:1;text-align:center;padding:8px;border-radius:10px;background:rgba(204,95,95,0.08)">
+                <div style="font-size:18px;font-weight:900;color:${colSpend}">${totalSpentG.toFixed(0)}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">🛒 اشتريت</div>
+              </div>
+              <div style="flex:1;text-align:center;padding:8px;border-radius:10px;background:rgba(92,170,127,0.10)">
+                <div style="font-size:18px;font-weight:900;color:${colCons}">${totalConsG.toFixed(0)}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">📉 استهلكت</div>
+              </div>
+              <div style="flex:1;text-align:center;padding:8px;border-radius:10px;background:var(--bg)">
+                <div style="font-size:18px;font-weight:900;color:${gapDir.col}">${netGap>0?'+':''}${netGap.toFixed(0)}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">الفرق</div>
+              </div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:${gapDir.col};text-align:center;margin-bottom:2px">${gapDir.txt}</div>
+            ${gapDir.hint ? `<div style="font-size:10px;color:var(--text3);text-align:center;margin-bottom:14px">${gapDir.hint}</div>` : '<div style="margin-bottom:14px"></div>'}`;
+
+          // Paired bars per month — spending (left) vs consumption (right)
+          html += `<div style="display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding-bottom:8px">`;
+          gapMonths.forEach((k,idx) => {
+            const sp = spentArr[idx], co = consArr[idx];
+            const spPx = Math.max((sp/maxPair)*chartHG, sp>0?3:0);
+            const coPx = Math.max((co/maxPair)*chartHG, co>0?3:0);
+            const [y,m] = k.split('-');
+            const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'short'});
+            const mGap = sp - co;
+            html += `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:56px">
+              <div style="font-size:9px;color:${mGap>0?'var(--warn)':'var(--ok)'};font-weight:700;margin-bottom:3px">${mGap>0?'+':''}${mGap.toFixed(0)}</div>
+              <div style="display:flex;align-items:flex-end;gap:4px;height:${chartHG}px">
+                <div style="width:20px;height:${spPx.toFixed(1)}px;background:${colSpend};border-radius:3px 3px 0 0" title="اشتريت: ${sp.toFixed(0)} ج.م"></div>
+                <div style="width:20px;height:${coPx.toFixed(1)}px;background:${colCons};border-radius:3px 3px 0 0" title="استهلكت: ${co.toFixed(0)} ج.م"></div>
+              </div>
+              <div style="font-size:11px;color:var(--text2);margin-top:6px;font-weight:600">${label}</div>
+            </div>`;
+          });
+          html += `</div>`;
+
+          // Inline legend so it's readable without scrolling up
+          html += `<div style="display:flex;justify-content:center;gap:16px;margin-top:8px;font-size:11px;color:var(--text2)">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${colSpend};vertical-align:middle;margin-left:4px"></span>اشتريت</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${colCons};vertical-align:middle;margin-left:4px"></span>استهلكت</span>
+          </div>`;
+
+          html += `</div>`;
+        }
+      }
+
       const consumeByItem = {};
       allConsumeEvents.forEach(e => {
         const id = String(e.itemId);
