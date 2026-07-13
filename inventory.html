@@ -1272,11 +1272,80 @@ function renderStats() {
     if (changes.length > 0) {
       changes.sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
       html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">📈 تغيرات الأسعار عن آخر طلب</div>`;
+        <div class="insight-title">تغيرات الأسعار عن آخر طلب</div>`;
       changes.forEach(p => {
         html += `<div class="insight-row">
           <div><div class="insight-name">${p.name}</div><div class="insight-sub">كان ${p.prev.toFixed(2)} ← أصبح ${p.cur.toFixed(2)} ج.م للوحدة</div></div>
           <div style="font-size:12px;font-weight:700;color:${p.diff>0?'#e53935':'#43a047'}">${p.diff>0?'▲':'▼'} ${Math.abs(p.diff).toFixed(2)} ج.م</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // ── Q6: Consumption this month ──
+    // Build price-at-time lookup: for each item, find the most recent order price before a given date
+    const ordersByItem = {}; // itemId -> [{date, price}] sorted oldest first
+    orders.filter(o => o.unitPrice > 0).forEach(o => {
+      const id = String(o.itemId);
+      const date = (o.receivedAt||o.orderedAt||'').slice(0,10);
+      if (!date) return;
+      if (!ordersByItem[id]) ordersByItem[id] = [];
+      ordersByItem[id].push({ date, price: o.unitPrice });
+    });
+    Object.values(ordersByItem).forEach(h => h.sort((a,b) => a.date.localeCompare(b.date)));
+
+    function getPriceAtDate(itemId, date) {
+      const history = ordersByItem[String(itemId)] || [];
+      // Find most recent order on or before this date
+      let price = 0;
+      for (const h of history) {
+        if (h.date <= date) price = h.price;
+        else break;
+      }
+      // Fallback to lastPrice if no order history before this date
+      if (!price) {
+        const item = items.find(i => String(i.id) === String(itemId));
+        price = item?.lastPrice || 0;
+      }
+      return price;
+    }
+
+    // Use consume events + negative adjust/par_change events (Emad's − taps)
+    const consumeEvents = events.filter(e => {
+      if (!e.timestamp || !e.timestamp.startsWith(selectedStatMonth)) return false;
+      return e.type === 'consume' ||
+             (e.type === 'adjust' && (e.qty||0) < 0) ||
+             (e.type === 'par_change' && (e.qty||0) < 0);
+    });
+    if (consumeEvents.length > 0) {
+      const consumed = {};
+      consumeEvents.forEach(e => {
+        const id = String(e.itemId);
+        const eventDate = (e.timestamp||'').slice(0,10);
+        const priceAtTime = getPriceAtDate(id, eventDate);
+        const qty = Math.abs(e.qty || 0);
+        if (!consumed[id]) {
+          const item = items.find(i => String(i.id) === id);
+          consumed[id] = { name: e.itemName || item?.ar || '', emoji: item?.emoji || '', qty: 0, value: 0, cat: item?.cat || 'cleaning' };
+        }
+        consumed[id].qty += qty;
+        consumed[id].value += qty * priceAtTime;
+      });
+      const consumptionList = Object.values(consumed).sort((a,b) => b.value - a.value);
+      const totalConsumedVal = consumptionList.reduce((s,c) => s + c.value, 0);
+      const maxC = Math.max(...consumptionList.map(c => c.value || c.qty), 1);
+      const catAlias5 = { snacks: 'basket' };
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">الاستهلاك هذا الشهر${totalConsumedVal > 0 ? ' — ' + totalConsumedVal.toFixed(0) + ' ج.م' : ''}</div>`;
+      consumptionList.forEach(c => {
+        const cat = catAlias5[c.cat] || (catKeys.includes(c.cat) ? c.cat : 'cleaning');
+        const barVal = c.value > 0 ? c.value : c.qty;
+        html += `<div class="stats-bar-row">
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${c.name} <span style="font-size:10px;color:var(--text3)">${c.qty} وحدة</span></span>
+            <span class="insight-val">${c.value > 0 ? c.value.toFixed(0) + ' ج.م' : ''}</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(barVal/maxC*100).toFixed(0)}%;background:${CATS[cat]?.color||'var(--primary)'}"></div></div>
         </div>`;
       });
       html += `</div>`;
@@ -1429,12 +1498,18 @@ async function adjCur(id, delta) {
   if (!it) return;
 
   if (delta < 0) {
-    // Open consume modal for proper logging
-    pendingConsumeItemId = id;
-    document.getElementById('consume-title').textContent = `استهلاك — ${it.ar}`;
-    document.getElementById('consume-qty').value = 1;
-    document.getElementById('consume-note').value = '';
-    openModal('consume-modal');
+    // Directly reduce stock and log consume event (no modal needed)
+    const qty = Math.abs(delta);
+    it.cur = Math.max(0, it.cur + delta);
+    updateCardUI(it);
+    renderSummary(); renderNawaqes();
+    const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'consume', qty, user:currentUserName, timestamp:new Date().toISOString(), note:'', curAfter:it.cur };
+    events.unshift(ev);
+    try {
+      await api('inv_update_cur', { itemId: it.id, cur: it.cur });
+      await api('inv_log_event', { event: ev });
+    } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+    toast(`✓ ${it.ar} — ${it.cur}`);
     return;
   }
 
