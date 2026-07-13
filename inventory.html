@@ -1010,50 +1010,58 @@ function renderOrders() {
 
 function renderStats() {
   const el = document.getElementById('stats-content');
-  if (events.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">لا توجد بيانات بعد — ستظهر الإحصائيات مع الاستخدام</div></div>`;
-    return;
-  }
 
-  // Monthly consumption totals
+  // Orders with prices
+  const pricedOrders = orders.filter(o => o.unitPrice > 0);
+  const totalSpent   = pricedOrders.reduce((s,o) => s + (o.total || o.unitPrice * o.qtyRequested), 0);
+
+  // This month spending
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const thisMonthOrders = pricedOrders.filter(o => o.orderedAt && o.orderedAt.startsWith(thisMonth));
+  const thisMonthSpent = thisMonthOrders.reduce((s,o) => s + (o.total || o.unitPrice * o.qtyRequested), 0);
+
+  // Monthly spending
   const byMonth = {};
-  events.filter(e => e.type === 'consume').forEach(e => {
-    const d = new Date(e.timestamp);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    byMonth[key] = (byMonth[key] || 0) + e.qty;
+  pricedOrders.forEach(o => {
+    const key = o.orderedAt ? o.orderedAt.slice(0,7) : null;
+    if (!key) return;
+    byMonth[key] = (byMonth[key] || 0) + (o.total || o.unitPrice * o.qtyRequested);
   });
   const months = Object.entries(byMonth).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6);
 
-  // Top consumed items
+  // Spending by category
+  const byCat = { cleaning: 0, snacks: 0 };
+  pricedOrders.forEach(o => {
+    const item = items.find(i => String(i.id) === String(o.itemId));
+    const cat = item ? item.cat : 'cleaning';
+    byCat[cat] = (byCat[cat]||0) + (o.total || o.unitPrice * o.qtyRequested);
+  });
+
+  // Spending by item
   const byItem = {};
-  events.filter(e => e.type === 'consume').forEach(e => {
-    byItem[e.itemName] = (byItem[e.itemName]||0) + e.qty;
+  pricedOrders.forEach(o => {
+    byItem[o.itemName] = (byItem[o.itemName]||0) + (o.total || o.unitPrice * o.qtyRequested);
   });
   const topItems = Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxQty = topItems[0]?.[1] || 1;
-
-  // Top purchased
-  const byPurch = {};
-  events.filter(e => e.type === 'purchase').forEach(e => {
-    byPurch[e.itemName] = (byPurch[e.itemName]||0) + e.qty;
-  });
 
   let html = `
   <div class="stats-grid" style="margin-bottom:16px">
-    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${events.filter(e=>e.type==='consume').length}</div><div class="stat-label">عمليات استهلاك</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${events.filter(e=>e.type==='purchase').length}</div><div class="stat-label">عمليات شراء</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${orders.filter(o=>o.status==='received').length}</div><div class="stat-label">طلبات مكتملة</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--primary)">${thisMonthSpent.toFixed(0)} ج.م</div><div class="stat-label">إنفاق هذا الشهر</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--text2)">${totalSpent.toFixed(0)} ج.م</div><div class="stat-label">إجمالي الإنفاق</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${byCat.cleaning.toFixed(0)} ج.م</div><div class="stat-label">مستلزمات</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${byCat.snacks.toFixed(0)} ج.م</div><div class="stat-label">سلة ترحيب</div></div>
   </div>`;
 
   if (months.length > 0) {
-    html += `<div class="section-title">الاستهلاك الشهري</div>
+    html += `<div class="section-title">الإنفاق الشهري</div>
     <div class="nawaqes-card" style="padding:14px 16px">`;
     const maxM = Math.max(...months.map(m=>m[1]),1);
     months.forEach(([k,v]) => {
       const [y,m] = k.split('-');
-      const label = new Date(y,m-1,1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+      const label = new Date(y, parseInt(m)-1, 1).toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
       html += `<div class="stats-bar-row">
-        <div class="stats-bar-top"><span class="stats-bar-name">${label}</span><span class="stats-bar-val">${v} وحدة</span></div>
+        <div class="stats-bar-top"><span class="stats-bar-name">${label}</span><span class="stats-bar-val">${v.toFixed(0)} ج.م</span></div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${(v/maxM*100).toFixed(0)}%"></div></div>
       </div>`;
     });
@@ -1187,16 +1195,23 @@ function openOrderModal() {
   needOrder.forEach(it => {
     const g = gap(it);
     html += `
-    <div style="display:flex;align-items:center;padding:12px 4px;border-bottom:1px solid var(--border);gap:12px">
-      <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0">${it.emoji}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:700">${it.ar}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">ينقص ${g} — حالي ${it.cur} / ثابت ${it.par}</div>
+    <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0">${it.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700">${it.ar}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">ينقص ${g} — حالي ${it.cur} / ثابت ${it.par}</div>
+        </div>
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+          <button class="qty-btn" onclick="orderQtyAdj(${it.id},-1)">−</button>
+          <span id="oq-${it.id}" style="min-width:32px;text-align:center;font-size:15px;font-weight:900;color:var(--primary)">${g}</span>
+          <button class="qty-btn" onclick="orderQtyAdj(${it.id},+1)">＋</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
-        <button class="qty-btn" onclick="orderQtyAdj(${it.id},-1)">−</button>
-        <span id="oq-${it.id}" style="min-width:32px;text-align:center;font-size:15px;font-weight:900;color:var(--primary)">${g}</span>
-        <button class="qty-btn" onclick="orderQtyAdj(${it.id},+1)">＋</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-right:48px">
+        <div style="font-size:11px;color:var(--text3);flex-shrink:0">سعر الوحدة (ج.م)</div>
+        <input type="number" id="op-${it.id}" value="${it.lastPrice||0}" min="0" step="0.5"
+          style="width:80px;border:1.5px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;font-family:'Cairo',sans-serif;text-align:center">
       </div>
     </div>`;
   });
@@ -1226,13 +1241,20 @@ async function confirmOrder() {
   for (const it of pendingOrderItems) {
     const el = document.getElementById('oq-'+it.id);
     const qty = el ? parseInt(el.textContent) || 0 : gap(it);
-    if (qty === 0) continue; // skip items set to zero
+    if (qty === 0) continue;
+    const priceEl = document.getElementById('op-'+it.id);
+    const unitPrice = priceEl ? parseFloat(priceEl.value) || 0 : (it.lastPrice || 0);
+    const total = qty * unitPrice;
     const ord = {
       id: genId(), itemId: it.id, itemName: it.ar,
       qtyRequested: qty, qtyReceived: 0,
+      unitPrice, total,
       orderedBy: currentUserName, orderedAt: now,
       receivedBy: '', receivedAt: '', status: 'ordered'
     };
+    // Update lastPrice on item
+    const itemIdx = items.findIndex(i => String(i.id) === String(it.id));
+    if (itemIdx !== -1) items[itemIdx].lastPrice = unitPrice;
     orders.push(ord);
     newOrders.push(ord);
   }
@@ -1249,6 +1271,10 @@ async function confirmOrder() {
   try {
     for (const ord of newOrders) {
       await api('inv_add_order', { order: ord });
+      // Update lastPrice in InvItems sheet
+      if (ord.unitPrice) {
+        await api('inv_update_last_price', { itemId: ord.itemId, price: ord.unitPrice });
+      }
     }
   } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
 }
@@ -1287,6 +1313,9 @@ async function confirmReceive() {
   ord.qtyReceived = qty;
   ord.receivedBy = currentUserName;
   ord.receivedAt = now;
+  // Recalculate total based on actual qty received
+  const actualTotal = qty * (ord.unitPrice || 0);
+  ord.total = actualTotal;
 
   closeModal('receive-modal');
   renderAll();
@@ -1296,7 +1325,7 @@ async function confirmReceive() {
 
   try {
     if (it) await api('inv_update_cur', { itemId: it.id, cur: it.cur });
-    await api('inv_update_order', { orderId: ord.id, fields: { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received' } });
+    await api('inv_update_order', { orderId: ord.id, fields: { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received', total: actualTotal } });
     await api('inv_log_event', { event: ev });
   } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
   toast(`✅ تم استلام ${qty} ${ord.itemName}`);
