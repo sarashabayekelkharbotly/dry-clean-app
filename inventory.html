@@ -816,14 +816,30 @@ function agoText(ts) {
 // API
 // ─────────────────────────────────────────────
 async function api(action, extra = {}) {
+  return apiWithRetry(action, extra, 1);
+}
+
+// Apps Script has "cold start" latency — the first call after a period of
+// inactivity can take much longer than usual, then subsequent calls are
+// fast. One silent retry with a longer timeout smooths this over instead
+// of surfacing a failure the user would just retry manually anyway.
+async function apiWithRetry(action, extra, attemptsLeft, timeoutMs = 25000) {
   const body = JSON.stringify({ action, ...extra });
-  const res = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body, signal: controller.signal
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    if (attemptsLeft > 0) return apiWithRetry(action, extra, attemptsLeft - 1, timeoutMs);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -866,7 +882,9 @@ async function syncData(silent = false) {
   syncing = true;
   if (!silent) toast('⏳ جاري التزامن...');
 
-  // Safety timeout — 15s max
+  // Safety timeout — generous, since api() now retries once internally
+  // (up to ~50s worst case for a genuinely cold Apps Script start) —
+  // this is just the final backstop, not the normal-case wait time
   let done = false;
   const safetyTimer = setTimeout(() => {
     if (done) return;
@@ -877,7 +895,7 @@ async function syncData(silent = false) {
     hideSplash();
     setFreshness('offline');
     if (!silent) toast('⚠️ تعذر الاتصال');
-  }, 15000);
+  }, 55000);
 
   let syncOk = false;
   try {
