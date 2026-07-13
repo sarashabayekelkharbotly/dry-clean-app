@@ -1089,9 +1089,38 @@ function stackedBar(data, maxVal, height) {
   return `<div style="height:${height}px;border-radius:4px;overflow:hidden;display:flex;width:${(scale*100).toFixed(0)}%">${segments}</div>`;
 }
 
+// ── Shared price lookup (used in both monthly and all-time views) ──
+function buildOrderPriceHistory() {
+  const ordersByItem = {};
+  orders.filter(o => o.unitPrice > 0).forEach(o => {
+    const id = String(o.itemId);
+    const date = (o.receivedAt||o.orderedAt||'').slice(0,10);
+    if (!date) return;
+    if (!ordersByItem[id]) ordersByItem[id] = [];
+    ordersByItem[id].push({ date, price: o.unitPrice });
+  });
+  Object.values(ordersByItem).forEach(h => h.sort((a,b) => a.date.localeCompare(b.date)));
+  return ordersByItem;
+}
+
+function getPriceAtDate(ordersByItem, itemId, date) {
+  const history = ordersByItem[String(itemId)] || [];
+  let price = 0;
+  for (const h of history) {
+    if (h.date <= date) price = h.price;
+    else break;
+  }
+  if (!price) {
+    const item = items.find(i => String(i.id) === String(itemId));
+    price = item?.lastPrice || 0;
+  }
+  return price;
+}
+
 function renderStats() {
   const el = document.getElementById('stats-content');
   const pricedOrders = orders.filter(o => (o.unitPrice||0) > 0);
+  const ordersByItem = buildOrderPriceHistory();
   const catKeys = Object.keys(CATS);
 
   // Build month map
@@ -1282,34 +1311,43 @@ function renderStats() {
       html += `</div>`;
     }
 
-    // ── Q6: Consumption this month ──
-    // Build price-at-time lookup: for each item, find the most recent order price before a given date
-    const ordersByItem = {}; // itemId -> [{date, price}] sorted oldest first
-    orders.filter(o => o.unitPrice > 0).forEach(o => {
+    // ── Order frequency this month ──
+    const monthOrderCount = {};
+    mData.orders.forEach(o => {
       const id = String(o.itemId);
-      const date = (o.receivedAt||o.orderedAt||'').slice(0,10);
-      if (!date) return;
-      if (!ordersByItem[id]) ordersByItem[id] = [];
-      ordersByItem[id].push({ date, price: o.unitPrice });
+      if (!monthOrderCount[id]) monthOrderCount[id] = { name: o.itemName, count: 0 };
+      monthOrderCount[id].count++;
     });
-    Object.values(ordersByItem).forEach(h => h.sort((a,b) => a.date.localeCompare(b.date)));
-
-    function getPriceAtDate(itemId, date) {
-      const history = ordersByItem[String(itemId)] || [];
-      // Find most recent order on or before this date
-      let price = 0;
-      for (const h of history) {
-        if (h.date <= date) price = h.price;
-        else break;
+    const multiOrdered = Object.values(monthOrderCount).filter(o=>o.count>1).sort((a,b)=>b.count-a.count);
+    const orderedIds = new Set(Object.keys(monthOrderCount));
+    const notOrdered = items.filter(i => !i.noReorder && i.par > 0 && !orderedIds.has(String(i.id)));
+    if (multiOrdered.length > 0 || notOrdered.length > 0) {
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">تكرار الطلبات — ${monthLabel}</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${mData.count} طلب هذا الشهر</div>`;
+      if (multiOrdered.length > 0) {
+        html += `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">طُلب أكثر من مرة</div>`;
+        multiOrdered.forEach(o => {
+          html += `<div class="insight-row">
+            <div class="insight-name">${o.name}</div>
+            <div class="insight-val">${o.count}x</div>
+          </div>`;
+        });
       }
-      // Fallback to lastPrice if no order history before this date
-      if (!price) {
-        const item = items.find(i => String(i.id) === String(itemId));
-        price = item?.lastPrice || 0;
+      if (notOrdered.length > 0) {
+        html += `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;margin-top:12px">لم يُطلب هذا الشهر</div>`;
+        notOrdered.slice(0,10).forEach(i => {
+          html += `<div class="insight-row">
+            <div><div class="insight-name">${i.ar}</div><div class="insight-sub">حالي ${i.cur} — ثابت ${i.par}</div></div>
+            <div style="font-size:11px;font-weight:700;color:${i.cur<i.par?'#e53935':'var(--text3)'};">${i.cur<i.par?'ناقص':'كافي'}</div>
+          </div>`;
+        });
+        if (notOrdered.length > 10) html += `<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">و ${notOrdered.length-10} أصناف أخرى</div>`;
       }
-      return price;
+      html += `</div>`;
     }
 
+    // ── Q6: Consumption this month ──
     // Use consume events + negative adjust/par_change events (Emad's − taps)
     const consumeEvents = events.filter(e => {
       if (!e.timestamp || !e.timestamp.startsWith(selectedStatMonth)) return false;
@@ -1322,7 +1360,7 @@ function renderStats() {
       consumeEvents.forEach(e => {
         const id = String(e.itemId);
         const eventDate = (e.timestamp||'').slice(0,10);
-        const priceAtTime = getPriceAtDate(id, eventDate);
+        const priceAtTime = getPriceAtDate(ordersByItem, id, eventDate);
         const qty = Math.abs(e.qty || 0);
         if (!consumed[id]) {
           const item = items.find(i => String(i.id) === id);
@@ -1431,6 +1469,90 @@ function renderStats() {
       html+=`</div>`;
     }
 
+    // ── All time consumption ──
+    const allConsumeEvents = events.filter(e =>
+      e.type === 'consume' ||
+      (e.type === 'adjust' && (e.qty||0) < 0) ||
+      (e.type === 'par_change' && (e.qty||0) < 0)
+    );
+
+    if (allConsumeEvents.length > 0) {
+      // Monthly consumption trend (stacked by category)
+      const consumeByMonth = {};
+      allConsumeEvents.forEach(e => {
+        const k = (e.timestamp||'').slice(0,7);
+        if (!k) return;
+        const id = String(e.itemId);
+        const eventDate = (e.timestamp||'').slice(0,10);
+        const price = getPriceAtDate(ordersByItem, id, eventDate);
+        const qty = Math.abs(e.qty||0);
+        const value = qty * price;
+        const item = items.find(i => String(i.id) === id);
+        const rawCat = item?.cat || 'cleaning';
+        const cat = rawCat === 'snacks' ? 'basket' : (catKeys.includes(rawCat) ? rawCat : 'cleaning');
+        if (!consumeByMonth[k]) { consumeByMonth[k] = { total:0 }; catKeys.forEach(c=>consumeByMonth[k][c]=0); }
+        consumeByMonth[k].total += value;
+        consumeByMonth[k][cat] = (consumeByMonth[k][cat]||0) + value;
+      });
+
+      const consumeMonths = Object.keys(consumeByMonth).sort((a,b)=>a.localeCompare(b)).slice(-12);
+      const maxCM = Math.max(...consumeMonths.map(k=>consumeByMonth[k].total), 1);
+      const totalConsumedAllTime = consumeMonths.reduce((s,k)=>s+consumeByMonth[k].total, 0);
+      const barWC = Math.floor(Math.min(52, (320/Math.max(consumeMonths.length,1))-4));
+
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">الاستهلاك الشهري — ${totalConsumedAllTime.toFixed(0)} ج.م إجمالي</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding-bottom:24px;overflow-x:auto">`;
+      consumeMonths.forEach(k => {
+        const mD = consumeByMonth[k];
+        const totalH = Math.max((mD.total/maxCM)*100, 2);
+        const [y,m] = k.split('-');
+        const label = new Date(y,parseInt(m)-1,1).toLocaleDateString('ar-EG',{month:'short'});
+        const segs = catKeys.filter(c=>mD[c]>0).map(c=>{
+          const h=(mD[c]/maxCM)*100;
+          return `<div style="width:100%;height:${h.toFixed(1)}%;background:${CATS[c].color}" title="${CATS[c].label}: ${mD[c].toFixed(0)} ج.م"></div>`;
+        }).join('');
+        html += `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${barWC}px">
+          <div style="font-size:9px;color:var(--text3);margin-bottom:2px">${mD.total.toFixed(0)}</div>
+          <div style="width:100%;height:100px;display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="width:100%;height:${totalH.toFixed(1)}%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden">${segs}</div>
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:3px;text-align:center">${label}</div>
+        </div>`;
+      });
+      html += `</div></div>`;
+
+      // Top consumed items all time by value
+      const consumeByItem = {};
+      allConsumeEvents.forEach(e => {
+        const id = String(e.itemId);
+        const eventDate = (e.timestamp||'').slice(0,10);
+        const price = getPriceAtDate(ordersByItem, id, eventDate);
+        const qty = Math.abs(e.qty||0);
+        if (!consumeByItem[id]) {
+          const item = items.find(i=>String(i.id)===id);
+          consumeByItem[id] = { name: e.itemName||item?.ar||'', cat: item?.cat||'cleaning', qty:0, value:0 };
+        }
+        consumeByItem[id].qty += qty;
+        consumeByItem[id].value += qty * price;
+      });
+      const topConsumed = Object.values(consumeByItem).sort((a,b)=>b.value-a.value).slice(0,8);
+      const maxCV = topConsumed[0]?.value || 1;
+      html += `<div class="insight-card" style="margin-bottom:16px">
+        <div class="insight-title">الأكثر استهلاكاً (كل الأوقات)</div>`;
+      topConsumed.forEach(c => {
+        const cat = c.cat==='snacks'?'basket':(catKeys.includes(c.cat)?c.cat:'cleaning');
+        html += `<div class="stats-bar-row">
+          <div class="stats-bar-top">
+            <span class="stats-bar-name">${c.name} <span style="font-size:10px;color:var(--text3)">${c.qty} وحدة</span></span>
+            <span class="insight-val">${c.value > 0 ? c.value.toFixed(0)+' ج.م' : ''}</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${(c.value/maxCV*100).toFixed(0)}%;background:${CATS[cat]?.color||'var(--primary)'}"></div></div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
     // All time top items
     const byItem={};
     pricedOrders.forEach(o=>{byItem[o.itemName]=(byItem[o.itemName]||0)+orderTotal(o);});
@@ -1452,32 +1574,7 @@ function renderStats() {
       html+=`</div>`;
     }
 
-    // Reorder frequency
-    const reorderCount={}, reorderDates={};
-    orders.filter(o=>o.status==='received').forEach(o=>{
-      reorderCount[o.itemName]=(reorderCount[o.itemName]||0)+1;
-      if(!reorderDates[o.itemName]) reorderDates[o.itemName]=[];
-      if(o.receivedAt) reorderDates[o.itemName].push(o.receivedAt);
-    });
-    const topReorder=Object.entries(reorderCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    if (topReorder.length>0) {
-      html+=`<div class="insight-card">
-        <div class="insight-title">🔄 الأكثر تكراراً في الطلب</div>`;
-      topReorder.forEach(([name,count])=>{
-        const item=items.find(i=>i.ar===name);
-        const dates=(reorderDates[name]||[]).sort();
-        let avgDays='';
-        if(dates.length>1){
-          const days=Math.round((new Date(dates[dates.length-1])-new Date(dates[0]))/(1000*60*60*24*(count-1)));
-          if(days>0) avgDays=`كل ${days} يوم تقريباً`;
-        }
-        html+=`<div class="insight-row">
-          <div><div class="insight-name">${item?.emoji||''} ${name}</div><div class="insight-sub">${avgDays||`طُلب ${count} مرة`}</div></div>
-          <div style="text-align:left"><div class="insight-val">${count}x</div></div>
-        </div>`;
-      });
-      html+=`</div>`;
-    }
+
   }
 
   el.innerHTML = html;
