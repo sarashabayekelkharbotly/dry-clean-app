@@ -725,14 +725,15 @@ function applyCategories(list) {
   });
   if (Object.keys(next).length === 0) return;
   CATS = next;
-  // Rebuild the add-item category dropdown
-  const sel = document.getElementById('n-cat');
-  if (sel) {
+  // Rebuild both category dropdowns: add-item (n-cat) and edit-item (edit-cat)
+  ['n-cat', 'edit-cat'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
     const cur = sel.value;
     sel.innerHTML = Object.keys(CATS).map(k =>
       `<option value="${k}">${CATS[k].emoji} ${CATS[k].label}</option>`).join('');
     if (CATS[cur]) sel.value = cur;
-  }
+  });
 }
 
 let items = [];
