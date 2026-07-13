@@ -1148,7 +1148,7 @@ function renderStats() {
   html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">`;
   catKeys.forEach(c => {
     html += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)">
-      <div style="width:10px;height:10px;border-radius:2px;background:${CATS[c].color};flex-shrink:0"></div>${CATS[c].emoji} ${CATS[c].label}
+      <div style="width:10px;height:10px;border-radius:2px;background:${CATS[c].color};flex-shrink:0"></div>${CATS[c].label}
     </div>`;
   });
   html += `</div>`;
