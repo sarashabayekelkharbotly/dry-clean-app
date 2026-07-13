@@ -1709,6 +1709,109 @@ function renderStats() {
         }
       }
 
+      // ── تحليل التخزين الزائد: overstock analysis ──
+      // For each item, walk its receipts. For each received batch, sum how much
+      // was consumed in the 30 days AFTER that receipt date. If received > consumed,
+      // the shortfall is "overstocked" (bought but not used up within 30 days).
+      // Note: consumption events aren't tied to a specific order, so this compares
+      // received-vs-consumed within each 30-day window rather than true batch FIFO —
+      // the right question for spotting over-ordering, which is what we want here.
+      {
+        const OVER_WINDOW_DAYS = 30;
+        // Gather receipts per item (received orders with a real receivedAt + qty)
+        const receiptsByItem = {};
+        orders.forEach(o => {
+          if (o.status !== 'received') return;
+          const qty = o.qtyReceived || 0;
+          const date = (o.receivedAt || '').slice(0,10);
+          if (!qty || !date) return;
+          const id = String(o.itemId);
+          if (!receiptsByItem[id]) receiptsByItem[id] = [];
+          receiptsByItem[id].push({ date, qty });
+        });
+
+        // Gather consumption events per item (date + qty)
+        const consumeByItemDated = {};
+        allConsumeEvents.forEach(e => {
+          const id = String(e.itemId);
+          const date = (e.timestamp||'').slice(0,10);
+          if (!date) return;
+          if (!consumeByItemDated[id]) consumeByItemDated[id] = [];
+          consumeByItemDated[id].push({ date, qty: Math.abs(e.qty||0) });
+        });
+
+        const addDays = (dateStr, n) => {
+          const d = new Date(dateStr + 'T00:00:00');
+          d.setDate(d.getDate() + n);
+          return d.toISOString().slice(0,10);
+        };
+
+        const overstock = [];
+        Object.keys(receiptsByItem).forEach(id => {
+          const item = items.find(i => String(i.id) === id);
+          if (!item) return;
+
+          // Sort receipts oldest-first, and consumption oldest-first
+          const receipts = receiptsByItem[id].slice().sort((a,b)=>a.date.localeCompare(b.date));
+          const consEvents = (consumeByItemDated[id] || []).slice().sort((a,b)=>a.date.localeCompare(b.date));
+
+          // Allocate each consumption unit to at most ONE receipt window, so
+          // overlapping 30-day windows never count the same usage twice.
+          // A consumption counts toward a receipt only if it falls on/after
+          // that receipt and within 30 days of it (post-receipt only — usage
+          // of pre-app / older stock is never counted).
+          let totalReceived = 0, totalUsedInWindow = 0;
+          const consumed = consEvents.map(c => ({ date: c.date, remaining: c.qty }));
+
+          receipts.forEach(r => {
+            totalReceived += r.qty;
+            const windowEnd = addDays(r.date, OVER_WINDOW_DAYS);
+            consumed.forEach(c => {
+              if (c.remaining <= 0) return;
+              if (c.date >= r.date && c.date <= windowEnd) {
+                totalUsedInWindow += c.remaining;
+                c.remaining = 0; // spent — can't be claimed by a later overlapping window
+              }
+            });
+          });
+          const leftover = totalReceived - totalUsedInWindow;
+          if (leftover > 0) {
+            const price = item.lastPrice || getPriceAtDate(ordersByItem, id, '9999-99-99') || 0;
+            const rawCat = item.cat || 'cleaning';
+            const cat = ({snacks:'basket'})[rawCat] || (catKeys.includes(rawCat) ? rawCat : 'cleaning');
+            overstock.push({
+              name: item.ar || '', emoji: item.emoji || '', cat,
+              received: totalReceived, used: totalUsedInWindow,
+              leftover, value: leftover * price
+            });
+          }
+        });
+
+        overstock.sort((a,b) => b.value - a.value);
+
+        if (overstock.length > 0) {
+          const maxOV = overstock[0].value || 1;
+          const totalOverValue = overstock.reduce((s,o)=>s+o.value,0);
+          html += `<div class="insight-card" style="margin-bottom:16px">
+            <div class="insight-title">📦 تخزين زائد — اشتُري ولم يُستهلك خلال 30 يوم</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:12px">قيمة إجمالية غير مستهلكة: <span style="color:var(--warn);font-weight:700">${totalOverValue.toFixed(0)} ج.م</span></div>`;
+          overstock.forEach(o => {
+            const pct = maxOV > 0 ? (o.value/maxOV*100).toFixed(0) : 0;
+            html += `<div class="stats-bar-row">
+              <div class="stats-bar-top">
+                <span class="stats-bar-name">${o.emoji} ${o.name}
+                  <span style="font-size:10px;color:var(--text3)">استلم ${o.received} · استهلك ${o.used} · باقٍ ${o.leftover}</span>
+                </span>
+                <span class="insight-val">${o.value.toFixed(0)} ج.م</span>
+              </div>
+              <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${CATS[o.cat]?.color||'var(--warn)'}"></div></div>
+            </div>`;
+          });
+          html += `<div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">💡 يشمل فقط الأصناف التي طلبتها واستلمها عماد عبر التطبيق، ويحسب الاستهلاك من تاريخ الاستلام فقط (لا يشمل مخزوناً قديماً سابقاً). «باقٍ» = المستلم ناقص ما استُهلك خلال 30 يوم من كل استلام.</div>`;
+          html += `</div>`;
+        }
+      }
+
       const consumeByItem = {};
       allConsumeEvents.forEach(e => {
         const id = String(e.itemId);
