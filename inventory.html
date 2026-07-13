@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OWH">
 <title>Our Welcome Home — المخزون</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -709,6 +711,71 @@ let pendingOrderItems = [];
 let pendingReceiveOrderId = null;
 let pendingConsumeItemId = null;
 let syncing = false;
+let lastSyncTs = 0;
+
+// ─────────────────────────────────────────────
+// LOCAL CACHE (stale-while-revalidate)
+// ─────────────────────────────────────────────
+const CACHE_KEY = 'owh_inv_cache_v1';
+
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, ts: lastSyncTs }));
+  } catch(e) { console.error('saveCache', e); }
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const c = JSON.parse(raw);
+    if (!c.items || c.items.length === 0) return false;
+    items     = c.items;
+    orders    = c.orders    || [];
+    events    = c.events    || [];
+    snapshots = c.snapshots || {};
+    lastSyncTs = c.ts || 0;
+    return true;
+  } catch(e) { console.error('loadCache', e); return false; }
+}
+
+// ─────────────────────────────────────────────
+// FRESHNESS INDICATOR
+// ─────────────────────────────────────────────
+// states: 'live' (just synced), 'stale' (showing cache, syncing), 'offline' (sync failed)
+function setFreshness(state) {
+  let el = document.getElementById('freshness-bar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'freshness-bar';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;text-align:center;font-size:11px;font-family:Cairo,sans-serif;padding:2px 8px;transition:all .3s;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  if (state === 'live') {
+    el.textContent = '';
+    el.style.display = 'none';
+  } else if (state === 'stale') {
+    el.style.display = 'block';
+    el.style.background = 'rgba(0,0,0,0.55)';
+    el.style.color = '#fff';
+    el.textContent = '⏳ جاري التحديث... (آخر تحديث ' + agoText(lastSyncTs) + ')';
+  } else if (state === 'offline') {
+    el.style.display = 'block';
+    el.style.background = '#e67e22';
+    el.style.color = '#fff';
+    el.textContent = '⚠️ غير متزامن — آخر تحديث ' + agoText(lastSyncTs);
+  }
+}
+
+function agoText(ts) {
+  if (!ts) return '—';
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1)   return 'الآن';
+  if (m < 60)  return 'منذ ' + m + ' دقيقة';
+  const h = Math.round(m / 60);
+  if (h < 24)  return 'منذ ' + h + ' ساعة';
+  return 'منذ ' + Math.round(h / 24) + ' يوم';
+}
 
 // ─────────────────────────────────────────────
 // API
@@ -733,12 +800,13 @@ async function cancelOrder(orderId, itemId) {
   try {
     await api('inv_cancel_order', { orderId, itemId });
     orders = orders.filter(o => o.id !== orderId);
+    saveCache();
     renderAll();
     toast('✅ تم إلغاء الطلب');
   } catch(e) {
-    orders = orders.filter(o => o.id !== orderId);
-    renderAll();
-    toast('⚠️ تم الإلغاء محلياً');
+    // Do NOT apply locally — the sheet still has the order, so hiding it here
+    // would let someone re-order the same item. Ask the user to retry instead.
+    toast('❌ فشل الإلغاء — تحقق من الإنترنت وحاول مرة أخرى');
   }
 }
 
@@ -749,19 +817,19 @@ async function toggleNoReorder(itemId) {
   try {
     await api('inv_toggle_reorder', { itemId, noReorder: newVal });
     items[idx].noReorder = newVal;
+    saveCache();
     renderAll();
     toast(newVal ? '🚫 لن يظهر في النواقص' : '✅ سيظهر في النواقص مجدداً');
   } catch(e) {
-    items[idx].noReorder = newVal;
-    renderAll();
-    toast('⚠️ تم التحديث محلياً');
+    // Do NOT apply locally — sheet and app would disagree until next sync
+    toast('❌ فشل التحديث — تحقق من الإنترنت وحاول مرة أخرى');
   }
 }
 
-async function syncData() {
+async function syncData(silent = false) {
   if (syncing) return;
   syncing = true;
-  toast('⏳ جاري التزامن...');
+  if (!silent) toast('⏳ جاري التزامن...');
 
   // Safety timeout — 15s max
   let done = false;
@@ -772,11 +840,17 @@ async function syncData() {
     if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
     renderAll();
     hideSplash();
-    toast('⚠️ تعذر الاتصال');
+    setFreshness('offline');
+    if (!silent) toast('⚠️ تعذر الاتصال');
   }, 15000);
 
+  let syncOk = false;
   try {
-    const res = await api('inv_get_all');
+    // Fetch main data + snapshots IN PARALLEL (was sequential — saves a full round-trip)
+    const [res, snapRes] = await Promise.all([
+      api('inv_get_all'),
+      api('inv_get_snapshots').catch(() => null)
+    ]);
     if (res.items && res.items.length > 0) {
       items = res.items;
     } else {
@@ -785,11 +859,10 @@ async function syncData() {
     }
     orders = res.orders || [];
     events = res.events || [];
-    // Load snapshots for Q6
-    try {
-      const snapRes = await api('inv_get_snapshots');
-      if (snapRes.ok) snapshots = snapRes.snapshots || {};
-    } catch(e) {}
+    if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
+    lastSyncTs = Date.now();
+    saveCache();
+    syncOk = true;
   } catch(e) {
     try {
       const r1 = await api('inv_get_items');
@@ -803,6 +876,9 @@ async function syncData() {
       orders = r2.orders || [];
       const r3 = await api('inv_get_events', { limit: 300 });
       events = r3.events || [];
+      lastSyncTs = Date.now();
+      saveCache();
+      syncOk = true;
     } catch(e2) {
       if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
       orders = orders || [];
@@ -815,9 +891,17 @@ async function syncData() {
   clearTimeout(safetyTimer);
   renderAll();
   hideSplash();
-  toast('✅ تم التحديث');
+  setFreshness(syncOk ? 'live' : 'offline');
+  if (!silent) toast(syncOk ? '✅ تم التحديث' : '⚠️ تعذر الاتصال');
   syncing = false;
 }
+
+// Re-sync when the user returns to the tab (if data is older than 60s)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentUser && Date.now() - lastSyncTs > 60000) {
+    syncData(true);
+  }
+});
 
 function hideSplash() {
   var s = document.getElementById('splash');
@@ -854,6 +938,7 @@ function fmtDateShort(ts) {
 // RENDER ALL
 // ─────────────────────────────────────────────
 function renderAll() {
+  try { if (items.length > 0) saveCache(); } catch(e) {}
   try { renderSummary(); } catch(e) { console.error('renderSummary',e); }
   try { renderNawaqes(); } catch(e) { console.error('renderNawaqes',e); }
   try { renderList('cleaning'); } catch(e) { console.error('renderList cleaning',e); }
@@ -1948,13 +2033,21 @@ function onAuthReady() {
   const lbl = document.getElementById('user-label');
   if (lbl) lbl.textContent = displayName;
 
-  try {
-    ['nawaqes-content','list-cleaning','list-snacks','orders-content','stats-content'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
-    });
-  } catch(e) { console.error('init loading state',e); }
-  syncData();
+  if (loadCache()) {
+    // Instant load from cache, then refresh silently in the background
+    hideSplash();
+    renderAll();
+    setFreshness('stale');
+    syncData(true);
+  } else {
+    try {
+      ['nawaqes-content','list-cleaning','list-snacks','orders-content','stats-content'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+      });
+    } catch(e) { console.error('init loading state',e); }
+    syncData();
+  }
 }
 </script>
 </body>
