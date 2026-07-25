@@ -591,12 +591,63 @@ let currentUser     = null;
 let currentUserName = null;
 let currentUserRole = null;
 
+/* ============================================================
+   SESSION TOKEN ON EVERY BACKEND CALL — installed once, here.
+   The backend now refuses every action without a valid session. Rather than edit each
+   call site (callScript, callScriptWithRetry, appendToSheet, updateSheetCell) and risk
+   missing one — or a future one being added without it — this wraps fetch: any POST to
+   the script URL gets the token merged into its JSON body, and an 'AUTH' reply returns
+   the user to the sign-in screen.
+   ============================================================ */
+function owhSid() {
+  try { const s = JSON.parse(localStorage.getItem('owh_session') || 'null'); return (s && s.sid) ? s.sid : ''; }
+  catch (e) { return ''; }
+}
+(function () {
+  const _fetch = window.fetch.bind(window);
+  window.fetch = function (url, opts) {
+    let o = opts;
+    if (typeof url === 'string' && url.indexOf(SCRIPT_URL_AUTH) === 0 && o && typeof o.body === 'string') {
+      try {
+        const b = JSON.parse(o.body);
+        if (b && b.action && b.action !== 'auth_login' && !b.sid) {   // auth_login must work without one
+          const sid = owhSid();
+          if (sid) { b.sid = sid; o = Object.assign({}, o, { body: JSON.stringify(b) }); }
+        }
+      } catch (e) { /* not JSON — leave the request untouched */ }
+    }
+    return _fetch(url, o).then(function (res) {
+      if (typeof url === 'string' && url.indexOf(SCRIPT_URL_AUTH) === 0) {
+        res.clone().json().then(function (j) {          // peek at a clone; caller still reads the body
+          if (j && j.ok === false && j.code === 'AUTH') owhSessionExpired();
+        }).catch(function () {});
+      }
+      return res;
+    });
+  };
+})();
+
+/* Token expired, revoked, or fabricated → drop it and ask for a real sign-in. Fires once. */
+let owhExpiredShown = false;
+function owhSessionExpired() {
+  if (owhExpiredShown) return;
+  owhExpiredShown = true;
+  localStorage.removeItem('owh_session');
+  currentUser = null; currentUserName = null; currentUserRole = null;
+  const el = document.getElementById('loginScreen');
+  if (el) { el.style.opacity = '1'; el.style.display = 'flex'; }
+  const err = document.getElementById('loginError');
+  if (err) { err.textContent = 'انتهت الجلسة — الرجاء تسجيل الدخول مرة أخرى'; err.style.display = 'block'; }
+}
+
 async function initAuth() {
   const saved = localStorage.getItem('owh_session');
   if (saved) {
     try {
       const s = JSON.parse(saved);
-      if (s && s.username && s.displayName) {
+      // must carry a token now — a session saved before session auth existed is unusable,
+      // and a hand-written localStorage entry can't fake one (only the server mints tokens)
+      if (s && s.username && s.sid) {
         currentUser     = s.username;
         currentUserName = s.displayName;
         currentUserRole = s.role;
@@ -661,6 +712,13 @@ function hideLoginScreen() {
 }
 
 function showSwitchUser() {
+  /* Tell the server to destroy the token, not just forget it locally — otherwise a copied
+     token keeps working until it expires. Fire-and-forget: the UI shouldn't wait. */
+  const sid = owhSid();
+  if (sid) {
+    try { window.fetch(SCRIPT_URL_AUTH, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'auth_logout', sid }) }).catch(function () {}); } catch (e) {}
+  }
   localStorage.removeItem('owh_session');
   currentUser = null; currentUserName = null; currentUserRole = null;
   document.getElementById('loginUsername').value = '';
