@@ -906,6 +906,20 @@ async function apiWithRetry(action, extra, attemptsLeft, timeoutMs = 25000) {
 // ─────────────────────────────────────────────
 // INIT & SYNC
 // ─────────────────────────────────────────────
+/* 🔔 puts an order on Emad's home screen (or takes it off). Server-side truth (InvOrders col M);
+   re-flaggable any number of times — deliveries arrive in parts, and receiving clears the flag. */
+async function flagEmad(orderId, on) {
+  toast('⏳ ...');
+  try {
+    const r = await api('inv_flag_emad', { orderId, on });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    const o = orders.find(x => String(x.id) === String(orderId));
+    if (o) o.notifyEmad = on ? new Date().toISOString() : '';
+    saveCache(); renderAll();
+    toast(on ? '🔔 ظهر عند عماد للاستلام' : '✅ اتشال من عند عماد');
+  } catch(e) { toast('❌ لم يتم — حاول مرة أخرى'); }
+}
+
 async function cancelOrder(orderId, itemId) {
   if (!confirm('إلغاء هذا الطلب؟')) return;
   toast('⏳ جاري الإلغاء...');
@@ -1226,11 +1240,26 @@ function renderOrders() {
           ${currentUser==='emad'
             ? `<button class="btn btn-success btn-sm" onclick="openReceiveModal('${ord.id}')">✅ استلمت</button>`
             : `<span class="badge badge-transit">🚚 جارٍ</span>`}
+          ${currentUser!=='emad'
+            ? (ord.notifyEmad
+                ? `<button onclick="flagEmad('${ord.id}',false)" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:3px 8px;font-size:11px;color:#2e7d32;cursor:pointer;font-family:'Cairo',sans-serif">🔔 عند عماد — إلغاء</button>`
+                : `<button onclick="flagEmad('${ord.id}',true)" style="background:none;border:1px solid #d9a441;border-radius:8px;padding:3px 8px;font-size:11px;color:#b07d1e;cursor:pointer;font-family:'Cairo',sans-serif">🔔 عماد: استلم</button>`)
+            : ``}
           <button onclick="cancelOrder('${ord.id}','${ord.itemId}')" style="background:none;border:1px solid #ffcdd2;border-radius:8px;padding:3px 8px;font-size:11px;color:#cc5f5f;cursor:pointer;font-family:'Cairo',sans-serif">❌ إلغاء</button>
         </div>
       </div>`;
     });
     html += `</div>`;
+  }
+
+  /* the 1-day nudge (Sarah's rule): an open order older than a day that nobody flagged yet is easy
+     to forget — prompt HER (and Khaled), never Emad directly; nothing reaches his screen unflagged */
+  if (currentUser!=='emad') {
+    const stale = active.filter(o => !o.notifyEmad && o.orderedAt && (Date.now() - new Date(o.orderedAt).getTime()) > 86400000);
+    if (stale.length) {
+      html = `<div class="nawaqes-card" style="border-right:3px solid #d9a441;padding:10px;margin-bottom:10px">
+        ⏰ <b>${stale.length} طلب${stale.length>1?'ات':''} من أكثر من يوم</b> بدون تنبيه لعماد — لو وصلت، اضغط 🔔 عماد: استلم</div>` + html;
+    }
   }
 
   if (received.length > 0) {
