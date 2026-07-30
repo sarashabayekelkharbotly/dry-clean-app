@@ -1117,14 +1117,19 @@ async function emadTaskDelete(id){
   } catch(e) { showToast('❌ لم تُحذف — حاول مرة أخرى'); }
 }
 
-function emadDoneKey(){ return 'emad_done_' + new Date().toISOString().slice(0,10); }
+/* LOCAL date, never toISOString: that is UTC, and Egypt runs ahead of it — after midnight the
+   screen said "30 July" while the header said 31, and tasks filed under the wrong day. */
+function emadTodayK(){ const d = new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function emadTimeKey(c){ const m = String(c.time||'').match(/^(\d{1,2}):(\d{2})/); return m ? ('0'+m[1]).slice(-2)+':'+m[2] : '99:99'; }
+// done-ticks live on this phone only, keyed by the day — a tick marks work done, it deletes nothing
+function emadDoneKey(){ return 'emad_done_' + emadTodayK(); }
 function emadDone(){ try { return JSON.parse(localStorage.getItem(emadDoneKey())||'{}'); } catch(e){ return {}; } }
 function emadTickTask(k){ const d = emadDone(); d[k] = !d[k]; try { localStorage.setItem(emadDoneKey(), JSON.stringify(d)); } catch(e){}; renderHome(); }
 
 function renderEmadPanel() {
   if (!EMAD) return '';
   let h = '';
-  const todayK = new Date().toISOString().slice(0, 10);
+  const todayK = emadTodayK();
   const done = emadDone();
 
   /* ONE to-do list (Sarah 2026-07-31): today's schedule in the exact WhatsApp wording, plus every
@@ -1139,9 +1144,12 @@ function renderEmadPanel() {
       <span style="font-size:13px;line-height:1.6${isDone?';text-decoration:line-through;opacity:.45':''}">${text}</span></div>`;
   };
 
-  (EMAD.schedule || []).filter(c => c.date === todayK).forEach((c, i) => {
-    todo += row('🧹', emadTaskLine(c), { tick: 'sched' + i, click: `emadTickTask('sched${i}')` });
-  });
+  // today's work in TIME order — the list reads like his day will actually run
+  (EMAD.schedule || []).filter(c => c.date === todayK)
+    .sort((a, b) => emadTimeKey(a) < emadTimeKey(b) ? -1 : 1)
+    .forEach((c, i) => {
+      todo += row('🧹', emadTaskLine(c), { tick: 'sched' + i, click: `emadTickTask('sched${i}')` });
+    });
   // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر
   (EMAD.tasks || []).forEach(t => {
     const txt = `${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}` +
@@ -1171,37 +1179,72 @@ function renderEmadPanel() {
           <span>${x.name}</span><span><b>${x.cur}</b> / ${x.par} <span style="color:#cc5f5f">(${x.pct}٪)</span></span></div>`).join('') + `</div>`;
     }
   }
-  // add box — anyone signed in can push a task onto the list; date defaults to today
-  const addBox = `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee)">
-    <input id="emadTaskText" placeholder="＋ أضف مهمة..." style="flex:1;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 10px;font-family:'Cairo',sans-serif;font-size:13px">
-    <input id="emadTaskDate" type="date" value="${todayK}" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:5px;font-family:'Cairo',sans-serif;font-size:12px;width:118px">
-    <button onclick="emadTaskAdd()" class="btn btn-primary btn-sm" style="flex-shrink:0">أضف</button></div>`;
+  // add box — anyone signed in can push a task onto the list; date defaults to today.
+  // fully inline-styled: the app's .btn class renders full-width and broke the row.
+  const addBox = `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee);align-items:center;flex-wrap:nowrap">
+    <input id="emadTaskText" placeholder="＋ أضف مهمة..." onkeydown="if(event.key==='Enter')emadTaskAdd()" style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 10px;font-family:'Cairo',sans-serif;font-size:13px">
+    <input id="emadTaskDate" type="date" value="${todayK}" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:112px">
+    <button onclick="emadTaskAdd()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px 16px;cursor:pointer">أضف</button></div>`;
   if (todo) {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:6px 12px">${todo}${addBox}</div>`;
   } else if (EMAD.schedule) {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:8px 12px"><div style="color:var(--text3);padding:6px 0">لا توجد مهام اليوم ✨</div>${addBox}</div>`;
   }
 
-  // ---- the confirmed week grid: read-only mirror of what Sarah confirmed in the Hub ----
+  // ---- the confirmed week as the SAME grid the Hub shows: flats × days, the Hub's colours ----
+  h += renderEmadGrid(todayK);
+  return h;
+}
+
+/* The Hub week grid, mirrored: rows = flats, columns = Sat→Fri, cells coloured with the exact
+   palette of the Hub's Week screen (checkout #f5dede · mid-stay/weekly #d6e2f2 · revision &
+   code-change #ecdcf0). Sarah: "i wanted the week to appear in the same format with the table and
+   the color codes ... i need the visual not the text." Read-only, this week + next. */
+const EMAD_CELL_BG = { checkout:'#f5dede', midstay:'#d6e2f2', weekly:'#d6e2f2', revision:'#ecdcf0', codechange:'#ecdcf0', custom:'#f5dede' };
+const EMAD_FLAT_ORDER = ['8A','17A','17B','28A','Zayed 2000'];
+function renderEmadGrid(todayK) {
   const sched = EMAD.schedule || [];
-  if (sched.length) {
-    const byDate = {};
-    sched.forEach(c => { (byDate[c.date] = byDate[c.date] || []).push(c); });
-    const dates = Object.keys(byDate).sort();
-    h += `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
-    dates.forEach(d => {
-      const dt = new Date(d + 'T12:00:00');
-      const isToday = d === todayK;
-      h += `<div class="card" style="margin-bottom:8px;padding:10px${isToday ? ';border:2px solid var(--primary)' : ''}">
-        <div style="font-weight:800;font-size:13px;margin-bottom:6px">${EMAD_DAY_AR[dt.getDay()]} ${dt.getDate()}/${dt.getMonth()+1}${isToday ? ' — اليوم' : ''}</div>` +
-        byDate[d].map(c => {
-          let line = `<b>${c.flat}</b> — ${EMAD_TYPE_AR[c.type] || c.type}`;
-          if (c.time && /^\d/.test(c.time)) line += ` الساعة ${c.time}`;
-          if (emadShowsCode(c.type) && c.code) line += ` — <span style="font-family:monospace;font-weight:800">كود ${c.code}</span>`;
-          if (c.inTime && /^\d/.test(c.inTime)) line += ` — دخول ضيف ${c.inTime}`;
-          return `<div style="padding:3px 0;border-bottom:1px solid var(--border,#f0f0f0)">${line}</div>`;
-        }).join('') + `</div>`;
+  if (!sched.length) return '';
+  const base = new Date(todayK + 'T12:00:00');
+  const sat = new Date(base); sat.setDate(sat.getDate() - ((sat.getDay() + 1) % 7));   // this week's Saturday
+  const flats = EMAD_FLAT_ORDER.filter(f => sched.some(c => c.flat === f))
+    .concat([...new Set(sched.map(c => c.flat))].filter(f => EMAD_FLAT_ORDER.indexOf(f) < 0));
+  let h = `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
+
+  for (let w = 0; w < 2; w++) {
+    const days = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(sat); d.setDate(d.getDate() + w * 7 + i); days.push(d); }
+    const keys = days.map(d => d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2));
+    if (!sched.some(c => keys.indexOf(c.date) > -1)) continue;         // an empty week earns no table
+
+    h += `<div class="card" style="margin-bottom:10px;padding:8px;overflow-x:auto">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">${w === 0 ? 'هذا الأسبوع' : 'الأسبوع القادم'}</div>
+      <table style="border-collapse:collapse;width:100%;min-width:520px;font-size:10.5px">
+      <tr><th style="border:1px solid #ecdede;padding:2px 4px;background:#faf6f6"></th>` +
+      days.map((d, i) => `<th style="border:1px solid #ecdede;padding:2px 3px;background:${keys[i] === todayK ? '#f3e6e6' : '#faf6f6'};font-size:10px">${EMAD_DAY_AR[d.getDay()]}<br>${d.getDate()}/${d.getMonth()+1}</th>`).join('') + `</tr>`;
+
+    flats.forEach(f => {
+      h += `<tr><td style="border:1px solid #ecdede;padding:2px 5px;font-weight:700;white-space:nowrap;background:#fff;font-size:11px">${emadFlatAr(f)}</td>`;
+      keys.forEach((k, i) => {
+        const cs = sched.filter(c => c.flat === f && c.date === k).sort((a,b) => emadTimeKey(a) < emadTimeKey(b) ? -1 : 1);
+        if (!cs.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
+        const cell = cs.map(c => {
+          let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}</div>`;
+          if (emadShowsCode(c.type) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.code}</div>`;
+          else t += `<div style="font-size:9.5px;color:#555">${EMAD_TYPE_AR[c.type] || c.type}</div>`;
+          if (c.inTime && /^\d/.test(c.inTime)) t += `<div style="font-size:9px;color:#555">دخول ${c.inTime}</div>`;
+          return t;
+        }).join('<div style="height:2px"></div>');
+        h += `<td style="border:1px solid #ecdede;padding:2px 3px;text-align:center;background:${EMAD_CELL_BG[cs[0].type] || '#f5dede'}${keys[i]===todayK?';outline:2px solid var(--primary,#cc5f5f);outline-offset:-2px':''}">${cell}</td>`;
+      });
+      h += `</tr>`;
     });
+    h += `</table>
+      <div style="font-size:9.5px;color:#777;margin-top:5px">
+        <span style="display:inline-block;width:9px;height:9px;background:#f5dede;border:1px solid #ecdede;vertical-align:middle"></span> تنظيف خروج
+        &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#d6e2f2;border:1px solid #ecdede;vertical-align:middle"></span> نظافة اثناء وجود ضيف
+        &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#ecdcf0;border:1px solid #ecdede;vertical-align:middle"></span> إعادة / تغيير كود
+      </div></div>`;
   }
   return h;
 }
