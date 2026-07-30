@@ -1031,6 +1031,7 @@ async function loadAllData(silent = false) {
     // works with a fully private spreadsheet, no public API key needed
     const data = await callScript({ action: 'dc_get_all' });
     if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
+    loadEmadHome();                                  // panel data in parallel — home renders again when it lands
 
     itemPrices     = data.itemPrices || {};
     colorOptions   = data.colorOptions || {};
@@ -1056,6 +1057,156 @@ async function loadAllData(silent = false) {
 }
 
 // ============================================================
+// EMAD PANEL — the Hub-confirmed week (read-only) + alerts (Sarah's design 2026-07-31)
+// ============================================================
+let EMAD = null, emadMissingOpen = false;
+async function loadEmadHome() {
+  try {
+    const r = await callScript({ action: 'emad_home' });
+    if (r && r.ok) { EMAD = r; renderHome(); }
+  } catch (e) {}                                   // the panel is additive — home still works without it
+}
+const EMAD_TYPE_AR = { checkout: 'تنظيف خروج', midstay: 'نظافة اثناء وجود ضيف', weekly: 'نظافة اثناء وجود ضيف',
+                       revision: 'إعادة', codechange: 'تغيير الكود', custom: 'تنظيف إضافي' };
+const EMAD_DAY_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function emadShowsCode(t){ return t === 'checkout' || t === 'revision' || t === 'codechange'; }
+function toggleEmadMissing(){ emadMissingOpen = !emadMissingOpen; renderHome(); }
+
+// ---- WhatsApp-identical wording (copied from the Hub's week screen, Sarah-approved) ----
+function emadPartOfDay(H){ if(H<5)return 'ليلاً'; if(H<12)return 'صباحاً'; if(H<15)return 'ظهراً'; if(H<18)return 'عصراً'; return 'مساءً'; }
+function emadHmAr(t){
+  const m = String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return String(t||'');
+  const H = +m[1], M = +m[2]; let h12 = H % 12; if(h12 === 0) h12 = 12;
+  return h12 + (M ? ':' + ('0'+M).slice(-2) : '') + ' ' + emadPartOfDay(H);
+}
+function emadFlatAr(f){ return f === 'Zayed 2000' ? 'زايد 2000' : f; }
+function emadTaskLine(c){
+  if (c.type === 'codechange') return `شقة ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — دخول ضيف غدا`;
+  let t = `شقة ${emadFlatAr(c.flat)}: ${EMAD_TYPE_AR[c.type] || 'تنظيف'}`;
+  if (c.time && /^\d/.test(c.time)) t += ` الساعة ${emadHmAr(c.time)}`;
+  if (c.type === 'checkout' && c.code) t += ` — كود الباب ${c.code}`;
+  else if (c.type === 'revision' && c.code && c.code !== '0107') t += ` — تغيير كود الباب إلى ${c.code}`;
+  if (c.inTime && /^\d/.test(c.inTime)) t += ` — دخول ضيف الساعة ${emadHmAr(c.inTime)}`;
+  return t;
+}
+// done-ticks live on this phone only, keyed by the day — a tick marks work done, it deletes nothing
+// ---- manual tasks (server-side, tab EmadTasks) ----
+async function emadTaskAdd(){
+  const el = document.getElementById('emadTaskText'), dl = document.getElementById('emadTaskDate');
+  const text = (el && el.value || '').trim(); if (!text) return;
+  try {
+    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '' });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    if (el) el.value = '';
+    loadEmadHome();
+  } catch(e) { showToast('❌ لم تُضف المهمة — حاول مرة أخرى'); }
+}
+async function emadTaskToggle(id, done){
+  const t = (EMAD && EMAD.tasks || []).find(x => x.id === id);
+  if (t) { t.done = done; renderHome(); }                       // optimistic — the list answers the tap
+  try { await callScript({ action: 'emad_task_toggle', id, done }); }
+  catch(e) { if (t) { t.done = !done; renderHome(); } }
+}
+async function emadTaskDelete(id){
+  if (!confirm('حذف هذه المهمة؟')) return;
+  try {
+    const r = await callScript({ action: 'emad_task_delete', id });
+    if (!r || r.ok !== true) throw new Error('failed');
+    if (EMAD && EMAD.tasks) EMAD.tasks = EMAD.tasks.filter(x => x.id !== id);
+    renderHome();
+  } catch(e) { showToast('❌ لم تُحذف — حاول مرة أخرى'); }
+}
+
+function emadDoneKey(){ return 'emad_done_' + new Date().toISOString().slice(0,10); }
+function emadDone(){ try { return JSON.parse(localStorage.getItem(emadDoneKey())||'{}'); } catch(e){ return {}; } }
+function emadTickTask(k){ const d = emadDone(); d[k] = !d[k]; try { localStorage.setItem(emadDoneKey(), JSON.stringify(d)); } catch(e){}; renderHome(); }
+
+function renderEmadPanel() {
+  if (!EMAD) return '';
+  let h = '';
+  const todayK = new Date().toISOString().slice(0, 10);
+  const done = emadDone();
+
+  /* ONE to-do list (Sarah 2026-07-31): today's schedule in the exact WhatsApp wording, plus every
+     alert as a task in the same list. Schedule tasks are tickable (strike-through, this phone only);
+     alert tasks are NOT tickable — they disappear when actually resolved (order received, laundry
+     collected, payment made), so a real problem can't be swiped away. */
+  let todo = '';
+  const row = (icon, text, opts) => {
+    const o = opts || {}, isDone = o.tick && done[o.tick];
+    return `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0)${o.click?';cursor:pointer':''}"${o.click?` onclick="${o.click}"`:''}>
+      <span style="font-size:15px;flex-shrink:0">${o.tick ? (isDone?'✅':'⬜') : icon}</span>
+      <span style="font-size:13px;line-height:1.6${isDone?';text-decoration:line-through;opacity:.45':''}">${text}</span></div>`;
+  };
+
+  (EMAD.schedule || []).filter(c => c.date === todayK).forEach((c, i) => {
+    todo += row('🧹', emadTaskLine(c), { tick: 'sched' + i, click: `emadTickTask('sched${i}')` });
+  });
+  // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر
+  (EMAD.tasks || []).forEach(t => {
+    const txt = `${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}` +
+      `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
+      ` <span onclick="event.stopPropagation();emadTaskDelete('${t.id}')" style="color:#cc5f5f;cursor:pointer;font-size:11px;padding:0 4px">✕</span>`;
+    todo += `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
+      <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
+      <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`;
+  });
+  if ((EMAD.schedule || []).some(c => c.flat === '8A' && c.date === todayK))
+    todo += row('⚡', `<b>سجّل رصيد كارت كهرباء 8A</b> أثناء التنظيف`, { tick: 'elec8a', click: `emadTickTask('elec8a')` });
+  (EMAD.receipts || []).forEach(o => {
+    todo += row('📦', `<b>استلم طلبية:</b> ${o.name} ×${o.qty} <span style="color:var(--text3);font-size:11px">(طلب ${o.orderedBy})</span>`);
+  });
+  (EMAD.sla || []).forEach(x => {
+    todo += row('🧺', `<b>تابع المغسلة:</b> شقة ${emadFlatAr(x.apt)} عند الغسيل من ${x.days} أيام <span style="color:#cc5f5f;font-size:11px">(أكثر من ٣ أيام)</span>`);
+  });
+  (EMAD.payment || []).forEach(x => {
+    todo += row('💵', `<b>الدفع للمغسلة:</b> شقة ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
+  });
+  if ((EMAD.missing || []).length) {
+    todo += row('🧴', `<b>${EMAD.missing.length} أصناف ناقصة</b> (أقل من ٦٠٪ من المطلوب) — اضغط للتفاصيل ${emadMissingOpen ? '▾' : '◂'}`,
+                { click: 'toggleEmadMissing()' });
+    if (emadMissingOpen) {
+      todo += `<div style="padding:6px 26px 4px 0">` +
+        EMAD.missing.map(x => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12.5px;border-bottom:1px solid var(--border,#f5f5f5)">
+          <span>${x.name}</span><span><b>${x.cur}</b> / ${x.par} <span style="color:#cc5f5f">(${x.pct}٪)</span></span></div>`).join('') + `</div>`;
+    }
+  }
+  // add box — anyone signed in can push a task onto the list; date defaults to today
+  const addBox = `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee)">
+    <input id="emadTaskText" placeholder="＋ أضف مهمة..." style="flex:1;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 10px;font-family:'Cairo',sans-serif;font-size:13px">
+    <input id="emadTaskDate" type="date" value="${todayK}" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:5px;font-family:'Cairo',sans-serif;font-size:12px;width:118px">
+    <button onclick="emadTaskAdd()" class="btn btn-primary btn-sm" style="flex-shrink:0">أضف</button></div>`;
+  if (todo) {
+    h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:6px 12px">${todo}${addBox}</div>`;
+  } else if (EMAD.schedule) {
+    h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:8px 12px"><div style="color:var(--text3);padding:6px 0">لا توجد مهام اليوم ✨</div>${addBox}</div>`;
+  }
+
+  // ---- the confirmed week grid: read-only mirror of what Sarah confirmed in the Hub ----
+  const sched = EMAD.schedule || [];
+  if (sched.length) {
+    const byDate = {};
+    sched.forEach(c => { (byDate[c.date] = byDate[c.date] || []).push(c); });
+    const dates = Object.keys(byDate).sort();
+    h += `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
+    dates.forEach(d => {
+      const dt = new Date(d + 'T12:00:00');
+      const isToday = d === todayK;
+      h += `<div class="card" style="margin-bottom:8px;padding:10px${isToday ? ';border:2px solid var(--primary)' : ''}">
+        <div style="font-weight:800;font-size:13px;margin-bottom:6px">${EMAD_DAY_AR[dt.getDay()]} ${dt.getDate()}/${dt.getMonth()+1}${isToday ? ' — اليوم' : ''}</div>` +
+        byDate[d].map(c => {
+          let line = `<b>${c.flat}</b> — ${EMAD_TYPE_AR[c.type] || c.type}`;
+          if (c.time && /^\d/.test(c.time)) line += ` الساعة ${c.time}`;
+          if (emadShowsCode(c.type) && c.code) line += ` — <span style="font-family:monospace;font-weight:800">كود ${c.code}</span>`;
+          if (c.inTime && /^\d/.test(c.inTime)) line += ` — دخول ضيف ${c.inTime}`;
+          return `<div style="padding:3px 0;border-bottom:1px solid var(--border,#f0f0f0)">${line}</div>`;
+        }).join('') + `</div>`;
+    });
+  }
+  return h;
+}
+
+// ============================================================
 // HOME PAGE
 // ============================================================
 function renderHome() {
@@ -1069,7 +1220,8 @@ function renderHome() {
   });
   const monthCost = monthSubs.reduce((sum,s) => sum + getSubmissionTotal(s.id), 0);
 
-  let html = `
+  let html = renderEmadPanel();
+  html += `
     <div class="stats-grid" style="margin-bottom:16px">
       <div class="stat-card"><div class="stat-value">${sent.length}</div><div class="stat-label">عند الغسيل الآن</div></div>
       <div class="stat-card"><div class="stat-value">$${monthCost.toFixed(0)}</div><div class="stat-label">تكلفة هذا الشهر</div></div>
