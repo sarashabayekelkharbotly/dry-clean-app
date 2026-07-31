@@ -1199,7 +1199,7 @@ async function renderElecScreen(force){
   const soon = E.depletion && E.ratePerDay > 0 && ((new Date(E.depletion+'T12:00:00') - new Date())/86400000) <= 7;
   let h = `
     <div class="stats-grid" style="margin-bottom:12px">
-      <div class="stat-card"><div class="stat-value">${E.balance != null ? E.balance : '—'}</div><div class="stat-label">آخر قراءة (جنيه)${E.lastAt ? `<br><span style="font-size:9.5px">${String(E.lastAt).slice(0,10)}</span>` : ''}</div></div>
+      <div class="stat-card"><div class="stat-value">${E.balance != null ? E.balance : '—'}</div><div class="stat-label">آخر قراءة (جنيه)${E.lastAt ? `<br><span dir="ltr" style="font-size:9.5px">${String(E.lastAt).slice(0,10)}</span>` : ''}</div></div>
       <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)</div></div>
       <div class="stat-card"${soon ? ' style="border:2px solid #cc5f5f"' : ''}><div class="stat-value"${soon ? ' style="color:#cc5f5f"' : ''}>${E.depletion ? E.depletion.slice(5).split('-').reverse().join('/') : '—'}</div><div class="stat-label">${soon ? '⚠️ ينفد قريباً' : 'ينفد تقريباً'}</div></div>
     </div>
@@ -1220,7 +1220,7 @@ async function renderElecScreen(force){
   if (!E.readings || !E.readings.length) h += `<div class="empty"><div class="empty-icon">⚡</div><div class="empty-text">لا توجد قراءات بعد</div></div>`;
   else h += `<div class="card" style="padding:6px 12px;margin-bottom:14px">` + E.readings.map((r, i) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#f0f0f0);font-size:13px">
-      <span style="color:var(--text3);flex:1;min-width:0">${String(r.at).slice(0,16)}${r.by ? ' — '+r.by : ''}</span>
+      <span style="color:var(--text3);flex:1;min-width:0"><span dir="ltr">${String(r.at).slice(0,16)}</span>${r.by ? ' — '+r.by : ''}</span>
       <span style="font-weight:800">${r.bal} ج</span>
       <button onclick="elecEditStart(${i})" title="تعديل" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px">✏️</button>
       <button onclick="elecDelete(${i})" title="حذف" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px">🗑️</button>
