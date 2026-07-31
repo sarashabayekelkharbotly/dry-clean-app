@@ -1275,6 +1275,12 @@ function renderEmadPanel() {
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
       <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`;
   });
+  // today's repairs — Emad meets the tradesman, so they are his tasks exactly as in the WhatsApp
+  (EMAD.repairs || []).filter(r => r.date === todayK).forEach((r, i) => {
+    todo += row('🔧', `شقة ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''}`,
+      { tick: 'rep' + i, click: `emadTickTask('rep${i}')` });
+  });
+
   /* ⚡ the 8A card reading — captured HERE at the house, never in the laundry submission (that
      happens at the dry cleaner's, long after he has left). Tapping opens the balance entry; a
      reading logged today shows as done on its own — the act of logging is the tick. */
@@ -1356,7 +1362,7 @@ function renderEmadGrid(todayK) {
     const range = `${days[0].getDate()}/${days[0].getMonth()+1} — ${days[6].getDate()}/${days[6].getMonth()+1}`;
     const navBtn = (dir, txt, enabled) =>
       `<button onclick="emadWeekNav(${dir})" ${enabled ? '' : 'disabled'} style="border:1px solid var(--border,#ddd);border-radius:8px;background:${enabled ? '#fff' : '#f5f5f5'};font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;padding:5px 10px;cursor:${enabled ? 'pointer' : 'default'};opacity:${enabled ? 1 : .4}">${txt}</button>`;
-    const hasWork = sched.some(c => keys.indexOf(c.date) > -1);
+    const hasWork = sched.some(c => keys.indexOf(c.date) > -1) || (EMAD.repairs || []).some(r => keys.indexOf(r.date) > -1);
 
     h += `<div class="card" style="margin-bottom:10px;padding:8px;overflow-x:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
@@ -1373,15 +1379,20 @@ function renderEmadGrid(todayK) {
       h += `<tr><td style="border:1px solid #ecdede;padding:2px 5px;font-weight:700;white-space:nowrap;background:#fff;font-size:11px">${emadFlatAr(f)}</td>`;
       keys.forEach((k, i) => {
         const cs = sched.filter(c => c.flat === f && c.date === k).sort((a,b) => emadTimeKey(a) < emadTimeKey(b) ? -1 : 1);
-        if (!cs.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
-        const cell = cs.map(c => {
+        const reps = (EMAD.repairs || []).filter(r => r.flat === f && r.date === k);
+        if (!cs.length && !reps.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
+        let cell = cs.map(c => {
           let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}</div>`;
           if (emadShowsCode(c.type) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.code}</div>`;
           else t += `<div style="font-size:9.5px;color:#555">${EMAD_TYPE_AR[c.type] || c.type}</div>`;
           if (c.inTime && /^\d/.test(c.inTime)) t += `<div style="font-size:9px;color:#555">دخول ${c.inTime}</div>`;
           return t;
         }).join('<div style="height:2px"></div>');
-        h += `<td style="border:1px solid #ecdede;padding:2px 3px;text-align:center;background:${EMAD_CELL_BG[cs[0].type] || '#f5dede'}${keys[i]===todayK?';outline:2px solid var(--primary,#cc5f5f);outline-offset:-2px':''}">${cell}</td>`;
+        if (reps.length) cell += (cs.length ? '<div style="height:2px"></div>' : '') + reps.map(r =>
+          `<div style="font-size:9.5px;font-weight:700;color:#6a5636">🔧 ${r.trade}${r.time && /^\d/.test(r.time) ? '<br>'+r.time : ''}</div>`).join('');
+        // a repair-only day wears the Hub's repair colour; a mixed day keeps the cleaning colour
+        const bg = cs.length ? (EMAD_CELL_BG[cs[0].type] || '#f5dede') : '#ece0cf';
+        h += `<td style="border:1px solid #ecdede;padding:2px 3px;text-align:center;background:${bg}${keys[i]===todayK?';outline:2px solid var(--primary,#cc5f5f);outline-offset:-2px':''}">${cell}</td>`;
       });
       h += `</tr>`;
     });
@@ -1390,6 +1401,7 @@ function renderEmadGrid(todayK) {
         <span style="display:inline-block;width:9px;height:9px;background:#f5dede;border:1px solid #ecdede;vertical-align:middle"></span> تنظيف خروج
         &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#d6e2f2;border:1px solid #ecdede;vertical-align:middle"></span> نظافة اثناء وجود ضيف
         &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#ecdcf0;border:1px solid #ecdede;vertical-align:middle"></span> إعادة / تغيير كود
+        &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#ece0cf;border:1px solid #ecdede;vertical-align:middle"></span> صيانة
       </div></div>`;
   }
   return h;
