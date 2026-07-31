@@ -1040,9 +1040,16 @@ async function loadAllData(silent = false) {
   try {
     // Single Apps Script call, authenticated as the script owner —
     // works with a fully private spreadsheet, no public API key needed
-    const data = await callScript({ action: 'dc_get_all' });
+    /* ONE render, not two: the panel used to land after the base page and shove it down — Sarah:
+       "the lower half is visible before the upper half". Both requests run in parallel and the
+       page renders once, with a cached panel filling the gap on a cold start. */
+    if (!EMAD) { try { const c = JSON.parse(localStorage.getItem('emadCache') || 'null'); if (c && c.ok) EMAD = c; } catch(e) {} }
+    const [data, emadR] = await Promise.all([
+      callScript({ action: 'dc_get_all' }),
+      callScript({ action: 'emad_home' }).catch(() => null)
+    ]);
+    if (emadR && emadR.ok) { EMAD = emadR; try { localStorage.setItem('emadCache', JSON.stringify(emadR)); } catch(e) {} }
     if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
-    loadEmadHome();                                  // panel data in parallel — home renders again when it lands
 
     itemPrices     = data.itemPrices || {};
     colorOptions   = data.colorOptions || {};
@@ -1074,7 +1081,7 @@ let EMAD = null, emadMissingOpen = false;
 async function loadEmadHome() {
   try {
     const r = await callScript({ action: 'emad_home' });
-    if (r && r.ok) { EMAD = r; renderHome(); }
+    if (r && r.ok) { EMAD = r; try { localStorage.setItem('emadCache', JSON.stringify(r)); } catch(e) {} renderHome(); }
   } catch (e) {}                                   // the panel is additive — home still works without it
 }
 const EMAD_TYPE_AR = { checkout: 'تنظيف خروج', midstay: 'نظافة اثناء وجود ضيف', weekly: 'نظافة اثناء وجود ضيف',
@@ -1327,6 +1334,10 @@ function renderEmadPanel() {
    the color codes ... i need the visual not the text." Read-only, this week + next. */
 const EMAD_CELL_BG = { checkout:'#f5dede', midstay:'#d6e2f2', weekly:'#d6e2f2', revision:'#ecdcf0', codechange:'#ecdcf0', custom:'#f5dede' };
 const EMAD_FLAT_ORDER = ['8A','17A','17B','28A','Zayed 2000'];
+/* ONE week at a time with prev/next arrows, like the Hub's Week screen — Sarah: "I don't want the
+   two weeks below each other". Range is bounded by what the backend serves (last week → next). */
+let EMAD_WEEK = 0;
+function emadWeekNav(d){ EMAD_WEEK = Math.max(-1, Math.min(1, EMAD_WEEK + d)); renderHome(); }
 function renderEmadGrid(todayK) {
   const sched = EMAD.schedule || [];
   if (!sched.length) return '';
@@ -1336,15 +1347,25 @@ function renderEmadGrid(todayK) {
     .concat([...new Set(sched.map(c => c.flat))].filter(f => EMAD_FLAT_ORDER.indexOf(f) < 0));
   let h = `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
 
-  for (let w = 0; w < 2; w++) {
+  {
+    const w = EMAD_WEEK;
     const days = [];
     for (let i = 0; i < 7; i++) { const d = new Date(sat); d.setDate(d.getDate() + w * 7 + i); days.push(d); }
     const keys = days.map(d => d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2));
-    if (!sched.some(c => keys.indexOf(c.date) > -1)) continue;         // an empty week earns no table
+    const label = w === 0 ? 'هذا الأسبوع' : (w === 1 ? 'الأسبوع القادم' : 'الأسبوع الماضي');
+    const range = `${days[0].getDate()}/${days[0].getMonth()+1} — ${days[6].getDate()}/${days[6].getMonth()+1}`;
+    const navBtn = (dir, txt, enabled) =>
+      `<button onclick="emadWeekNav(${dir})" ${enabled ? '' : 'disabled'} style="border:1px solid var(--border,#ddd);border-radius:8px;background:${enabled ? '#fff' : '#f5f5f5'};font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;padding:5px 10px;cursor:${enabled ? 'pointer' : 'default'};opacity:${enabled ? 1 : .4}">${txt}</button>`;
+    const hasWork = sched.some(c => keys.indexOf(c.date) > -1);
 
     h += `<div class="card" style="margin-bottom:10px;padding:8px;overflow-x:auto">
-      <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">${w === 0 ? 'هذا الأسبوع' : 'الأسبوع القادم'}</div>
-      <table style="border-collapse:collapse;width:100%;min-width:520px;font-size:10.5px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
+        ${navBtn(-1, '→ السابق', w > -1)}
+        <div style="font-weight:800;font-size:12.5px;text-align:center">${label} <span dir="ltr" style="font-weight:400;font-size:10.5px;color:var(--text3)">${range}</span></div>
+        ${navBtn(1, 'القادم ←', w < 1)}
+      </div>`;
+    if (!hasWork) { h += `<div style="padding:14px;text-align:center;color:var(--text3);font-size:12.5px">لا توجد مهام في هذا الأسبوع ✨</div></div>`; return h; }
+    h += `<table style="border-collapse:collapse;width:100%;min-width:520px;font-size:10.5px">
       <tr><th style="border:1px solid #ecdede;padding:2px 4px;background:#faf6f6"></th>` +
       days.map((d, i) => `<th style="border:1px solid #ecdede;padding:2px 3px;background:${keys[i] === todayK ? '#f3e6e6' : '#faf6f6'};font-size:10px">${EMAD_DAY_AR[d.getDay()]}<br>${d.getDate()}/${d.getMonth()+1}</th>`).join('') + `</tr>`;
 
