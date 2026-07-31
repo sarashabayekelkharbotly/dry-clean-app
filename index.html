@@ -1123,6 +1123,19 @@ function emadTodayK(){ const d = new Date(); return d.getFullYear()+'-'+('0'+(d.
 function emadTimeKey(c){ const m = String(c.time||'').match(/^(\d{1,2}):(\d{2})/); return m ? ('0'+m[1]).slice(-2)+':'+m[2] : '99:99'; }
 // done-ticks live on this phone only, keyed by the day — a tick marks work done, it deletes nothing
 function emadDoneKey(){ return 'emad_done_' + emadTodayK(); }
+
+// ⚡ quick entry for the 8A card balance — the raw number as the meter shows it
+async function emadMeterPrompt(){
+  const v = prompt('رصيد كارت كهرباء 8A بالجنيه (الرقم كما يظهر على العداد):');
+  if (v === null) return;
+  const b = parseFloat(String(v).replace(/[^\d.]/g, ''));
+  if (isNaN(b) || b < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
+  try {
+    const r = await callScript({ action: 'meter_log', balance: b });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    await loadEmadHome();                             // the task flips to ✅ on its own
+  } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
+}
 function emadDone(){ try { return JSON.parse(localStorage.getItem(emadDoneKey())||'{}'); } catch(e){ return {}; } }
 function emadTickTask(k){ const d = emadDone(); d[k] = !d[k]; try { localStorage.setItem(emadDoneKey(), JSON.stringify(d)); } catch(e){}; renderHome(); }
 
@@ -1159,8 +1172,18 @@ function renderEmadPanel() {
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
       <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`;
   });
-  if ((EMAD.schedule || []).some(c => c.flat === '8A' && c.date === todayK))
-    todo += row('⚡', `<b>سجّل رصيد كارت كهرباء 8A</b> أثناء التنظيف`, { tick: 'elec8a', click: `emadTickTask('elec8a')` });
+  /* ⚡ the 8A card reading — captured HERE at the house, never in the laundry submission (that
+     happens at the dry cleaner's, long after he has left). Tapping opens the balance entry; a
+     reading logged today shows as done on its own — the act of logging is the tick. */
+  if ((EMAD.schedule || []).some(c => c.flat === '8A' && c.date === todayK)) {
+    const loggedToday = EMAD.meter && String(EMAD.meter.at || '').slice(0, 10) === todayK;
+    if (loggedToday)
+      todo += row('✅', `تم تسجيل رصيد كارت 8A اليوم: <b>${EMAD.meter.balance}</b> جنيه`, {});
+    else
+      todo += row('⚡', `<b>سجّل رصيد كارت كهرباء 8A</b> أثناء التنظيف — اضغط للتسجيل` +
+        (EMAD.meter ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${EMAD.meter.balance} — ${String(EMAD.meter.at).slice(0,10)})</span>` : ''),
+        { click: 'emadMeterPrompt()' });
+  }
   (EMAD.receipts || []).forEach(o => {
     todo += row('📦', `<b>استلم طلبية:</b> ${o.name} ×${o.qty} <span style="color:var(--text3);font-size:11px">(طلب ${o.orderedBy})</span>`);
   });
