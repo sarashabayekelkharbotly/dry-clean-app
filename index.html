@@ -1156,7 +1156,35 @@ async function emadMeterPrompt(){
 // balance + burn + projected-empty up top, then the reading and recharge histories.
 // Recharges are read-only here (they are logged in WeShare when paid, as always).
 // ============================================================
-let ELEC = null;
+let ELEC = null, ELEC_EDIT = null;                     // ELEC_EDIT = the reading being corrected
+
+async function elecRefresh(){ ELEC = null; ELEC_EDIT = null; await renderElecScreen(true); loadEmadHome(); }
+function elecEditStart(i){ ELEC_EDIT = ELEC.readings[i]; renderElecScreen(); }
+function elecEditCancel(){ ELEC_EDIT = null; renderElecScreen(); }
+async function elecSave(){
+  const b = parseFloat(document.getElementById('elecBal').value);
+  const d = document.getElementById('elecDate').value;
+  if (isNaN(b) || b < 0) { showToast('❌ أدخل رقم الرصيد'); return; }
+  try {
+    const r = ELEC_EDIT
+      ? await callScript({ action: 'meter_edit', row: ELEC_EDIT.row, at: ELEC_EDIT.at, balance: b, date: d })
+      : await callScript({ action: 'meter_log', balance: b, date: d });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast(ELEC_EDIT ? '✅ تم التعديل' : '✅ تم تسجيل القراءة');
+    await elecRefresh();
+  } catch(e) { showToast('❌ لم يتم الحفظ — ' + (e.message || 'حاول مرة أخرى')); }
+}
+async function elecDelete(i){
+  const r0 = ELEC.readings[i];
+  if (!confirm(`حذف قراءة ${String(r0.at).slice(0,10)} (${r0.bal} ج)؟`)) return;
+  try {
+    const r = await callScript({ action: 'meter_delete', row: r0.row, at: r0.at });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ تم الحذف');
+    await elecRefresh();
+  } catch(e) { showToast('❌ لم يتم الحذف — ' + (e.message || 'حاول مرة أخرى')); }
+}
+
 async function renderElecScreen(force){
   const el = document.getElementById('elecContent');
   if (!ELEC || force) {
@@ -1175,14 +1203,28 @@ async function renderElecScreen(force){
       <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)</div></div>
       <div class="stat-card"${soon ? ' style="border:2px solid #cc5f5f"' : ''}><div class="stat-value"${soon ? ' style="color:#cc5f5f"' : ''}>${E.depletion ? E.depletion.slice(5).split('-').reverse().join('/') : '—'}</div><div class="stat-label">${soon ? '⚠️ ينفد قريباً' : 'ينفد تقريباً'}</div></div>
     </div>
-    <button onclick="emadMeterPrompt()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:11px;cursor:pointer;margin-bottom:14px">⚡ سجّل قراءة جديدة</button>`;
+    <div class="card" style="padding:10px 12px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:6px" id="elecFormTitle">${ELEC_EDIT ? '✏️ تعديل قراءة' : '⚡ قراءة جديدة'}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
+        <input id="elecBal" type="number" inputmode="numeric" placeholder="الرصيد بالجنيه" value="${ELEC_EDIT ? ELEC_EDIT.bal : ''}"
+          style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:14px">
+        <input id="elecDate" type="date" value="${ELEC_EDIT ? String(ELEC_EDIT.at).slice(0,10) : emadTodayK()}"
+          style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:118px">
+        <button onclick="elecSave()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:9px 16px;cursor:pointer">${ELEC_EDIT ? 'حفظ' : 'سجّل'}</button>
+        ${ELEC_EDIT ? `<button onclick="elecEditCancel()" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;background:none;font-family:'Cairo',sans-serif;font-size:13px;padding:9px 10px;cursor:pointer">✕</button>` : ''}
+      </div>
+    </div>`;
   if (E.readings && E.readings.length < 2)
     h += `<div class="card" style="padding:10px;margin-bottom:12px;font-size:12px;color:var(--text3)">الحسابات تبدأ من القراءة الثانية — سجّل الرصيد مع كل تنظيف.</div>`;
   h += `<div class="section-title">القراءات</div>`;
   if (!E.readings || !E.readings.length) h += `<div class="empty"><div class="empty-icon">⚡</div><div class="empty-text">لا توجد قراءات بعد</div></div>`;
-  else h += `<div class="card" style="padding:6px 12px;margin-bottom:14px">` + E.readings.map(r =>
-    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border,#f0f0f0);font-size:13px">
-      <span style="color:var(--text3)">${String(r.at).slice(0,16)}${r.by ? ' — '+r.by : ''}</span><span style="font-weight:800">${r.bal} ج</span></div>`).join('') + `</div>`;
+  else h += `<div class="card" style="padding:6px 12px;margin-bottom:14px">` + E.readings.map((r, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#f0f0f0);font-size:13px">
+      <span style="color:var(--text3);flex:1;min-width:0">${String(r.at).slice(0,16)}${r.by ? ' — '+r.by : ''}</span>
+      <span style="font-weight:800">${r.bal} ج</span>
+      <button onclick="elecEditStart(${i})" title="تعديل" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px">✏️</button>
+      <button onclick="elecDelete(${i})" title="حذف" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px">🗑️</button>
+    </div>`).join('') + `</div>`;
   h += `<div class="section-title">الشحنات (من WeShare)</div>`;
   if (!E.recharges || !E.recharges.length) h += `<div class="empty"><div class="empty-icon">💳</div><div class="empty-text">لا توجد شحنات مسجلة</div></div>`;
   else h += `<div class="card" style="padding:6px 12px">` + E.recharges.map(r =>
