@@ -1833,7 +1833,8 @@ function renderStats() {
         const addDays = (dateStr, n) => {
           const d = new Date(dateStr + 'T00:00:00');
           d.setDate(d.getDate() + n);
-          return d.toISOString().slice(0,10);
+          // LOCAL date — toISOString is UTC and lags Egypt after midnight
+          return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
         };
 
         const overstock = [];
