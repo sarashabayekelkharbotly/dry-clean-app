@@ -69,14 +69,14 @@ body {
 }
 .nav::-webkit-scrollbar { display: none; }
 .nav-tab {
-  flex: 1; min-width: 65px; padding: 10px 4px;
-  text-align: center; font-size: 11px; font-weight: 700;
+  flex: 0 0 auto; min-width: 56px; padding: 8px 7px;   /* 8 tabs now — compact, swipe for the rest */
+  text-align: center; font-size: 10.5px; font-weight: 700;
   color: var(--text3); border: none; background: none;
   cursor: pointer; border-bottom: 3px solid transparent;
   transition: all 0.2s; font-family: 'Cairo', sans-serif; white-space: nowrap;
 }
 .nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-.nav-tab .tab-icon { font-size: 18px; display: block; margin-bottom: 1px; }
+.nav-tab .tab-icon { font-size: 16px; display: block; margin-bottom: 1px; }
 
 /* PAGES */
 .page { display: none; padding: 16px; padding-bottom: 60px; animation: fadeIn 0.2s ease; }
@@ -1051,15 +1051,18 @@ async function loadAllData(silent = false) {
   try {
     // Single Apps Script call, authenticated as the script owner —
     // works with a fully private spreadsheet, no public API key needed
-    /* ONE render, not two: the panel used to land after the base page and shove it down — Sarah:
-       "the lower half is visible before the upper half". Both requests run in parallel and the
-       page renders once, with a cached panel filling the gap on a cold start. */
+    /* The panel loads in PARALLEL but never blocks the page: waiting on it made the whole home as
+       slow as the slowest call. Instead the panel slot always renders something — cached content,
+       a spinner, or an error with retry — so the top of the page exists from the first paint and
+       nothing jumps when the fresh data lands. */
     if (!EMAD) { try { const c = JSON.parse(localStorage.getItem('emadCache') || 'null'); if (c && c.ok) EMAD = c; } catch(e) {} }
-    const [data, emadR] = await Promise.all([
-      callScript({ action: 'dc_get_all' }),
-      callScript({ action: 'emad_home' }).catch(() => null)
-    ]);
-    if (emadR && emadR.ok) { EMAD = emadR; try { localStorage.setItem('emadCache', JSON.stringify(emadR)); } catch(e) {} }
+    EMAD_ERR = false;
+    callScript({ action: 'emad_home' }).then(r => {
+      if (r && r.ok) { EMAD = r; try { localStorage.setItem('emadCache', JSON.stringify(r)); } catch(e) {} }
+      else if (!EMAD) EMAD_ERR = true;
+      renderHome();
+    }).catch(() => { if (!EMAD) { EMAD_ERR = true; renderHome(); } });
+    const data = await callScript({ action: 'dc_get_all' });
     if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
 
     itemPrices     = data.itemPrices || {};
@@ -1088,7 +1091,7 @@ async function loadAllData(silent = false) {
 // ============================================================
 // EMAD PANEL — the Hub-confirmed week (read-only) + alerts (Sarah's design 2026-07-31)
 // ============================================================
-let EMAD = null, emadMissingOpen = false;
+let EMAD = null, emadMissingOpen = false, EMAD_ERR = false;
 // §7 ③ — runs the Hub's whole pipeline; the token lives server-side, this button only asks for it
 async function dcSyncAll(){
   const btn = document.getElementById('dcSyncBtn');
@@ -1191,6 +1194,9 @@ let REP = null, REP_CLOSE_ID = null, REP_ADD_OPEN = false, REP_NEW_TRADE = false
 function emadRepairFromTodo(id){ REP_CLOSE_ID = id; showPage('repairs'); }
 async function renderRepairsScreen(force){
   const el = document.getElementById('repairsContent');
+  // the home payload already carries every open ticket + the trades — opening this tab costs nothing
+  if (!REP && !force && EMAD && EMAD.repairsAll)
+    REP = { open: EMAD.repairsAll, trades: EMAD.trades || [], flats: EMAD.flats || EMAD_FLAT_ORDER };
   if (!REP || force) {
     el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
     try {
@@ -1364,7 +1370,14 @@ function emadDone(){ try { return JSON.parse(localStorage.getItem(emadDoneKey())
 function emadTickTask(k){ const d = emadDone(); d[k] = !d[k]; try { localStorage.setItem(emadDoneKey(), JSON.stringify(d)); } catch(e){}; renderHome(); }
 
 function renderEmadPanel() {
-  if (!EMAD) return '';
+  /* the slot always shows SOMETHING — an invisible upper half twice looked like a broken page */
+  if (!EMAD) {
+    if (EMAD_ERR) return `<div class="card" style="padding:12px;margin-bottom:12px;text-align:center">
+      ⚠️ <span style="font-size:12.5px">تعذر تحميل المهام والجدول</span>
+      <button onclick="EMAD_ERR=false;renderHome();loadEmadHome()" style="border:1px solid var(--border,#ddd);border-radius:8px;background:none;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;padding:5px 12px;cursor:pointer;margin-right:8px">🔄 حاول مرة أخرى</button></div>`;
+    return `<div class="card" style="padding:12px;margin-bottom:12px;text-align:center;color:var(--text3);font-size:12.5px">
+      <div class="spinner" style="display:inline-block;vertical-align:middle;margin-left:8px"></div> جاري تحميل المهام والجدول...</div>`;
+  }
   let h = '';
   const todayK = emadTodayK();
   const done = emadDone();
