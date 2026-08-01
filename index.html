@@ -352,6 +352,9 @@ window.addEventListener('load',function(){
   <button class="nav-tab" onclick="showPage('elec')">
     <span class="tab-icon">⚡</span>كهرباء
   </button>
+  <button class="nav-tab" onclick="showPage('repairs')">
+    <span class="tab-icon">🔧</span>إصلاحات
+  </button>
   <button class="nav-tab" onclick="showPage('stats')">
     <span class="tab-icon">📊</span>إحصائيات
   </button>
@@ -368,6 +371,14 @@ window.addEventListener('load',function(){
 <!-- ===================== HOME PAGE ===================== -->
 <div class="page active" id="page-home">
   <div id="homeContent">
+    <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
+  </div>
+</div>
+
+<!-- ===================== REPAIRS ===================== -->
+<div class="page" id="page-repairs">
+  <div class="section-title">🔧 الإصلاحات</div>
+  <div id="repairsContent">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
   </div>
 </div>
@@ -1078,6 +1089,19 @@ async function loadAllData(silent = false) {
 // EMAD PANEL — the Hub-confirmed week (read-only) + alerts (Sarah's design 2026-07-31)
 // ============================================================
 let EMAD = null, emadMissingOpen = false;
+// §7 ③ — runs the Hub's whole pipeline; the token lives server-side, this button only asks for it
+async function dcSyncAll(){
+  const btn = document.getElementById('dcSyncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري المزامنة...'; }
+  try {
+    const r = await callScript({ action: 'hub_sync_all' });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ تمت المزامنة' + (r.pending ? ` — ${r.pending} في انتظار التأكيد` : ''));
+    await Promise.all([loadAllData(true), renderElecScreen && ELEC ? (ELEC = null) : null]);
+  } catch(e) { showToast('❌ فشلت المزامنة — ' + (e.message || 'حاول مرة أخرى')); }
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 مزامنة شاملة'; }
+}
+
 async function loadEmadHome() {
   try {
     const r = await callScript({ action: 'emad_home' });
@@ -1137,7 +1161,8 @@ async function emadTaskDelete(id){
 
 /* LOCAL date, never toISOString: that is UTC, and Egypt runs ahead of it — after midnight the
    screen said "30 July" while the header said 31, and tasks filed under the wrong day. */
-function emadTodayK(){ const d = new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function emadYmdOf(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function emadTodayK(){ return emadYmdOf(new Date()); }
 function emadTimeKey(c){ const m = String(c.time||'').match(/^(\d{1,2}):(\d{2})/); return m ? ('0'+m[1]).slice(-2)+':'+m[2] : '99:99'; }
 // done-ticks live on this phone only, keyed by the day — a tick marks work done, it deletes nothing
 function emadDoneKey(){ return 'emad_done_' + emadTodayK(); }
@@ -1156,6 +1181,102 @@ async function emadMeterPrompt(){
     loadEmadHome();                                   // the home task flips to ✅ on its own
     if (document.getElementById('page-elec')?.classList.contains('active')) renderElecScreen(true);
   } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
+}
+
+// ============================================================
+// 🔧 REPAIRS (§7 ②) — Emad opens AND closes tickets; both write the Hub's Repairs tab directly.
+// Closing REQUIRES a cost (0 allowed, blank refused) and books the pending Maintenance in WeShare.
+// ============================================================
+let REP = null, REP_CLOSE_ID = null, REP_ADD_OPEN = false, REP_NEW_TRADE = false;
+function emadRepairFromTodo(id){ REP_CLOSE_ID = id; showPage('repairs'); }
+async function renderRepairsScreen(force){
+  const el = document.getElementById('repairsContent');
+  if (!REP || force) {
+    el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
+    try {
+      const r = await callScript({ action: 'repairs_data' });
+      if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+      REP = r;
+    } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">تعذر التحميل — حاول مرة أخرى</div></div>`; return; }
+  }
+  let h = `<button onclick="REP_ADD_OPEN=!REP_ADD_OPEN;REP_NEW_TRADE=false;renderRepairsScreen()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:11px;cursor:pointer;margin-bottom:12px">${REP_ADD_OPEN ? '✕ إلغاء' : '➕ فتح بلاغ صيانة جديد'}</button>`;
+
+  if (REP_ADD_OPEN) {
+    h += `<div class="card" style="padding:12px;margin-bottom:14px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <select id="repFlat" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+          ${(REP.flats||[]).map(f => `<option value="${f}">${emadFlatAr(f)}</option>`).join('')}</select>
+        ${REP_NEW_TRADE
+          ? `<input id="repNewTrade" placeholder="نوع الصيانة الجديد..." style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+             <button onclick="REP_NEW_TRADE=false;renderRepairsScreen()" style="border:none;background:none;color:var(--text3);font-family:'Cairo',sans-serif;font-size:11px;cursor:pointer;text-align:right">← الرجوع للقائمة</button>`
+          : `<select id="repTrade" onchange="if(this.value==='__new__'){REP_NEW_TRADE=true;renderRepairsScreen();}" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+              ${(REP.trades||[]).map(t => `<option>${t}</option>`).join('')}<option value="__new__">➕ نوع جديد...</option></select>`}
+        <div style="display:flex;gap:6px">
+          <input id="repDate" type="date" value="${emadTodayK()}" style="flex:1;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px;font-family:'Cairo',sans-serif;font-size:12px">
+          <input id="repTime" type="time" style="flex:1;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px;font-family:'Cairo',sans-serif;font-size:12px">
+        </div>
+        <input id="repWhat" placeholder="ما المشكلة؟" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+        <button onclick="repairOpenSave()" style="border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:10px;cursor:pointer">فتح البلاغ</button>
+      </div></div>`;
+  }
+
+  h += `<div class="section-title">البلاغات المفتوحة (${(REP.open||[]).length})</div>`;
+  if (!(REP.open||[]).length) h += `<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">لا توجد بلاغات مفتوحة</div></div>`;
+  (REP.open||[]).forEach(t => {
+    const closing = REP_CLOSE_ID === t.id;
+    h += `<div class="card" style="padding:10px 12px;margin-bottom:8px${closing ? ';border:2px solid var(--primary,#cc5f5f)' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:13.5px">🔧 ${emadFlatAr(t.flat)} — ${t.trade}</div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:2px"><span dir="ltr">${t.date || 'بدون تاريخ'}</span>${t.time && /^\d/.test(t.time) ? ' — ' + emadHmAr(t.time) : ''}${t.what ? ' — ' + t.what : ''}</div>
+        </div>
+        <button onclick="REP_CLOSE_ID=${closing ? 'null' : `'${t.id}'`};renderRepairsScreen()" style="flex-shrink:0;border:1px solid ${closing ? 'var(--border,#ddd)' : '#a5d6a7'};border-radius:8px;background:${closing ? 'none' : '#e8f5e9'};color:${closing ? 'var(--text3)' : '#2e7d32'};font-family:'Cairo',sans-serif;font-weight:700;font-size:12px;padding:6px 12px;cursor:pointer">${closing ? '✕' : '✅ إغلاق'}</button>
+      </div>`;
+    if (closing) {
+      h += `<div style="display:flex;flex-direction:column;gap:7px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border,#eee)">
+        <input id="repCost" type="number" inputmode="numeric" placeholder="التكلفة بالجنيه (اكتب 0 لو مجاناً) — إجباري" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+        <input id="repDone" placeholder="ماذا تم عمله؟" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;font-size:13px">
+        <input id="repCloseDate" type="date" value="${emadTodayK()}" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:7px;font-family:'Cairo',sans-serif;font-size:12px">
+        <button onclick="repairCloseSave('${t.id}')" style="border:none;border-radius:8px;background:#2e7d32;color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:10px;cursor:pointer">تأكيد الإغلاق</button>
+      </div>`;
+    }
+    h += `</div>`;
+  });
+  el.innerHTML = h;
+}
+async function repairOpenSave(){
+  const nt = REP_NEW_TRADE ? (document.getElementById('repNewTrade')?.value || '').trim() : '';
+  const body = { action: 'repair_open',
+    flat: document.getElementById('repFlat').value,
+    trade: REP_NEW_TRADE ? '' : document.getElementById('repTrade').value,
+    newTrade: nt,
+    date: document.getElementById('repDate').value,
+    time: document.getElementById('repTime').value,
+    what: document.getElementById('repWhat').value.trim() };
+  if (REP_NEW_TRADE && !nt) { showToast('❌ اكتب اسم النوع الجديد'); return; }
+  try {
+    const r = await callScript(body);
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ تم فتح البلاغ');
+    REP_ADD_OPEN = false; REP_NEW_TRADE = false;
+    await renderRepairsScreen(true); loadEmadHome();
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
+}
+async function repairCloseSave(id){
+  const costRaw = document.getElementById('repCost').value;
+  // the rule: a cost MUST be entered — 0 is a real answer, an empty box is not
+  if (String(costRaw).trim() === '' || isNaN(parseFloat(costRaw)) || parseFloat(costRaw) < 0) {
+    showToast('❌ لازم تكتب التكلفة — لو مجاناً اكتب 0'); return;
+  }
+  try {
+    const r = await callScript({ action: 'repair_close', id: id, cost: parseFloat(costRaw),
+      done: document.getElementById('repDone').value.trim(),
+      date: document.getElementById('repCloseDate').value });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ تم الإغلاق' + (r.weshare === 'pending row added' ? ' — في انتظار تأكيد خالد' : ''));
+    REP_CLOSE_ID = null;
+    await renderRepairsScreen(true); loadEmadHome();
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
 
 // ============================================================
@@ -1275,10 +1396,11 @@ function renderEmadPanel() {
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
       <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`;
   });
-  // today's repairs — Emad meets the tradesman, so they are his tasks exactly as in the WhatsApp
-  (EMAD.repairs || []).filter(r => r.date === todayK).forEach((r, i) => {
-    todo += row('🔧', `شقة ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''}`,
-      { tick: 'rep' + i, click: `emadTickTask('rep${i}')` });
+  /* today's repairs — tapping one opens the CLOSE form, not a cosmetic tick: a repair is done when
+     its cost is entered (0 allowed), and the task leaves the list because the ticket really closed */
+  (EMAD.repairs || []).filter(r => r.date === todayK).forEach(r => {
+    todo += row('🔧', `شقة ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق</span>`,
+      { click: `emadRepairFromTodo('${r.id}')` });
   });
 
   /* ⚡ the 8A card reading — captured HERE at the house, never in the laundry submission (that
@@ -1421,7 +1543,8 @@ function renderHome() {
   });
   const monthCost = monthSubs.reduce((sum,s) => sum + getSubmissionTotal(s.id), 0);
 
-  let html = renderEmadPanel();
+  let html = `<button id="dcSyncBtn" onclick="dcSyncAll()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13.5px;padding:10px;cursor:pointer;margin-bottom:12px">🔄 مزامنة شاملة</button>`;
+  html += renderEmadPanel();
   html += `
     <div class="stats-grid" style="margin-bottom:16px">
       <div class="stat-card"><div class="stat-value">${sent.length}</div><div class="stat-label">عند الغسيل الآن</div></div>
@@ -1507,10 +1630,10 @@ function openEditModal(subId) {
   // Deep copy items for editing
   editItems = allItems.filter(i => i.submissionId === subId).map(i => ({...i}));
 
-  let dateStr = new Date().toISOString().slice(0,10);
+  let dateStr = emadTodayK();                         // LOCAL date — toISOString is UTC and lags Egypt after midnight
   try {
     const d = sub.timestamp ? excelDateToJS(sub.timestamp) : new Date();
-    if (d && !isNaN(d)) dateStr = d.toISOString().slice(0,10);
+    if (d && !isNaN(d)) dateStr = emadYmdOf(d);
   } catch(e) { /* use today */ }
 
   const aptOptions = ['8A','17A','28A','Zayed 2000'].map(a =>
@@ -1826,7 +1949,7 @@ async function submitNew() {
   try {
     const submissionId = generateId();
     const now = new Date(dateVal ? dateVal + 'T12:00:00' : Date.now());
-    const ts = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+    const ts = emadYmdOf(now) + ' ' + now.toTimeString().slice(0,5);   // LOCAL date — a midnight submission must file under today, not UTC-yesterday
     await appendToSheet('Submissions', [[submissionId, apt, ts, '', submitter, 'sent']]);
     const itemRows = newItems.map(item => [generateId(), submissionId, ts, item.type, item.color, item.qty, item.unitPrice, item.total, 'sent', '']);
     await appendToSheet('Items', itemRows);
@@ -1885,7 +2008,7 @@ function renderIssuesSummary() {
 async function resolveIssue(itemId) {
   const itemIdx = allItems.findIndex(i => i.itemId === itemId);
   if (itemIdx === -1) return;
-  const now = new Date().toISOString().slice(0,10);
+  const now = emadTodayK();                           // LOCAL date, same rule as everywhere
   const resolvedNote = (allItems[itemIdx].note ? allItems[itemIdx].note + ' — ' : '') + 'تم الإصلاح ' + now;
   showToast('⏳ جاري الحفظ...');
   try {
@@ -2177,10 +2300,11 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
-  const tabs = ['home','new','review','elec','stats','manage'];
+  const tabs = ['home','new','review','elec','repairs','stats','manage'];
   document.querySelectorAll('.nav-tab')[tabs.indexOf(name)]?.classList.add('active');
   if (name === 'manage') renderManageList();
   if (name === 'elec') renderElecScreen();
+  if (name === 'repairs') renderRepairsScreen();
 }
 
 function showToast(msg) {
