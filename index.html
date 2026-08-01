@@ -1100,14 +1100,15 @@ async function dcSyncAll(){
     const r = await callScript({ action: 'hub_sync_all' });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('✅ تمت المزامنة' + (r.pending ? ` — ${r.pending} في انتظار التأكيد` : ''));
-    await Promise.all([loadAllData(true), renderElecScreen && ELEC ? (ELEC = null) : null]);
+    ELEC = null;
+    await Promise.all([loadAllData(true), loadEmadHome(true)]);   // force = bypass the server cache after a pipeline run
   } catch(e) { showToast('❌ فشلت المزامنة — ' + (e.message || 'حاول مرة أخرى')); }
   if (btn) { btn.disabled = false; btn.textContent = '🔄 مزامنة شاملة'; }
 }
 
-async function loadEmadHome() {
+async function loadEmadHome(force) {
   try {
-    const r = await callScript({ action: 'emad_home' });
+    const r = await callScript({ action: 'emad_home', force: force ? 1 : 0 });
     if (r && r.ok) { EMAD = r; try { localStorage.setItem('emadCache', JSON.stringify(r)); } catch(e) {} renderHome(); }
   } catch (e) {}                                   // the panel is additive — home still works without it
 }
