@@ -347,11 +347,8 @@ window.addEventListener('load',function(){
   <button class="nav-tab active" onclick="showPage('home')">
     <span class="tab-icon">🏠</span>الرئيسية
   </button>
-  <button class="nav-tab" onclick="showPage('new')">
-    <span class="tab-icon">➕</span>إرسال
-  </button>
-  <button class="nav-tab" onclick="showPage('review')">
-    <span class="tab-icon">📦</span>مراجعة
+  <button class="nav-tab" onclick="showPage('dc')">
+    <span class="tab-icon">🧺</span>دراي كلين
   </button>
   <button class="nav-tab" onclick="showPage('elec')">
     <span class="tab-icon">⚡</span>كهرباء
@@ -359,11 +356,8 @@ window.addEventListener('load',function(){
   <button class="nav-tab" onclick="showPage('repairs')">
     <span class="tab-icon">🔧</span>إصلاحات
   </button>
-  <button class="nav-tab" onclick="showPage('stats')">
-    <span class="tab-icon">📊</span>إحصائيات
-  </button>
-  <button class="nav-tab" onclick="showPage('manage')">
-    <span class="tab-icon">⚙️</span>إدارة
+  <button class="nav-tab" onclick="showPage('log')">
+    <span class="tab-icon">📋</span>سجل
   </button>
   <button class="nav-tab" onclick="window.location.href='inventory.html'">
     <span class="tab-icon">🗂️</span>المخزون
@@ -375,6 +369,25 @@ window.addEventListener('load',function(){
 <!-- ===================== HOME PAGE ===================== -->
 <div class="page active" id="page-home">
   <div id="homeContent">
+    <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
+  </div>
+</div>
+
+<!-- ===================== 🧺 الدراي كلين (launcher) ===================== -->
+<div class="page" id="page-dc">
+  <div class="section-title">🧺 الدراي كلين</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 2px">
+    <button onclick="showPage('new')" style="border:1px solid var(--border,#e5e0d8);border-radius:12px;background:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:22px 8px;cursor:pointer"><div style="font-size:26px;margin-bottom:4px">➕</div>إرسال جديد</button>
+    <button onclick="showPage('review')" style="border:1px solid var(--border,#e5e0d8);border-radius:12px;background:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:22px 8px;cursor:pointer"><div style="font-size:26px;margin-bottom:4px">📦</div>مراجعة</button>
+    <button onclick="showPage('stats')" style="border:1px solid var(--border,#e5e0d8);border-radius:12px;background:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:22px 8px;cursor:pointer"><div style="font-size:26px;margin-bottom:4px">📊</div>إحصائيات</button>
+    <button onclick="showPage('manage')" style="border:1px solid var(--border,#e5e0d8);border-radius:12px;background:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:22px 8px;cursor:pointer"><div style="font-size:26px;margin-bottom:4px">⚙️</div>إدارة</button>
+  </div>
+</div>
+
+<!-- ===================== سجل النظافة ===================== -->
+<div class="page" id="page-log">
+  <div class="section-title">📋 سجل النظافة</div>
+  <div id="logContent">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
   </div>
 </div>
@@ -1187,16 +1200,126 @@ async function emadCleanStart(date, flat, type, time){
   } catch(e) { alert('لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
 async function emadCleanEnd(date, flat, type, time){
-  const req = type === 'checkout';
-  const notes = prompt(req ? 'حالة الشقة؟ (إجباري) — أعطال، نواقص، أو "كله تمام"' : 'ملاحظات؟ (اختياري)');
+  // Sarah 2026-08-02: house-status notes are required on EVERY clean — the سجل screen reads them
+  const notes = prompt('حالة الشقة؟ (إجباري) — أعطال، نواقص، أو "كله تمام"');
   if (notes === null) return;
-  if (req && !notes.trim()) { alert('لازم تكتب حالة الشقة — لو مفيش حاجة اكتب "كله تمام"'); return; }
+  if (!notes.trim()) { alert('لازم تكتب حالة الشقة — لو مفيش حاجة اكتب "كله تمام"'); return; }
   try {
     const r = await callScript({ action: 'clean_end', date, flat, type, time, notes: notes.trim() });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('🏁 خلصت (' + r.mins + ' دقيقة)');
     loadEmadHome(true);
   } catch(e) { alert('لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
+}
+
+// ============================================================
+// 📋 سجل النظافة (Sarah 2026-08-02) — Emad's month in numbers + the log Sarah reads.
+// Stats measure only what Emad controls: on-time starts (≤15 min past scheduled), durations,
+// notes filled. Rows from today/yesterday can be amended (تعديل) — original kept server-side
+// in the Edits column, Telegram to Sarah+Khaled on every change.
+// ============================================================
+let CLOG = null, CLOG_MONTH = null;
+function clogMin(t){ const m = String(t||'').match(/^(\d{1,2}):(\d{2})/); return m ? (+m[1])*60 + (+m[2]) : null; }
+function clogOnTime(r){ const s = clogMin(r.sched), a = clogMin(r.started); return s !== null && a !== null ? (a - s) <= 15 : null; }
+function clogShiftMonth(delta){
+  const p = CLOG_MONTH.split('-'), d = new Date(+p[0], +p[1]-1+delta, 1);
+  const nowM = emadYmdOf(new Date()).slice(0,7);
+  const m = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  if (m > nowM) return;
+  CLOG_MONTH = m; renderCleanLog(true);
+}
+async function renderCleanLog(force){
+  const el = document.getElementById('logContent');
+  if (!CLOG_MONTH) CLOG_MONTH = emadYmdOf(new Date()).slice(0,7);
+  if (!CLOG || CLOG.month !== CLOG_MONTH || force){
+    el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
+    try {
+      const r = await callScript({ action:'clean_log', month: CLOG_MONTH });
+      if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+      CLOG = r;
+    } catch(e){
+      el.innerHTML = `<div style="text-align:center;padding:24px;color:#c62828">تعذر التحميل — <button class="btn btn-outline btn-sm" onclick="renderCleanLog(true)">إعادة المحاولة</button></div>`;
+      return;
+    }
+  }
+  const rows = CLOG.rows, todayK = CLOG.today, nowM = emadYmdOf(new Date()).slice(0,7);
+  const ydayK = emadYmdOf(new Date(Date.now() - 86400000));
+  // ---- stats: only what he controls
+  const done = rows.filter(r => r.started);
+  const withSched = done.filter(r => clogMin(r.sched) !== null);
+  const onTimeN = withSched.filter(r => clogOnTime(r) === true).length;
+  const durs = rows.map(r => { const a = clogMin(r.started), b = clogMin(r.ended); return (a!==null && b!==null && b>a) ? b-a : null; }).filter(x => x !== null);
+  const avgDur = durs.length ? Math.round(durs.reduce((s,x)=>s+x,0)/durs.length) : null;
+  // streak: consecutive days (newest first) where every scheduled clean started on time; empty days don't break it
+  const byDay = {};
+  withSched.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); });
+  let streak = 0, streakBroken = false;
+  Object.keys(byDay).sort().reverse().forEach(d => {
+    if (streakBroken) return;
+    if (byDay[d].every(r => clogOnTime(r) === true)) streak++;
+    else streakBroken = true;
+  });
+  const byFlat = {};
+  rows.forEach(r => { byFlat[r.flat] = (byFlat[r.flat]||0) + (r.started ? 1 : 0); });
+  const diff = done.length - (CLOG.prevCount || 0);
+  const arrow = CLOG.prevCount ? (diff > 0 ? ` <span style="color:#2e7d32">▲${diff}</span>` : diff < 0 ? ` <span style="color:#c62828">▼${Math.abs(diff)}</span>` : ' <span style="color:#888">=</span>') : '';
+  const pct = withSched.length ? Math.round(onTimeN/withSched.length*100) : null;
+  const card = (big, label) => `<div style="background:var(--card,#fff);border:1px solid #e5e0d8;border-radius:10px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800">${big}</div><div style="font-size:11px;color:#777">${label}</div></div>`;
+  let h = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <button class="btn btn-outline btn-sm" style="padding:4px 12px" onclick="clogShiftMonth(1)" ${CLOG.month>=nowM?'disabled':''}>‹</button>
+    <b style="font-size:15px">${CLOG.month}</b>
+    <button class="btn btn-outline btn-sm" style="padding:4px 12px" onclick="clogShiftMonth(-1)">›</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+    ${card(done.length + arrow, 'نظافة هذا الشهر')}
+    ${card(pct === null ? '—' : pct + '%', 'الالتزام بالمعاد (خلال ١٥ دقيقة)')}
+    ${card(avgDur === null ? '—' : avgDur + ' د', 'متوسط مدة النظافة')}
+    ${card(streak, 'أيام ملتزمة متتالية 🔥')}
+  </div>`;
+  const flatBits = Object.keys(byFlat).filter(f => byFlat[f]).map(f => `${emadFlatAr(f)}: <b>${byFlat[f]}</b>`);
+  if (flatBits.length) h += `<div style="font-size:12px;color:#555;margin-bottom:10px;text-align:center">${flatBits.join(' · ')}</div>`;
+  // ---- the log, newest first, grouped by day
+  if (!rows.length) h += `<div style="text-align:center;color:#888;padding:20px">لا توجد نظافات مسجلة في هذا الشهر</div>`;
+  const days = {};
+  rows.forEach(r => { (days[r.date] = days[r.date] || []).push(r); });
+  Object.keys(days).sort().reverse().forEach(d => {
+    const dd = new Date(d + 'T12:00:00');
+    h += `<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px;color:#6b5d4f">${dd.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'})}${d===todayK?' — اليوم':''}</div>`;
+    days[d].sort((a,b)=>String(a.sched||a.started).localeCompare(String(b.sched||b.started))).forEach(r => {
+      const ot = clogOnTime(r);
+      const badge = !r.started ? '⬜' : r.ended ? (ot === false ? '⏰' : '✅') : '🟢';
+      const dur = (clogMin(r.started)!==null && clogMin(r.ended)!==null) ? (clogMin(r.ended)-clogMin(r.started)) : null;
+      const canAmend = (d === todayK || d === ydayK) && r.started;
+      h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px">
+        <div style="display:flex;justify-content:space-between;gap:6px">
+          <div style="font-size:13px"><b>${badge} ${emadFlatAr(r.flat)}</b> — ${EMAD_TYPE_AR[r.type] || r.type || 'نظافة'}</div>
+          <div style="font-size:11.5px;color:#666;white-space:nowrap">${r.sched ? 'المجدول ' + r.sched + ' · ' : ''}${r.started ? 'بدأ ' + r.started : 'لم تبدأ'}${r.ended ? ' → ' + r.ended : ''}${dur ? ' (' + dur + ' د)' : ''}</div>
+        </div>
+        ${r.notes ? `<div style="font-size:12px;color:#444;margin-top:4px">📋 ${r.notes}</div>` : ''}
+        ${r.edits ? `<div style="font-size:10.5px;color:#a1887f;margin-top:4px;white-space:pre-line">✏️ ${r.edits}</div>` : ''}
+        ${canAmend ? `<div style="margin-top:5px;display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="clogAmend('${r.date}','${r.flat.replace(/'/g,"\\'")}','${r.type}','${r.sched}','started','${r.started}')">✏️ البداية</button>
+          ${r.ended ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="clogAmend('${r.date}','${r.flat.replace(/'/g,"\\'")}','${r.type}','${r.sched}','ended','${r.ended}')">✏️ النهاية</button>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="clogAmend('${r.date}','${r.flat.replace(/'/g,"\\'")}','${r.type}','${r.sched}','notes','')">✏️ الملاحظات</button>` : ''}
+        </div>` : ''}
+      </div>`;
+    });
+  });
+  el.innerHTML = h;
+}
+async function clogAmend(date, flat, type, sched, field, cur){
+  const label = field === 'started' ? 'وقت البداية' : field === 'ended' ? 'وقت النهاية' : 'الملاحظات';
+  const v = prompt(field === 'notes'
+    ? 'الملاحظات الجديدة (تستبدل القديمة — القديمة محفوظة في السجل):'
+    : label + ' الصحيح (مثال 10:45):' + (cur ? '\nالحالي: ' + cur : ''), field === 'notes' ? '' : (cur || ''));
+  if (v === null || !v.trim()) return;
+  if (field !== 'notes' && !/^\d{1,2}:\d{2}$/.test(v.trim())) { alert('اكتب الوقت بصيغة ساعة:دقيقة مثل 10:45'); return; }
+  try {
+    const r = await callScript({ action:'clean_amend', date, flat, type, time: sched, field, value: v.trim() });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✏️ تم التعديل — واتسجل في السجل');
+    renderCleanLog(true); loadEmadHome(true);
+  } catch(e){ alert('لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
 
 // ⚡ quick entry for the 8A card balance — the raw number as the meter shows it
@@ -1502,6 +1625,32 @@ function renderEmadPanel() {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:6px 12px">${todo}${addBox}</div>`;
   } else if (EMAD.schedule) {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:8px 12px"><div style="color:var(--text3);padding:6px 0">لا توجد مهام اليوم ✨</div>${addBox}</div>`;
+  }
+
+  /* ---- 🏠 homepage headline (Sarah 2026-08-02): the month's costs across Emad's three streams
+     (numbers he himself entered — never the P&L or the split) + the stock picture at a glance. */
+  const mcv = EMAD.monthCosts;
+  if (mcv) {
+    const eg = n => Math.round(n).toLocaleString('ar-EG');
+    h += `<div class="section-title">💰 مصاريف الشهر</div>
+    <div class="card" style="margin-bottom:12px;padding:10px 12px">
+      <div style="text-align:center;font-size:22px;font-weight:800;margin-bottom:6px">${eg(mcv.total)} <span style="font-size:12px;font-weight:600">جنيه</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+        <div style="background:var(--bg2,#faf6f2);border-radius:8px;padding:6px"><div style="font-size:15px;font-weight:700">${eg(mcv.dc)}</div><div style="font-size:10.5px;color:var(--text3)">🧺 دراي كلين</div></div>
+        <div style="background:var(--bg2,#faf6f2);border-radius:8px;padding:6px"><div style="font-size:15px;font-weight:700">${eg(mcv.inv)}</div><div style="font-size:10.5px;color:var(--text3)">🗂️ مخزون</div></div>
+        <div style="background:var(--bg2,#faf6f2);border-radius:8px;padding:6px"><div style="font-size:15px;font-weight:700">${eg(mcv.rep)}</div><div style="font-size:10.5px;color:var(--text3)">🔧 إصلاحات</div></div>
+      </div>
+    </div>`;
+  }
+  {
+    const miss = EMAD.missing || [];
+    let stock = miss.length
+      ? `<div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:4px">${miss.length} أصناف تحت ٦٠٪ من المطلوب</div>` +
+        miss.slice(0, 3).map(x => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0"><span>${x.name}</span><span><b>${x.pct}٪</b></span></div>`).join('') +
+        `<div style="font-size:11px;color:var(--text3);margin-top:3px">${miss.length > 3 ? 'و' + (miss.length - 3) + ' أصناف أخرى — ' : ''}اضغط للمخزون</div>`
+      : `<div style="font-size:13px;color:#2e7d32">المخزون تمام ✅ <span style="color:var(--text3);font-size:11px">— اضغط للتفاصيل</span></div>`;
+    h += `<div class="section-title">🧴 المخزون</div>
+    <div class="card" style="margin-bottom:12px;padding:10px 12px;cursor:pointer" onclick="window.location.href='inventory.html'">${stock}</div>`;
   }
 
   // ---- the confirmed week as the SAME grid the Hub shows: flats × days, the Hub's colours ----
@@ -2353,11 +2502,14 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
-  const tabs = ['home','new','review','elec','repairs','stats','manage'];
-  document.querySelectorAll('.nav-tab')[tabs.indexOf(name)]?.classList.add('active');
+  /* 6 tabs since 2026-08-02: the four dry-clean screens (إرسال/مراجعة/إحصائيات/إدارة) live behind
+     the ONE 🧺 tab (a launcher, like المخزون is its own world) — so any of those pages highlights it */
+  const tabOf = { home:0, dc:1, 'new':1, review:1, stats:1, manage:1, elec:2, repairs:3, log:4 };
+  document.querySelectorAll('.nav-tab')[tabOf[name] !== undefined ? tabOf[name] : 0]?.classList.add('active');
   if (name === 'manage') renderManageList();
   if (name === 'elec') renderElecScreen();
   if (name === 'repairs') renderRepairsScreen();
+  if (name === 'log') renderCleanLog();
 }
 
 function showToast(msg) {
