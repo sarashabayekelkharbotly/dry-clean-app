@@ -698,6 +698,7 @@ window.addEventListener('load',function(){
     <div id="receive-modal-body"></div>
     <div class="form-group" style="margin-top:12px"><label class="form-label">الكمية المستلمة فعلاً</label>
       <input class="form-input" id="recv-qty" type="number" min="0">
+      <div style="font-size:11.5px;color:var(--text3,#888);margin-top:4px">لو اللي وصل أقل أو أكتر من المطلوب، <b>غيّر الرقم للعدد الحقيقي</b> — التكلفة هتتحسب على اللي استلمته فعلاً، والاستلام الجزئي عادي ✓</div>
     </div>
     <button class="btn btn-success" onclick="confirmReceive()">✅ تم الاستلام — إضافة للمخزون</button>
     <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('receive-modal')">إلغاء</button>
@@ -2040,12 +2041,22 @@ async function adjCur(id, delta) {
     return;
   }
 
-  // Positive = manual add without full receive flow
+  /* GUARDRAIL (Sarah 2026-08-02): stock can only INCREASE through receiving an order — a manual
+     + bypasses WeShare cost tracking entirely (this is exactly how the kitchen-rolls mix-up
+     happened). The ONE exception: undoing an accidental − tap on the same item, by the same
+     user, within the last 10 minutes — that's a correction, not a phantom delivery. */
+  const undoable = events.find(e => String(e.itemId) === String(it.id)) ;
+  const isUndo = undoable && undoable.type === 'consume' && undoable.user === currentUserName &&
+                 (Date.now() - new Date(undoable.timestamp).getTime()) < 10 * 60000;
+  if (!isUndo) {
+    alert('الزيادة في المخزون تتسجل باستلام طلب بس 📦\nلو وصلت حاجة من غير طلب، كلم سارة أو خالد يسجلوا الطلب الأول — علشان التكلفة تتحسب صح.\n(لو كنت خصمت بالغلط من شوية، اضغط ＋ خلال ١٠ دقايق من الخصم وهيرجع)');
+    return;
+  }
   it.cur = Math.max(0, it.cur + delta);
   updateCardUI(it);
   renderSummary(); renderNawaqes();
 
-  const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'adjust', qty:delta, user:currentUserName, timestamp:new Date().toISOString(), note:'إضافة يدوية', curAfter:it.cur };
+  const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'adjust', qty:delta, user:currentUserName, timestamp:new Date().toISOString(), note:'تراجع عن خصم بالغلط', curAfter:it.cur };
   events.unshift(ev);
   try {
     await api('inv_update_cur', { itemId: it.id, cur: it.cur });
@@ -2249,7 +2260,10 @@ async function confirmReceive() {
     await api('inv_update_order', { orderId: ord.id, fields: { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received', total: actualTotal } });
     await api('inv_log_event', { event: ev });
   } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
-  toast(`✅ تم استلام ${qty} ${ord.itemName}`);
+  if (qty < (ord.qtyRequested || 0))
+    toast(`✅ استلمت ${qty} من ${ord.qtyRequested} ${ord.itemName} — لو الباقي هييجي بعدين، يتسجل كطلب جديد`);
+  else
+    toast(`✅ تم استلام ${qty} ${ord.itemName}`);
 }
 
 // ─────────────────────────────────────────────
