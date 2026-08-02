@@ -72,7 +72,7 @@ body {
 }
 .nav::-webkit-scrollbar { display: none; }
 .nav-tab {
-  flex: 0 0 auto; min-width: 56px; padding: 8px 7px;   /* 8 tabs now — compact, swipe for the rest */
+  flex: 1 0 auto; min-width: 56px; padding: 8px 7px;   /* 6 tabs since 2026-08-02 — stretch to fill, so they sit centered */
   text-align: center; font-size: 10.5px; font-weight: 700;
   color: var(--text3); border: none; background: none;
   cursor: pointer; border-bottom: 3px solid transparent;
@@ -1603,6 +1603,12 @@ function renderEmadPanel() {
   (EMAD.sla || []).forEach(x => {
     todo += row('🧺', `<b>تابع المغسلة:</b> شقة ${emadFlatAr(x.apt)} عند الغسيل من ${x.days} أيام <span style="color:#cc5f5f;font-size:11px">(أكثر من ٣ أيام)</span>`);
   });
+  /* partial receipts stay here until the submission is flipped to استلام كامل in المراجعة —
+     the follow-up log Sarah asked for (2026-08-02): item + comment, impossible to forget */
+  (EMAD.partials || []).forEach(p => {
+    const det = (p.items || []).map(x => `${x.type}${x.qty > 1 ? ' ×' + x.qty : ''}${x.note ? ' — ' + x.note : ''}`).join('، ');
+    todo += row('🧺', `<b>متبقي من الغسيل:</b> شقة ${emadFlatAr(p.apt)}${det ? ': ' + det : ''} <span style="color:#cc5f5f;font-size:11px">(استلام جزئي — تابعه لحد ما يرجع)</span>`);
+  });
   (EMAD.payment || []).forEach(x => {
     todo += row('💵', `<b>الدفع للمغسلة:</b> شقة ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
   });
@@ -2320,12 +2326,12 @@ function openReviewModal(subId) {
 
   html += `
     <div class="divider"></div>
-    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">تحديث حالة الطلب</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px">الاستلام — كامل أو جزئي</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">استلام جزئي = علِّم الصنف اللي فيه مشكلة بزرار ⚠️ فوق واكتب التعليق، وهيفضل على قايمة المتابعة لحد ما يرجع</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-      <button class="btn btn-success" onclick="updateSubmissionStatus('${subId}','returned')">✅ مُسترجع بالكامل</button>
-      <button class="btn btn-warn" onclick="updateSubmissionStatus('${subId}','partial')">📦 جزئي</button>
-      <button class="btn btn-danger" onclick="updateSubmissionStatus('${subId}','issue')">⚠️ مشكلة</button>
-      <button class="btn btn-outline" onclick="updateSubmissionStatus('${subId}','sent')">⏳ عند الغسيل</button>
+      <button class="btn btn-success" onclick="updateSubmissionStatus('${subId}','returned')">✅ استلام كامل</button>
+      <button class="btn btn-warn" onclick="updateSubmissionStatus('${subId}','partial')">📦 استلام جزئي</button>
+      <button class="btn btn-outline" style="grid-column:1 / -1" onclick="updateSubmissionStatus('${subId}','sent')">⏳ رجوع لـ«عند الغسيل»</button>
     </div>
     <div class="divider"></div>
     <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="closeModal();promptDelete('${subId}')">🗑️ حذف هذا الطلب</button>`;
@@ -2373,6 +2379,19 @@ async function togglePaid(subId) {
 async function updateSubmissionStatus(subId, status) {
   const subIdx = allSubmissions.findIndex(s => s.id === subId);
   if (subIdx === -1) return;
+  /* Sarah 2026-08-02: receipt is FULL or PARTIAL, nothing else. Partial requires the problem
+     item(s) flagged ⚠️ with a comment each — that's what feeds the follow-up log; full receipt
+     is refused while an item is still flagged (either the flag is stale, or it's really partial). */
+  const issueItems = allItems.filter(i => i.submissionId === subId && (i.status || '') === 'issue');
+  if (status === 'partial') {
+    if (!issueItems.length) { alert('استلام جزئي: علِّم الأول الصنف اللي فيه مشكلة بزرار ⚠️ واكتب التعليق'); return; }
+    const noNote = issueItems.filter(i => !(i.note || '').trim());
+    if (noNote.length) { alert('اكتب تعليق على كل صنف معلَّم ⚠️:\n' + noNote.map(i => '• ' + (i.type || '')).join('\n')); return; }
+  }
+  if (status === 'returned' && issueItems.length) {
+    alert('فيه أصناف معلَّمة ⚠️ — لو رجعت كلها وتمام، شيل العلامة (✅ ok) الأول. لو لسه ناقصة اختار «استلام جزئي»');
+    return;
+  }
   showToast('⏳ جاري الحفظ...');
   try {
     await callScript({ action: 'update_by_id', sheet: 'Submissions', id: subId, col: 6, value: status });
