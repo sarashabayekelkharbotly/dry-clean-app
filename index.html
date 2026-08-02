@@ -1607,7 +1607,10 @@ function renderEmadPanel() {
      the follow-up log Sarah asked for (2026-08-02): item + comment, impossible to forget */
   (EMAD.partials || []).forEach(p => {
     const det = (p.items || []).map(x => `${x.type}${x.qty > 1 ? ' ×' + x.qty : ''}${x.note ? ' — ' + x.note : ''}`).join('، ');
-    todo += row('🧺', `<b>متبقي من الغسيل:</b> شقة ${emadFlatAr(p.apt)}${det ? ': ' + det : ''} <span style="color:#cc5f5f;font-size:11px">(استلام جزئي — تابعه لحد ما يرجع)</span>`);
+    const when = p.date ? ` <span style="color:var(--text3);font-size:11px">(غسيل ${p.date.slice(5).replace('-', '/')})</span>` : '';
+    todo += row('🧺', `<b>متبقي من الغسيل:</b> شقة ${emadFlatAr(p.apt)}${when}${det
+      ? `<br><span style="font-size:12px">${det}</span> <span style="color:#cc5f5f;font-size:11px">— تابعه لحد ما يرجع</span>`
+      : ` <span style="color:#cc5f5f;font-size:11px">— الأصناف غير محددة: افتحها في «المراجعة» وعلِّم الناقص ⚠️، أو لو رجعت خلاص اعمل «استلام كامل»</span>`}`);
   });
   (EMAD.payment || []).forEach(x => {
     todo += row('💵', `<b>الدفع للمغسلة:</b> شقة ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
@@ -2313,8 +2316,7 @@ function openReviewModal(subId) {
           ${data.items.map(item => `
             <div style="margin-bottom:6px">
               <div style="display:flex;gap:4px;margin-bottom:3px">
-                <button onclick="setItemStatus('${item.itemId}','ok')" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='ok'?'#e8f5e9':'var(--surface3)'};color:${(item.status||'sent')==='ok'?'#2e7d32':'var(--text3)'}">✅ ok</button>
-                <button onclick="setItemStatus('${item.itemId}','issue')" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='issue'?'#ffeef0':'var(--surface3)'};color:${(item.status||'sent')==='issue'?'#cc5f5f':'var(--text3)'}">⚠️ مشكلة</button>
+                <button onclick="setItemStatus('${item.itemId}',${(item.status||'sent')==='issue' ? `'sent'` : `'issue'`})" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='issue'?'#ffeef0':'var(--surface3)'};color:${(item.status||'sent')==='issue'?'#cc5f5f':'var(--text3)'}">⚠️ ${(item.status||'sent')==='issue'?'فيه مشكلة — دوس للإلغاء':'مشكلة؟'}</button>
               </div>
               ${(item.status||'sent')==='issue' ? `<input placeholder="وصف المشكلة..." value="${item.note||''}" onchange="setItemNote('${item.itemId}',this.value)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:'Cairo',sans-serif;background:var(--surface2)">` : ''}
             </div>`).join('')}
