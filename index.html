@@ -1147,6 +1147,8 @@ function emadTaskLine(c){
   if (c.type === 'codechange') return `شقة ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — دخول ضيف غدا`;
   let t = `شقة ${emadFlatAr(c.flat)}: ${EMAD_TYPE_AR[c.type] || 'تنظيف'}`;
   if (c.time && /^\d/.test(c.time)) t += ` الساعة ${emadHmAr(c.time)}`;
+  if (c.cleaner === 'jinny') t += ' — النظافة: جيني';
+  else if (c.cleaner === 'both') t += ' — النظافة: أمل + جيني';
   if (c.type === 'checkout' && c.code) t += ` — كود الباب ${c.code}`;
   else if (c.type === 'revision' && c.code && c.code !== '0107') t += ` — تغيير كود الباب إلى ${c.code}`;
   if (c.inTime && /^\d/.test(c.inTime)) t += ` — دخول ضيف الساعة ${emadHmAr(c.inTime)}`;
