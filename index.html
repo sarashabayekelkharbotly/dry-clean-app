@@ -1608,7 +1608,7 @@ function renderEmadPanel() {
   /* partial receipts stay here until the submission is flipped to استلام كامل in المراجعة —
      the follow-up log Sarah asked for (2026-08-02): item + comment, impossible to forget */
   (EMAD.partials || []).forEach(p => {
-    const det = (p.items || []).map(x => `${x.type}${x.qty > 1 ? ' ×' + x.qty : ''}${x.note ? ' — ' + x.note : ''}`).join('، ');
+    const det = (p.items || []).map(x => `${x.type}${x.qty > 1 ? (x.issueQty ? ` (${x.issueQty} من ${x.qty})` : ' ×' + x.qty) : ''}${x.note ? ' — ' + x.note : ''}`).join('، ');
     const when = p.date ? ` <span style="color:var(--text3);font-size:11px">(غسيل ${p.date.slice(5).replace('-', '/')})</span>` : '';
     todo += row('🧺', `<b>متبقي من الغسيل:</b> شقة ${emadFlatAr(p.apt)}${when}${det
       ? `<br><span style="font-size:12px">${det}</span> <span style="color:#cc5f5f;font-size:11px">— تابعه لحد ما يرجع</span>`
@@ -2329,7 +2329,7 @@ function openReviewModal(subId) {
           ${data.items.map(item => `
             <div style="margin-bottom:6px">
               <div style="display:flex;gap:4px;margin-bottom:3px">
-                <button onclick="setItemStatus('${item.itemId}',${(item.status||'sent')==='issue' ? `'sent'` : `'issue'`})" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='issue'?'#ffeef0':'var(--surface3)'};color:${(item.status||'sent')==='issue'?'#cc5f5f':'var(--text3)'}">⚠️ ${(item.status||'sent')==='issue'?'فيه مشكلة — دوس للإلغاء':'مشكلة؟'}</button>
+                <button onclick="setItemStatus('${item.itemId}',${(item.status||'sent')==='issue' ? `'sent'` : `'issue'`})" style="border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-weight:700;background:${(item.status||'sent')==='issue'?'#ffeef0':'var(--surface3)'};color:${(item.status||'sent')==='issue'?'#cc5f5f':'var(--text3)'}">⚠️ ${(item.status||'sent')==='issue'?('فيه مشكلة'+((item.issueQty&&item.qty>1)?` (${item.issueQty} من ${item.qty})`:'')+' — دوس للإلغاء'):'مشكلة؟'}</button>
               </div>
               ${(item.status||'sent')==='issue' ? `<input placeholder="وصف المشكلة..." value="${item.note||''}" onchange="setItemNote('${item.itemId}',this.value)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:'Cairo',sans-serif;background:var(--surface2)">` : ''}
             </div>`).join('')}
@@ -2360,9 +2360,24 @@ function closeModal() { document.getElementById('reviewModal').classList.remove(
 async function setItemStatus(itemId, status) {
   const itemIdx = allItems.findIndex(i => i.itemId === itemId);
   if (itemIdx === -1) return;
+  const item = allItems[itemIdx];
+  /* Sarah 2026-08-04: a flag must say HOW MANY pieces it covers — flagging a line of 6 towels
+     because one came back stained must not read as "6 with an issue". Stored in Items col K. */
+  let issueQty = '';
+  if (status === 'issue') {
+    const q = Number(item.qty) || 1;
+    if (q > 1) {
+      const v = prompt(`كام قطعة فيها المشكلة؟ (من ${q})`, q);
+      if (v === null) return;
+      issueQty = Math.round(parseFloat(v));
+      if (isNaN(issueQty) || issueQty < 1 || issueQty > q) { alert('عدد غير صحيح — اكتب من 1 لـ ' + q); return; }
+    } else issueQty = 1;
+  }
   try {
     await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 9, value: status });
+    await callScript({ action: 'update_by_id', sheet: 'Items', id: itemId, col: 11, value: issueQty });
     allItems[itemIdx].status = status;
+    allItems[itemIdx].issueQty = issueQty === '' ? null : issueQty;
     const subId = allItems[itemIdx].submissionId;
     openReviewModal(subId);
   } catch(e) { showToast('❌ خطأ في الحفظ'); }
