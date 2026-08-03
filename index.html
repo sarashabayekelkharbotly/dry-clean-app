@@ -1717,7 +1717,7 @@ function renderEmadGrid(todayK) {
         const reps = (EMAD.repairs || []).filter(r => r.flat === f && r.date === k);
         if (!cs.length && !reps.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
         let cell = cs.map(c => {
-          let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}</div>`;
+          let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}${c.cleaner==='jinny'?' <span style="color:#8a5200">جيني</span>':(c.cleaner==='both'?' <span style="color:#8a5200">أمل+جيني</span>':'')}</div>`;
           if (emadShowsCode(c.type) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.code}</div>`;
           else t += `<div style="font-size:9.5px;color:#555">${EMAD_TYPE_AR[c.type] || c.type}</div>`;
           if (c.inTime && /^\d/.test(c.inTime)) t += `<div style="font-size:9px;color:#555">دخول ${c.inTime}</div>`;
@@ -1725,8 +1725,9 @@ function renderEmadGrid(todayK) {
         }).join('<div style="height:2px"></div>');
         if (reps.length) cell += (cs.length ? '<div style="height:2px"></div>' : '') + reps.map(r =>
           `<div style="font-size:9.5px;font-weight:700;color:#6a5636">🔧 ${r.trade}${r.time && /^\d/.test(r.time) ? '<br>'+r.time : ''}</div>`).join('');
-        // a repair-only day wears the Hub's repair colour; a mixed day keeps the cleaning colour
-        const bg = cs.length ? (EMAD_CELL_BG[cs[0].type] || '#f5dede') : '#ece0cf';
+        // a repair-only day wears the Hub's repair colour; a mixed day keeps the cleaning colour;
+        // TWO cleanings in one day (جيني ثم أمل) wear their own loud colour, matching the Hub grid
+        const bg = cs.length > 1 ? '#ffd58f' : (cs.length ? (EMAD_CELL_BG[cs[0].type] || '#f5dede') : '#ece0cf');
         h += `<td style="border:1px solid #ecdede;padding:2px 3px;text-align:center;background:${bg}${keys[i]===todayK?';outline:2px solid var(--primary,#cc5f5f);outline-offset:-2px':''}">${cell}</td>`;
       });
       h += `</tr>`;
