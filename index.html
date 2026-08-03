@@ -1617,12 +1617,15 @@ function renderEmadPanel() {
   (EMAD.payment || []).forEach(x => {
     todo += row('💵', `<b>الدفع للمغسلة:</b> شقة ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
   });
-  if ((EMAD.missing || []).length) {
-    todo += row('🧴', `<b>${EMAD.missing.length} أصناف ناقصة</b> (أقل من ٦٠٪ من المطلوب) — اضغط للتفاصيل ${emadMissingOpen ? '▾' : '◂'}`,
+  /* only items with NO order out are an attention item (Sarah 2026-08-04) — once ordered, there's
+     nothing to do until delivery, so they leave the to-do and sit on the stock card marked مطلوب */
+  const missAct = (EMAD.missing || []).filter(x => !x.onOrder);
+  if (missAct.length) {
+    todo += row('🧴', `<b>${missAct.length} أصناف ناقصة محتاجة طلب</b> (أقل من ٦٠٪) — اضغط للتفاصيل ${emadMissingOpen ? '▾' : '◂'}`,
                 { click: 'toggleEmadMissing()' });
     if (emadMissingOpen) {
       todo += `<div style="padding:6px 26px 4px 0">` +
-        EMAD.missing.map(x => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12.5px;border-bottom:1px solid var(--border,#f5f5f5)">
+        missAct.map(x => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12.5px;border-bottom:1px solid var(--border,#f5f5f5)">
           <span>${x.name}</span><span><b>${x.cur}</b> / ${x.par} <span style="color:#cc5f5f">(${x.pct}٪)</span></span></div>`).join('') + `</div>`;
     }
   }
@@ -1654,12 +1657,19 @@ function renderEmadPanel() {
     </div>`;
   }
   {
+    /* two truths on one card (2026-08-04): items that NEED an order (red, actionable) and items
+       already ordered (muted 📦 مطلوب — waiting on delivery, nothing to do). */
     const miss = EMAD.missing || [];
-    let stock = miss.length
-      ? `<div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:4px">${miss.length} أصناف تحت ٦٠٪ من المطلوب</div>` +
-        miss.slice(0, 3).map(x => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0"><span>${x.name}</span><span><b>${x.pct}٪</b></span></div>`).join('') +
-        `<div style="font-size:11px;color:var(--text3);margin-top:3px">${miss.length > 3 ? 'و' + (miss.length - 3) + ' أصناف أخرى — ' : ''}اضغط للمخزون</div>`
-      : `<div style="font-size:13px;color:#2e7d32">المخزون تمام ✅ <span style="color:var(--text3);font-size:11px">— اضغط للتفاصيل</span></div>`;
+    const need = miss.filter(x => !x.onOrder), waiting = miss.filter(x => x.onOrder);
+    const line = (x, muted) => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0${muted?';color:#9a8f83':''}">
+      <span>${muted?'📦 ':''}${x.name}${muted?' <span style="font-size:10px">— مطلوب</span>':''}</span><span><b>${x.cur}</b>/${x.par} (${x.pct}٪)</span></div>`;
+    let stock = '';
+    if (need.length) stock += `<div style="font-size:13px;font-weight:700;color:#cc5f5f;margin-bottom:4px">${need.length} أصناف محتاجة طلب</div>` +
+      need.slice(0, 4).map(x => line(x, false)).join('') + (need.length > 4 ? `<div style="font-size:11px;color:var(--text3)">و${need.length - 4} أخرى…</div>` : '');
+    if (waiting.length) stock += `<div style="font-size:11.5px;font-weight:700;color:#9a8f83;margin:${need.length?'6px':'0'} 0 2px">مطلوب ومستني التوريد</div>` +
+      waiting.slice(0, 4).map(x => line(x, true)).join('') + (waiting.length > 4 ? `<div style="font-size:11px;color:var(--text3)">و${waiting.length - 4} أخرى…</div>` : '');
+    if (!miss.length) stock = `<div style="font-size:13px;color:#2e7d32">المخزون تمام ✅ <span style="color:var(--text3);font-size:11px">— اضغط للتفاصيل</span></div>`;
+    else stock += `<div style="font-size:11px;color:var(--text3);margin-top:3px">اضغط للمخزون</div>`;
     h += `<div class="section-title">🧴 المخزون</div>
     <div class="card" style="margin-bottom:12px;padding:10px 12px;cursor:pointer" onclick="window.location.href='inventory.html'">${stock}</div>`;
   }
