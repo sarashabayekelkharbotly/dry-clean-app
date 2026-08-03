@@ -991,6 +991,7 @@ async function syncData(silent = false) {
     if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
     if (res.categories && res.categories.length) categoriesList = res.categories;
     applyCategories(categoriesList);
+    warnDuplicateIds();
     lastSyncTs = Date.now();
     saveCache();
     syncOk = true;
@@ -2116,6 +2117,21 @@ async function confirmConsume() {
   toast(`📉 ${it.ar} — تبقى ${it.cur}`);
 }
 
+/* GUARDRAIL (2026-08-04): two item rows sharing one id = a row was copy-pasted in the sheet — the
+   AA/AAA battery incident. Orders placed while a duplicate exists bind to the wrong item, and a
+   later row-deletion orphans them. Loudly name the culprits instead of misbehaving quietly. */
+function warnDuplicateIds() {
+  const seen = {}, dupes = [];
+  (items || []).forEach(i => {
+    const k = String(i.id);
+    if (seen[k]) dupes.push(`«${seen[k]}» و«${i.ar}»`);
+    else seen[k] = i.ar;
+  });
+  if (dupes.length)
+    alert('⚠️ فيه أصناف مكررة بنفس الرقم في شيت المخزون:\n' + dupes.join('\n') +
+          '\nده بيحصل لما صف يتعمله نسخ-لصق في الشيت — امسحوا المكرر وسجلوا الصنف الجديد من التطبيق نفسه.');
+}
+
 // ─────────────────────────────────────────────
 // ORDER FLOW
 // ─────────────────────────────────────────────
@@ -2237,7 +2253,20 @@ async function confirmReceive() {
   const ord = orders.find(o => o.id === pendingReceiveOrderId);
   if (!ord) return;
   const qty = parseInt(document.getElementById('recv-qty').value) || 0;
-  const it = items.find(i => String(i.id)===String(ord.itemId));
+  let it = items.find(i => String(i.id)===String(ord.itemId));
+  /* GUARDRAIL (2026-08-04, the AA/AAA battery incident): an order whose itemId points at a deleted
+     duplicate row (or at an item whose name no longer matches) must NOT credit the wrong stock.
+     If exactly ONE item matches the order's NAME, re-point the order at it — id healed in the
+     sheet too. Anything ambiguous blocks with a clear message instead of guessing. */
+  let healedId = null;
+  if (!it || (it.ar||'').trim() !== (ord.itemName||'').trim()) {
+    const byName = items.filter(i => (i.ar||'').trim() === (ord.itemName||'').trim());
+    if (byName.length === 1) { it = byName[0]; healedId = it.id; ord.itemId = it.id; }
+    else {
+      alert('⚠️ الطلب ده مربوط بصنف مش مطابق («' + (ord.itemName||'') + '») — راجعوا الصنف في المستلزمات الأول، أو كلموا سارة.');
+      return;
+    }
+  }
   const now = new Date().toISOString();
 
   if (it) { it.cur += qty; }
@@ -2257,7 +2286,9 @@ async function confirmReceive() {
 
   try {
     if (it) await api('inv_update_cur', { itemId: it.id, cur: it.cur });
-    await api('inv_update_order', { orderId: ord.id, fields: { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received', total: actualTotal } });
+    const updFields = { qtyReceived: qty, receivedBy: currentUserName, receivedAt: now, status: 'received', total: actualTotal };
+    if (healedId !== null) updFields.itemId = healedId;   // persist the re-pointed binding
+    await api('inv_update_order', { orderId: ord.id, fields: updFields });
     await api('inv_log_event', { event: ev });
   } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
   if (qty < (ord.qtyRequested || 0))
