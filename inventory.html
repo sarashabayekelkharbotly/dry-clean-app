@@ -1324,7 +1324,8 @@ function stackedBar(data, maxVal, height) {
 // ── Shared price lookup (used in both monthly and all-time views) ──
 function buildOrderPriceHistory() {
   const ordersByItem = {};
-  orders.filter(o => o.unitPrice > 0).forEach(o => {
+  // RECEIVED only (Sarah's rule, built 2026-08-04): an order still on the way has no real price/date yet
+  orders.filter(o => o.status === 'received' && o.unitPrice > 0).forEach(o => {
     const id = String(o.itemId);
     const date = (o.receivedAt||o.orderedAt||'').slice(0,10);
     if (!date) return;
@@ -1351,7 +1352,8 @@ function getPriceAtDate(ordersByItem, itemId, date) {
 
 function renderStats() {
   const el = document.getElementById('stats-content');
-  const pricedOrders = orders.filter(o => (o.unitPrice||0) > 0);
+  // stats count RECEIVED orders only (Sarah's rule, 2026-08-04): "times ordered" = times it actually arrived
+  const pricedOrders = orders.filter(o => o.status === 'received' && (o.unitPrice||0) > 0);
   const ordersByItem = buildOrderPriceHistory();
   const catKeys = Object.keys(CATS);
 
