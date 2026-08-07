@@ -1475,20 +1475,37 @@ async function elecDelete(i){
 
 async function renderElecScreen(force){
   const el = document.getElementById('elecContent');
+  /* Perf (2026-08-07): the ⚡ screen was the slowest in the app — every open sat on a spinner for a
+     full server round-trip. Same pattern as the home now: paint the last known figures instantly
+     from localStorage, fetch in the background, repaint when the fresh data lands. The spinner
+     only appears when there is nothing cached at all. */
+  if (!ELEC && !force) { try { const c = JSON.parse(localStorage.getItem('elecCache') || 'null'); if (c && c.ok) ELEC = c; } catch(e) {} }
   if (!ELEC || force) {
     el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
     try {
-      const r = await callScript({ action: 'meter_screen' });
+      const r = await callScript({ action: 'meter_screen', force: force ? 1 : 0 });
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
       ELEC = r;
+      try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
     } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">تعذر التحميل — حاول مرة أخرى</div></div>`; return; }
+  } else {
+    callScript({ action: 'meter_screen' }).then(r => {
+      if (r && r.ok) { ELEC = r; try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
+        renderElecBody();
+      }
+    }).catch(()=>{});
   }
+  renderElecBody();
+}
+function renderElecBody(){
+  const el = document.getElementById('elecContent');
+  if (!el || !ELEC) return;
   const E = ELEC;
   const soon = E.depletion && E.ratePerDay > 0 && ((new Date(E.depletion+'T12:00:00') - new Date())/86400000) <= 7;
   let h = `
     <div class="stats-grid" style="margin-bottom:12px">
       <div class="stat-card"><div class="stat-value">${E.balance != null ? E.balance : '—'}</div><div class="stat-label">آخر قراءة (جنيه)${E.lastAt ? `<br><span dir="ltr" style="font-size:9.5px">${String(E.lastAt).slice(0,10)}</span>` : ''}</div></div>
-      <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)</div></div>
+      <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)${E.rateBasis==='recharges' ? '<br><span style="font-size:9px">تقديري من الشحنات — سجّل قراءتين للدقة</span>' : ''}</div></div>
       <div class="stat-card"${soon ? ' style="border:2px solid #cc5f5f"' : ''}><div class="stat-value"${soon ? ' style="color:#cc5f5f"' : ''}>${E.depletion ? E.depletion.slice(5).split('-').reverse().join('/') : '—'}</div><div class="stat-label">${soon ? '⚠️ ينفد قريباً' : 'ينفد تقريباً'}</div></div>
     </div>
     <div class="card" style="padding:10px 12px;margin-bottom:14px">
@@ -1980,6 +1997,10 @@ async function saveEdit() {
   const newDate      = document.getElementById('editDate').value;
   const newSubmitter = document.getElementById('editSubmitter').value;
   const newStatus    = document.getElementById('editStatus').value;
+
+  // a submission must always carry its apartment — laundry is a per-flat cost (Sarah 2026-08-05).
+  // The server refuses it too; this is just the friendlier message.
+  if (!newApt || !newApt.trim()) { showToast('⚠️ لازم تحدد الشقة'); return; }
 
   // Validate items
   for (const item of editItems) {
