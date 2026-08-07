@@ -1000,6 +1000,7 @@ async function confirmAddColor() {
 // ---- Local cache (stale-while-revalidate) + freshness indicator ----
 const DC_CACHE_KEY = 'owh_dc_cache_v1';
 let lastSyncTs = 0;
+let ITEMS_PARTIAL = false;   // boot payload carries recent items only; full history streams in behind
 
 function saveDcCache() {
   try {
@@ -1079,13 +1080,25 @@ async function loadAllData(silent = false) {
       else if (!EMAD) EMAD_ERR = true;
       renderHome();
     }).catch(() => { if (!EMAD) { EMAD_ERR = true; renderHome(); } });
-    const data = await callScript({ action: 'dc_get_all' });
-    if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
+    /* Recent-first (Sarah 2026-08-07): the boot call carries prices, colours, ALL submissions and
+       only the items that matter now — the last 90 days plus anything unpaid. A quarter of the
+       weight, served from a server-side cache that every write invalidates, so what paints first
+       is both FAST and CURRENT. Full history follows in the background purely for the statistics
+       screen, which says so until it arrives. Falls back to the old full call on an old backend. */
+    let data;
+    try {
+      data = await callScript({ action: 'dc_get_boot' });
+      if (!data || data.ok !== true) throw new Error((data && data.error) || 'boot failed');
+    } catch(eBoot) {
+      data = await callScript({ action: 'dc_get_all' });
+      if (!data || data.ok !== true) throw new Error('dc_get_all failed: ' + (data && data.error));
+    }
 
     itemPrices     = data.itemPrices || {};
     colorOptions   = data.colorOptions || {};
     allSubmissions = data.submissions || [];
     allItems       = data.items || [];
+    ITEMS_PARTIAL  = !!data.itemsPartial;
 
     // Rebuild catalog now that everything is loaded
     rebuildCatalogFromColorOptions();
@@ -1095,9 +1108,22 @@ async function loadAllData(silent = false) {
     renderStats();
     renderManageList();
     lastSyncTs = Date.now();
-    saveDcCache();
     setFreshness('live');
     if (!silent) showToast('✅ تم تحديث البيانات');
+
+    if (ITEMS_PARTIAL) {
+      // history for the stats screen — never blocks anything, and the cache stores the MERGED set
+      callScript({ action: 'dc_get_all' }).then(fullD => {
+        if (fullD && fullD.ok === true) {
+          allItems = fullD.items || allItems;
+          ITEMS_PARTIAL = false;
+          renderStats();
+          saveDcCache();
+        }
+      }).catch(()=>{});
+    } else {
+      saveDcCache();
+    }
   } catch(e) {
     setFreshness('offline');
     if (!silent) showToast('❌ خطأ في تحميل البيانات');
@@ -1351,15 +1377,28 @@ async function renderRepairsScreen(force){
   // the home payload already carries every open ticket + the trades — opening this tab costs nothing
   if (!REP && !force && EMAD && EMAD.repairsAll)
     REP = { open: EMAD.repairsAll, trades: EMAD.trades || [], flats: EMAD.flats || EMAD_FLAT_ORDER };
+  // last resort before a spinner: the previous visit's list from localStorage, refreshed underneath
+  if (!REP && !force) {
+    try { const c = JSON.parse(localStorage.getItem('repCache') || 'null'); if (c && c.open) REP = c; } catch(e) {}
+    if (REP) callScript({ action: 'repairs_data' }).then(r => {
+      if (r && r.ok) { r._ts = Date.now(); REP = r; try { localStorage.setItem('repCache', JSON.stringify(r)); } catch(e) {}
+        renderRepairsScreen(); }
+    }).catch(()=>{});
+  }
   if (!REP || force) {
     el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
     try {
       const r = await callScript({ action: 'repairs_data' });
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-      REP = r;
+      r._ts = Date.now(); REP = r;
+      try { localStorage.setItem('repCache', JSON.stringify(r)); } catch(e) {}
     } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">تعذر التحميل — حاول مرة أخرى</div></div>`; return; }
   }
-  let h = `<button onclick="REP_ADD_OPEN=!REP_ADD_OPEN;REP_NEW_TRADE=false;renderRepairsScreen()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:11px;cursor:pointer;margin-bottom:12px">${REP_ADD_OPEN ? '✕ إلغاء' : '➕ فتح بلاغ صيانة جديد'}</button>`;
+  // honesty rule: a cached list announces its age until the background refresh replaces it
+  const repAge = REP._ts ? Date.now() - REP._ts : (REP._ts === undefined && EMAD ? 0 : 999999);
+  let h = (repAge > 60000
+    ? `<div style="font-size:10.5px;color:#8a6420;background:#efe4d4;border-radius:8px;padding:4px 8px;margin-bottom:8px">⏳ القايمة دي ${REP._ts ? agoText(REP._ts) : 'قديمة'} — جاري التحديث…</div>` : '') +
+    `<button onclick="REP_ADD_OPEN=!REP_ADD_OPEN;REP_NEW_TRADE=false;renderRepairsScreen()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;padding:11px;cursor:pointer;margin-bottom:12px">${REP_ADD_OPEN ? '✕ إلغاء' : '➕ فتح بلاغ صيانة جديد'}</button>`;
 
   if (REP_ADD_OPEN) {
     h += `<div class="card" style="padding:12px;margin-bottom:14px">
@@ -1485,12 +1524,12 @@ async function renderElecScreen(force){
     try {
       const r = await callScript({ action: 'meter_screen', force: force ? 1 : 0 });
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-      ELEC = r;
+      r._ts = Date.now(); ELEC = r;
       try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
     } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">تعذر التحميل — حاول مرة أخرى</div></div>`; return; }
   } else {
     callScript({ action: 'meter_screen' }).then(r => {
-      if (r && r.ok) { ELEC = r; try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
+      if (r && r.ok) { r._ts = Date.now(); ELEC = r; try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
         renderElecBody();
       }
     }).catch(()=>{});
@@ -1502,7 +1541,13 @@ function renderElecBody(){
   if (!el || !ELEC) return;
   const E = ELEC;
   const soon = E.depletion && E.ratePerDay > 0 && ((new Date(E.depletion+'T12:00:00') - new Date())/86400000) <= 7;
-  let h = `
+  /* Honesty rule (Sarah 2026-08-07): a cached paint must SAY it is old — fast must never mean
+     silently stale. The banner shows while the figures are >1 min old and disappears the moment
+     the background refresh replaces them. */
+  const age = E._ts ? Date.now() - E._ts : 0;
+  const staleNote = age > 60000
+    ? `<div style="font-size:10.5px;color:#8a6420;background:#efe4d4;border-radius:8px;padding:4px 8px;margin-bottom:8px">⏳ الأرقام دي ${agoText(E._ts)} — جاري التحديث…</div>` : '';
+  let h = staleNote + `
     <div class="stats-grid" style="margin-bottom:12px">
       <div class="stat-card"><div class="stat-value">${E.balance != null ? E.balance : '—'}</div><div class="stat-label">آخر قراءة (جنيه)${E.lastAt ? `<br><span dir="ltr" style="font-size:9.5px">${String(E.lastAt).slice(0,10)}</span>` : ''}</div></div>
       <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)${E.rateBasis==='recharges' ? '<br><span style="font-size:9px">تقديري من الشحنات — سجّل قراءتين للدقة</span>' : ''}</div></div>
@@ -2491,7 +2536,9 @@ function renderStats() {
   if (!months.has(curMonth)) monthList.unshift(curMonth);
   if (!currentMonth) currentMonth = monthList[0];
 
-  document.getElementById('monthBar').innerHTML = monthList.map(m => {
+  document.getElementById('monthBar').innerHTML =
+    (ITEMS_PARTIAL ? `<div style="flex-basis:100%;font-size:10.5px;color:#8a6420;background:#efe4d4;border-radius:8px;padding:4px 8px;margin-bottom:6px">⏳ الشهور الأقدم من ٩٠ يوم لسه بتتحمل — الأرقام الحديثة كاملة ودقيقة</div>` : '') +
+    monthList.map(m => {
     const [y,mo] = m.split('-');
     const label = new Date(y,mo-1,1).toLocaleDateString('ar-EG',{month:'short',year:'numeric'});
     return `<button class="month-chip ${m===currentMonth?'active':''}" onclick="selectMonth('${m}',this)">${label}</button>`;
