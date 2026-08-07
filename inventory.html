@@ -685,7 +685,7 @@ window.addEventListener('load',function(){
     <div class="modal-title">🛒 ما الذي اشتريته؟</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:14px">الكميات محسوبة تلقائياً — عدّل أي صنف أو اجعله صفراً لتخطيه</div>
     <div id="order-modal-body"></div>
-    <button class="btn btn-primary" onclick="confirmOrder()" style="margin-top:4px">✅ تأكيد الشراء</button>
+    <button class="btn btn-primary" id="order-confirm-btn" onclick="confirmOrder()" style="margin-top:4px">✅ تأكيد الشراء</button>
     <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('order-modal')">إلغاء</button>
   </div>
 </div>
@@ -2202,10 +2202,6 @@ async function confirmOrder() {
       orderedBy: currentUserName, orderedAt: now,
       receivedBy: '', receivedAt: '', status: 'ordered'
     };
-    // Update lastPrice on item
-    const itemIdx = items.findIndex(i => String(i.id) === String(it.id));
-    if (itemIdx !== -1) items[itemIdx].lastPrice = unitPrice;
-    orders.push(ord);
     newOrders.push(ord);
   }
 
@@ -2214,19 +2210,51 @@ async function confirmOrder() {
     return;
   }
 
-  closeModal('order-modal');
-  renderAll();
-  toast(`✅ تم تسجيل شراء ${newOrders.length} صنف`);
+  /* SAVE FIRST, THEN SAY SO (2026-08-07).
+     This used to push every order into the local list, close the modal and toast "✅ registered N
+     items" BEFORE a single write had been attempted — then loop the writes with one try/catch
+     around the whole loop. So the first failure abandoned every remaining item while the screen
+     already showed them all as ordered, and they vanished from "needs ordering" because inTransit()
+     saw the local copy. A large order lost 4 items exactly that way.
+     Now: each item is written on its own, a failure on one does not stop the rest, only what the
+     sheet actually accepted enters the local list, and the message says what really happened. */
+  const btn = document.getElementById('order-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ الحفظ…'; }
 
+  let saved = [], failed = [];
+  // The whole basket in ONE call — one lock, one write, one Telegram message — instead of two
+  // HTTP round-trips per item. Ten items used to mean twenty sequential calls; the first one
+  // that timed out silently abandoned the rest. If the new endpoint isn't deployed yet, fall
+  // back to per-item writes, each isolated so one failure cannot take the others with it.
   try {
+    const r = await api('inv_add_orders', { orders: newOrders });
+    if (!r || r.ok === false) throw new Error((r && r.error) || 'bulk failed');
+    saved = newOrders.slice();
+  } catch (eBulk) {
     for (const ord of newOrders) {
-      await api('inv_add_order', { order: ord });
-      // Update lastPrice in InvItems sheet
-      if (ord.unitPrice) {
-        await api('inv_update_last_price', { itemId: ord.itemId, price: ord.unitPrice });
-      }
+      try { await api('inv_add_order', { order: ord }); saved.push(ord); }
+      catch (e) { failed.push(ord); }
     }
-  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  }
+  saved.forEach(ord => {
+    orders.push(ord);                                     // only once the sheet has it
+    const itemIdx = items.findIndex(i => String(i.id) === String(ord.itemId));
+    if (itemIdx !== -1) items[itemIdx].lastPrice = ord.unitPrice;
+  });
+
+  if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الشراء'; }
+  renderAll();
+
+  if (!failed.length) {
+    closeModal('order-modal');
+    toast(`✅ تم تسجيل شراء ${saved.length} صنف`);
+  } else {
+    // Leave the modal open with the failures still selected, so a retry is one tap away.
+    pendingOrderItems = pendingOrderItems.filter(it =>
+      failed.some(f => String(f.itemId) === String(it.id)));
+    openOrderModal();
+    toast(`⚠️ تم حفظ ${saved.length} من ${newOrders.length} — لم يُحفظ: ${failed.map(f => f.itemName).join('، ')}`);
+  }
 }
 
 // ─────────────────────────────────────────────
