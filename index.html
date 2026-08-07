@@ -1366,6 +1366,20 @@ async function emadMeterPrompt(){
   } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
 }
 
+/* 📶 §9 — router GB entry, same shape as the meter prompt. Written into the Hub's readings tab. */
+async function emadInetPrompt(flat){
+  const v = prompt('الجيجا المتبقية في راوتر شقة ' + emadFlatAr(flat) + ' (زي ما ظاهرة في صفحة الراوتر):');
+  if (v === null) return;
+  const g = parseFloat(String(v).replace(/[^\d.]/g, ''));
+  if (isNaN(g) || g < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
+  try {
+    const r = await callScript({ action: 'inet_log', flat: flat, remaining: g });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ تم تسجيل القراءة');
+    loadEmadHome();                                   // the home task flips to ✅ on its own
+  } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
+}
+
 // ============================================================
 // 🔧 REPAIRS (§7 ②) — Emad opens AND closes tickets; both write the Hub's Repairs tab directly.
 // Closing REQUIRES a cost (0 allowed, blank refused) and books the pending Maintenance in WeShare.
@@ -1660,6 +1674,32 @@ function renderEmadPanel() {
         (EMAD.meter ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${EMAD.meter.balance} — منذ ${readingAge} يوم)</span>`
                     : ` <span style="color:var(--text3);font-size:11px">(لا توجد قراءات بعد — أول تسجيل)</span>`),
         { click: 'emadMeterPrompt()' });
+  }
+  /* 📶 §9 (Sarah 2026-08-07, corrected same day) — the router's remaining GB at guest boundaries.
+     This task is for SARAH AND KHALED, not Emad: he has no access to the internet portal, so the
+     wording is noun-based (the house Telegram rule) and never addresses him. It lives on the home
+     to-do anyway because that list is what Sarah reads every morning. Tapping prompts for the GB
+     and logs it straight into the Hub's readings tab, feeding the §5.4 pace model.
+     And EVERY flat has internet — a flat with no bundle row is a config gap to FLAG, never a
+     reason to skip the reminder silently. */
+  {
+    const inet = EMAD.inet || { flats: {}, last: {} };
+    if (EMAD.inet) (EMAD.flats || []).forEach(f => {
+      if (!inet.flats[f])
+        todo += row('⚠️', `<b>شقة ${emadFlatAr(f)} من غير باقة إنترنت مسجلة</b> — كل الشقق فيها إنترنت؛ الباقة بتتسجل من شاشة الإنترنت في The Hub`, {});
+    });
+    const seenNet = new Set();
+    (EMAD.schedule || []).forEach(c => {
+      if (c.date !== todayK || seenNet.has(c.flat)) return;
+      if (!['checkout','midstay','weekly'].includes(c.type)) return;
+      if (!inet.flats[c.flat]) return;                 // already flagged above as a missing bundle
+      seenNet.add(c.flat);
+      if (inet.last[c.flat] === todayK)
+        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — شقة ${emadFlatAr(c.flat)}`, {});
+      else
+        todo += row('📶', `<b>تسجيل جيجا الإنترنت — شقة ${emadFlatAr(c.flat)}</b> (يوم نظافة — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
+          { click: `emadInetPrompt('${c.flat}')` });
+    });
   }
   (EMAD.receipts || []).forEach(o => {
     todo += row('📦', `<b>استلم طلبية:</b> ${o.name} ×${o.qty} <span style="color:var(--text3);font-size:11px">(طلب ${o.orderedBy})</span>`);
