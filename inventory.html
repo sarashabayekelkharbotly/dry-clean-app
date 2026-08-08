@@ -922,7 +922,7 @@ async function sendFlagSel(){
     const now=new Date().toISOString();
     ids.forEach(id => { const o=orders.find(x=>String(x.id)===id); if(o) o.notifyEmad=now; });
     flagSel.clear(); saveCache(); renderAll();
-    toast(`🔔 وصلت لعماد — ${r.flagged} صنف في رسالة واحدة`);
+    toast(r.notified===false ? '⚠️ الأصناف اتعلمت لكن رسالة التليجرام ماوصلتش — جرّب تاني' : `🔔 وصلت لعماد — ${r.flagged} صنف في رسالة واحدة`);
   }catch(e){ toast('❌ لم يتم — حدّثي سكربت الكنترول وحاولي مرة أخرى'); }
 }
 
