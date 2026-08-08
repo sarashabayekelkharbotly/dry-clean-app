@@ -1189,11 +1189,12 @@ function emadTaskLine(c){
 // ---- manual tasks (server-side, tab EmadTasks) ----
 async function emadTaskAdd(){
   const el = document.getElementById('emadTaskText'), dl = document.getElementById('emadTaskDate');
+  const tl = document.getElementById('emadTaskTime');
   const text = (el && el.value || '').trim(); if (!text) return;
   try {
-    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '' });
+    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '', time: (tl && tl.value) || '' });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-    if (el) el.value = '';
+    if (el) el.value = ''; if (tl) tl.value = '';
     loadEmadHome();
   } catch(e) { showToast('❌ لم تُضف المهمة — حاول مرة أخرى'); }
 }
@@ -1629,32 +1630,37 @@ function renderEmadPanel() {
       <span style="font-size:13px;line-height:1.6${isDone?';text-decoration:line-through;opacity:.45':''}">${text}</span></div>`;
   };
 
-  /* today's work in TIME order. Cleans are the §D two-stage flow — «بدأت» then «خلصت» — with the
-     state living SERVER-side (CleanLogs), so Sarah sees the same truth and the 45-min watcher can
-     hold it to account. Only non-clean visits (code changes) keep the local cosmetic tick. */
+  /* today's work in TIME order — cleans, manual tasks and repairs interleaved by clock (Sarah
+     2026-08-08: a 14:00 task must sit between the 12:00 checkout and the 16:00 check-in, not in a
+     separate block at the bottom). Untimed items sink below the timed ones.
+     Cleans are the §D two-stage flow — «بدأت» then «خلصت» — with the state living SERVER-side
+     (CleanLogs), so Sarah sees the same truth and the 45-min watcher can hold it to account. */
+  const timed = [];
   (EMAD.schedule || []).filter(c => c.date === todayK)
-    .sort((a, b) => emadTimeKey(a) < emadTimeKey(b) ? -1 : 1)
     .forEach((c, i) => {
+      const tk = emadTimeKey(c);
       const isClean = ['checkout','midstay','weekly','revision','custom'].includes(c.type);
-      if (!isClean) { todo += row('🧹', emadTaskLine(c), { tick: 'sched' + i, click: `emadTickTask('sched${i}')` }); return; }
+      if (!isClean) { timed.push({t: tk, h: row('🧹', emadTaskLine(c), { tick: 'sched' + i, click: `emadTickTask('sched${i}')` })}); return; }
       const lg = (EMAD.cleanLogs || {})[[c.date, c.flat, c.type, String(c.time || '')].join('|')];
       const args = `'${c.date}','${c.flat}','${c.type}','${String(c.time || '')}'`;
       if (lg && lg.started && lg.ended)
-        todo += row('✅', `${emadTaskLine(c)} <span dir="ltr" style="color:var(--text3);font-size:11px">(${lg.started} → ${lg.ended})</span>`, {});
+        timed.push({t: tk, h: row('✅', `${emadTaskLine(c)} <span dir="ltr" style="color:var(--text3);font-size:11px">(${lg.started} → ${lg.ended})</span>`, {})});
       else if (lg && lg.started)
-        todo += row('🟢', `${emadTaskLine(c)}<br><b style="color:#2e7d32">بدأت ${lg.started} — اضغط لما تخلّص</b>`, { click: `emadCleanEnd(${args})` });
+        timed.push({t: tk, h: row('🟢', `${emadTaskLine(c)}<br><b style="color:#2e7d32">بدأت ${lg.started} — اضغط لما تخلّص</b>`, { click: `emadCleanEnd(${args})` })});
       else
-        todo += row('🧹', `${emadTaskLine(c)} <span style="color:var(--text3);font-size:10.5px">— اضغط لما تبدأ</span>`, { click: `emadCleanStart(${args})` });
+        timed.push({t: tk, h: row('🧹', `${emadTaskLine(c)} <span style="color:var(--text3);font-size:10.5px">— اضغط لما تبدأ</span>`, { click: `emadCleanStart(${args})` })});
     });
   // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر
   (EMAD.tasks || []).forEach(t => {
-    const txt = `${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}` +
+    const tm = (t.time && /^\d{2}:\d{2}$/.test(t.time)) ? t.time : '';
+    const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}` +
       `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
       ` <span onclick="event.stopPropagation();emadTaskDelete('${t.id}')" style="color:#cc5f5f;cursor:pointer;font-size:11px;padding:0 4px">✕</span>`;
-    todo += `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
+    timed.push({t: tm || '98:99', h: `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
-      <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`;
+      <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`});
   });
+  timed.sort((a, b) => String(a.t) < String(b.t) ? -1 : 1).forEach(x => todo += x.h);
   /* today's repairs — tapping one opens the CLOSE form, not a cosmetic tick: a repair is done when
      its cost is entered (0 allowed), and the task leaves the list because the ticket really closed */
   (EMAD.repairs || []).filter(r => r.date === todayK).forEach(r => {
@@ -1745,6 +1751,7 @@ function renderEmadPanel() {
   const addBox = `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee);align-items:center;flex-wrap:nowrap">
     <input id="emadTaskText" placeholder="＋ أضف مهمة..." onkeydown="if(event.key==='Enter')emadTaskAdd()" style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 10px;font-family:'Cairo',sans-serif;font-size:13px">
     <input id="emadTaskDate" type="date" value="${todayK}" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:112px">
+    <input id="emadTaskTime" type="time" title="اختياري — يرتّب المهمة في مكانها الصحيح في اليوم" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:86px">
     <button onclick="emadTaskAdd()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px 16px;cursor:pointer">أضف</button></div>`;
   if (todo) {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:6px 12px">${todo}${addBox}</div>`;
