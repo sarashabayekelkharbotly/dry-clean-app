@@ -1044,7 +1044,11 @@ function setFreshness(state) {
     el.style.display = 'block';
     el.style.background = '#e67e22';
     el.style.color = '#fff';
-    el.textContent = '⚠️ غير متزامن — آخر تحديث ' + agoText(lastSyncTs);
+    // NAME THE CAUSE (2026-08-08): this pill sat on screen for 20 hours saying "out of sync"
+    // while hiding WHY — the actual error was only in the console nobody opens. Whatever broke
+    // the sync is now written on the pill itself, so a screenshot is a diagnosis.
+    el.textContent = '⚠️ غير متزامن — آخر تحديث ' + agoText(lastSyncTs) +
+      (window.__lastSyncErr ? ' — السبب: ' + window.__lastSyncErr : '');
   }
 }
 
@@ -1125,6 +1129,7 @@ async function loadAllData(silent = false) {
       saveDcCache();
     }
   } catch(e) {
+    window.__lastSyncErr = (e && (e.message || String(e))) || 'unknown';
     setFreshness('offline');
     if (!silent) showToast('❌ خطأ في تحميل البيانات');
     console.error(e);
@@ -2728,7 +2733,13 @@ async function callScriptWithRetry(body, attemptsLeft, timeoutMs = 25000) {
       body: JSON.stringify(body), signal: controller.signal
     });
     if (!res.ok) throw new Error('Script failed');
-    return await res.json();
+    const j = await res.json();
+    /* Session death was invisible (Sarah 2026-08-08): an expired sid made EVERY call return
+       {code:'AUTH'}, the catch painted "⚠️ غير متزامن" and the app sat there looking out-of-sync
+       forever — while the header still showed the cached name. The server is telling us exactly
+       what is wrong; route it to the login screen instead of the offline pill. */
+    if (j && j.ok === false && j.code === 'AUTH') { try { owhSessionExpired(); } catch (eA) {} }
+    return j;
   } catch (e) {
     if (attemptsLeft > 0) return callScriptWithRetry(body, attemptsLeft - 1, timeoutMs);
     throw e;
