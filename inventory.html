@@ -909,6 +909,23 @@ async function apiWithRetry(action, extra, attemptsLeft, timeoutMs = 25000) {
 // ─────────────────────────────────────────────
 /* 🔔 puts an order on Emad's home screen (or takes it off). Server-side truth (InvOrders col M);
    re-flaggable any number of times — deliveries arrive in parts, and receiving clears the flag. */
+/* Bulk flag (Sarah 2026-08-08) — many arrived items, one send, one Telegram. */
+let flagSel = new Set();
+function toggleFlagSel(id, on){ id=String(id); if(on) flagSel.add(id); else flagSel.delete(id); renderAll(); }
+async function sendFlagSel(){
+  const ids=[...flagSel].filter(id => orders.some(o => String(o.id)===id && o.status==='ordered' && !o.notifyEmad));
+  if(!ids.length) return;
+  toast('⏳ ...');
+  try{
+    const r = await api('inv_flag_orders', { orderIds: ids });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    const now=new Date().toISOString();
+    ids.forEach(id => { const o=orders.find(x=>String(x.id)===id); if(o) o.notifyEmad=now; });
+    flagSel.clear(); saveCache(); renderAll();
+    toast(`🔔 وصلت لعماد — ${r.flagged} صنف في رسالة واحدة`);
+  }catch(e){ toast('❌ لم يتم — حدّثي سكربت الكنترول وحاولي مرة أخرى'); }
+}
+
 async function flagEmad(orderId, on) {
   toast('⏳ ...');
   try {
@@ -1229,10 +1246,23 @@ function renderOrders() {
   let html = '';
 
   if (active.length > 0) {
-    html += `<div class="section-title">طلبات جارية</div><div class="nawaqes-card">`;
+    html += `<div class="section-title">طلبات جارية</div>`;
+    /* Bulk receipt-flag (Sarah 2026-08-08): a delivery arrives with many items, and flagging them
+       one by one meant one Telegram per tap — noise, and during the wrong-paste window nothing
+       reached Emad at all. Tick the boxes, one button, ONE message listing everything. */
+    const selCount = [...flagSel].filter(id => active.some(o => String(o.id)===id && !o.notifyEmad)).length;
+    if (currentUser!=='emad' && active.some(o=>!o.notifyEmad))
+      html += `<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
+        <button class="btn btn-primary btn-sm" style="width:auto" ${selCount?'':'disabled'} onclick="sendFlagSel()">🔔 إرسال المحدد لعماد (${selCount})</button>
+        <span style="font-size:11px;color:var(--text3)">علّمي الأصناف اللي وصلت — رسالة تليجرام واحدة</span>
+      </div>`;
+    html += `<div class="nawaqes-card">`;
     active.forEach(ord => {
       const it = items.find(i => String(i.id)===String(ord.itemId));
       html += `<div class="nawaqes-row">
+        ${currentUser!=='emad' && !ord.notifyEmad
+          ? `<input type="checkbox" ${flagSel.has(String(ord.id))?'checked':''} onchange="toggleFlagSel('${ord.id}',this.checked)" style="width:18px;height:18px;margin-left:4px;accent-color:#cc5f5f">`
+          : ``}
         <div class="nawaqes-emoji">${it?.emoji||'📦'}</div>
         <div class="nawaqes-info">
           <div class="nawaqes-name">${ord.itemName}</div>
