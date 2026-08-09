@@ -561,6 +561,7 @@ window.addEventListener('load',function(){
     <div class="stat-card"><div class="stat-value" style="color:var(--text3)">—</div><div class="stat-label">كافي</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--text3)">—</div><div class="stat-label">في الطريق</div></div>
   </div>
+  <div id="countgate-bar"></div>
   <div id="nawaqes-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
 </div>
 
@@ -805,6 +806,12 @@ let events = [];
 let pendingOrderItems = [];
 let pendingReceiveOrderId = null;
 let pendingConsumeItemId = null;
+/* 📐 gate (Sarah 2026-08-10): جرد corrections are closed by default; Sarah/Khaled SCHEDULE a
+   جرد day — open all that day, shut at midnight. Server enforces; this only decides what to draw. */
+let countFixDay = '';
+function todayYmd() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function countGateOpen() { return !!countFixDay && countFixDay === todayYmd(); }
+function countGateFuture() { return !!countFixDay && countFixDay > todayYmd(); }
 let syncing = false;
 let lastSyncTs = 0;
 
@@ -815,7 +822,7 @@ const CACHE_KEY = 'owh_inv_cache_v1';
 
 function saveCache() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, categoriesList, ts: lastSyncTs }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, categoriesList, countFixDay, ts: lastSyncTs }));
   } catch(e) { console.error('saveCache', e); }
 }
 
@@ -831,6 +838,7 @@ function loadCache() {
     snapshots = c.snapshots || {};
     categoriesList = c.categoriesList || [];
     applyCategories(categoriesList);
+    countFixDay = c.countFixDay || countFixDay || '';
     lastSyncTs = c.ts || 0;
     return true;
   } catch(e) { console.error('loadCache', e); return false; }
@@ -1007,6 +1015,7 @@ async function syncData(silent = false) {
     events = res.events || [];
     if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
     if (res.categories && res.categories.length) categoriesList = res.categories;
+    countFixDay = res.countFixDay || '';
     applyCategories(categoriesList);
     warnDuplicateIds();
     lastSyncTs = Date.now();
@@ -1115,6 +1124,61 @@ function renderSummary() {
     <div class="stat-card"><div class="stat-value" style="color:var(--ok)">${ok}</div><div class="stat-label">كافي</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${tr}</div><div class="stat-label">في الطريق</div></div>
   `;
+  renderCountGate();
+}
+
+/* 📐 gate bar — Sarah/Khaled hold the key; Emad only ever sees status.
+   Three states: nothing scheduled · scheduled for a future day · open (today is the day). */
+function renderCountGate() {
+  const el = document.getElementById('countgate-bar');
+  if (!el) return;
+  const base = 'display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;';
+  const btnCss = `border:1px solid var(--border);background:white;border-radius:8px;padding:4px 10px;font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer`;
+  if (isReadonly()) {   // sarah / khaled — the keyholders
+    if (countGateOpen())
+      el.innerHTML = `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)"><span style="flex:1">📐 يوم الجرد — مفتوح لعماد طول اليوم</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">قفل الآن</button></div>`;
+    else if (countGateFuture())
+      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)"><span style="flex:1">📐 جرد متجدول يوم ${countFixDay}</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">إلغاء / تغيير</button></div>`;
+    else
+      el.innerHTML = `<div style="${base}background:var(--bg);color:var(--text2)"><span style="flex:1">📐 الجرد مقفول</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">تحديد يوم جرد لعماد</button></div>`;
+  } else {
+    if (countGateOpen())
+      el.innerHTML = `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)">📐 النهارده يوم الجرد — عدّ على الرف وصحّح بزرار 📐 جنب الصنف</div>`;
+    else if (countGateFuture())
+      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)">📐 جرد متجدول يوم ${countFixDay}</div>`;
+    else el.innerHTML = '';
+  }
+}
+
+/* Scheduling is an EVENT with a trail: the server telegrams all three and drops a task dated
+   the جرد day in Emad's to-do; the gate opens that whole day and shuts itself at midnight.
+   Cancelling withdraws the not-yet-done task. Save-then-toast — state moves only on server ok. */
+async function toggleCountGate() {
+  if (!isReadonly()) return;
+  const active = countGateOpen() || countGateFuture();
+  let day = '';
+  if (active) {
+    if (!confirm(countGateOpen() ? 'قفل الجرد الآن؟' : `إلغاء الجرد المتجدول يوم ${countFixDay}؟\n(لو عايزة يوم تاني: ألغي وبعدين حددي من جديد)`)) return;
+  } else {
+    const v = prompt('📐 يوم الجرد لعماد (YYYY-MM-DD):\nهيوصله تلجرام ومهمة في التودو، والجرد يفتح اليوم ده كله ويقفل آخره لوحده.', todayYmd());
+    if (v === null) return;
+    day = String(v).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { toast('التاريخ لازم يكون بالشكل YYYY-MM-DD'); return; }
+    if (day < todayYmd()) { toast('التاريخ فات — اختاري يوم من النهارده فصاعداً'); return; }
+  }
+  const btn = document.getElementById('gate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  let r = null;
+  try { r = await api('inv_count_gate', active ? { on: false } : { on: true, day }); } catch(e) { r = null; }
+  if (!r || r.ok !== true) {
+    if (btn) btn.disabled = false;
+    renderCountGate();
+    toast('❌ لم يتم — ' + ((r && r.error) || 'تحقق من الإنترنت وحاول مرة أخرى'));
+    return;
+  }
+  countFixDay = r.day || '';
+  saveCache(); renderAll();
+  toast(active ? '📐 الجرد اتلغى' : (countFixDay === todayYmd() ? '📐 الجرد مفتوح النهارده — عماد وصله تلجرام ومهمة' : '📐 اتجدول يوم ' + countFixDay + ' — عماد وصله تلجرام ومهمة'));
 }
 
 function renderNawaqes() {
@@ -1201,6 +1265,7 @@ function renderList(cat) {
           <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
             <div class="item-name">${it.ar}</div>
             <div style="display:flex;gap:4px;align-items:center">
+              ${(!ro && countGateOpen()) ? `<button onclick="countFix('${it.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:2px 4px;flex-shrink:0" title="تصحيح الجرد بعد العد">📐</button>` : ''}
               <button onclick="openEditModal(${it.id})" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:2px 4px;flex-shrink:0" title="تعديل">✏️</button>
               <button onclick="toggleNoReorder('${it.id}')" title="${it.noReorder ? 'السماح بالطلب مجدداً' : 'عدم الطلب مجدداً'}" style="background:none;border:1px solid var(--border);border-radius:8px;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">${it.noReorder ? '✅' : '🚫'}</button>
             </div>
@@ -2082,7 +2147,7 @@ async function adjCur(id, delta) {
   const isUndo = undoable && undoable.type === 'consume' && undoable.user === currentUserName &&
                  (Date.now() - new Date(undoable.timestamp).getTime()) < 10 * 60000;
   if (!isUndo) {
-    alert('الزيادة في المخزون تتسجل باستلام طلب بس 📦\nلو وصلت حاجة من غير طلب، كلم سارة أو خالد يسجلوا الطلب الأول — علشان التكلفة تتحسب صح.\n(لو كنت خصمت بالغلط من شوية، اضغط ＋ خلال ١٠ دقايق من الخصم وهيرجع)');
+    alert('الزيادة في المخزون تتسجل باستلام طلب بس 📦\nلو وصلت حاجة من غير طلب، كلم سارة أو خالد يسجلوا الطلب الأول — علشان التكلفة تتحسب صح.\nلو العدد في التطبيق غلط بعد ما عدّيت على الرف، استخدم زرار 📐 جنب اسم الصنف.\n(لو كنت خصمت بالغلط من شوية، اضغط ＋ خلال ١٠ دقايق من الخصم وهيرجع)');
     return;
   }
   it.cur = Math.max(0, it.cur + delta);
@@ -2096,6 +2161,31 @@ async function adjCur(id, delta) {
     await api('inv_log_event', { event: ev });
   } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
   toast(`✓ ${it.ar} — ${it.cur}`);
+}
+
+/* COUNT CORRECTION (📐, 2026-08-09) — the legitimate way to make the app match the shelf.
+   Before this, Emad's only tool for a wrong count was hammering − (which the statistics read
+   as real consumption) and + was blocked. A جرد correction is DIFFERENT from consumption:
+   the server stores it as type='correction' (every statistic ignores that type) and telegrams
+   Sarah + Khaled + Emad — so every count error surfaces as a visible exception, including
+   suspicious increases that might be unrecorded purchases. One atomic server call; nothing
+   changes on screen until the sheet accepted it. */
+async function countFix(id) {
+  if (isReadonly()) { toast('عماد فقط يمكنه التعديل'); return; }
+  const it = items.find(i => i.id == id);
+  if (!it) return;
+  const v = prompt(`📐 جرد ${it.ar}\nالعدد في التطبيق: ${it.cur}\n\nاكتب العدد الفعلي اللي عدّيته على الرف:`, '');
+  if (v === null || String(v).trim() === '') return;
+  const actual = Math.floor(Number(String(v).trim()));
+  if (!(actual >= 0)) { toast('اكتب رقم صحيح'); return; }
+  let r = null;
+  try { r = await api('inv_count_fix', { itemId: it.id, actual }); } catch(e) { r = null; }
+  if (!r || r.ok !== true) { toast('❌ لم يُحفظ التصحيح — ' + ((r && r.error) || 'تحقق من الإنترنت وحاول مرة أخرى')); return; }
+  if (r.same) { toast(`ℹ️ العدد أصلاً ${r.cur} — لا تغيير`); return; }
+  it.cur = r.cur;
+  events.unshift({ id:genId(), itemId:it.id, itemName:it.ar, type:'correction', qty:r.cur - r.old, user:currentUserName, timestamp:new Date().toISOString(), note:`جرد: من ${r.old} إلى ${r.cur}`, curAfter:r.cur });
+  updateCardUI(it); renderSummary(); renderNawaqes(); saveCache();
+  toast(`📐 اتصحح: ${it.ar} من ${r.old} إلى ${r.cur}`);
 }
 
 async function adjPar(id, delta) {
