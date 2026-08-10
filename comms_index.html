@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>التواصل — OWH</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#f6f4f0; --card:#fff; --border:#e5e0d8; --text1:#2d2a26; --text2:#6b655c; --text3:#a09a8f;
+  --primary:#8a6d4f; --ok:#5caa7f; --warn:#c9a24b; --danger:#cc5f5f; --blue:#4285f4; }
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Cairo',sans-serif; }
+body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
+.hdr { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:10px; }
+.hdr h1 { font-size:17px; font-weight:900; flex:1; }
+.pill { font-size:10px; color:var(--text3); }
+.wrap { padding:14px 14px 0; max-width:640px; margin:0 auto; }
+.tabs { position:sticky; top:53px; z-index:19; background:var(--bg); display:flex; gap:6px; padding:10px 14px; overflow-x:auto; }
+.tab { flex-shrink:0; border:1.5px solid var(--border); background:var(--card); border-radius:20px; padding:5px 14px; font-size:12.5px; font-weight:700; color:var(--text2); cursor:pointer; }
+.tab.on { background:var(--primary); border-color:var(--primary); color:#fff; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:12px; }
+.stay-hd { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.stay-nm { font-weight:900; font-size:14px; flex:1; unicode-bidi:isolate; }
+.stay-meta { font-size:11px; color:var(--text2); margin-top:2px; }
+.badge { font-size:10.5px; font-weight:700; border-radius:8px; padding:2px 8px; flex-shrink:0; }
+.b-due { background:rgba(204,95,95,.12); color:var(--danger); }
+.b-ok { background:rgba(92,170,127,.12); color:var(--ok); }
+.b-soon { background:rgba(201,162,75,.14); color:#8a6d1f; }
+.step { display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px dashed var(--border); }
+.step-lb { flex:1; font-size:12.5px; }
+.step-sub { font-size:10.5px; color:var(--text3); }
+.done .step-lb { color:var(--text3); text-decoration:line-through; }
+.btn { border:1.5px solid var(--border); background:var(--card); border-radius:10px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer; color:var(--text1); }
+.btn-ok { background:var(--ok); border-color:var(--ok); color:#fff; }
+.btn:disabled { opacity:.5; }
+.wa { text-decoration:none; font-size:15px; }
+.due-row { background:rgba(204,95,95,.05); border:1px solid rgba(204,95,95,.25); border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+.sec-h { font-size:13px; font-weight:900; color:var(--text2); margin:16px 0 8px; }
+.day-h { font-size:12px; font-weight:900; color:var(--primary); margin:12px 0 6px; }
+.line { display:flex; gap:8px; align-items:center; font-size:12.5px; padding:6px 0; border-bottom:1px dashed var(--border); }
+.banner { font-size:11px; color:#8a6d1f; background:rgba(201,162,75,.12); border-radius:10px; padding:6px 10px; margin-bottom:10px; }
+.inp { width:100%; border:1.5px solid var(--border); border-radius:10px; padding:8px 10px; font-size:13px; margin-bottom:8px; background:#fff; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:#fff; border-radius:12px; padding:10px 18px; font-size:13px; z-index:99; opacity:0; transition:.3s; pointer-events:none; max-width:90vw; }
+.toast.show { opacity:1; }
+#loginScreen { position:fixed; inset:0; background:var(--bg); z-index:50; display:none; align-items:center; justify-content:center; transition:opacity .3s; }
+.login-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:26px 22px; width:88%; max-width:340px; }
+.login-box h2 { font-size:17px; font-weight:900; margin-bottom:14px; text-align:center; }
+#loginError { display:none; color:var(--danger); font-size:12px; margin-bottom:8px; text-align:center; }
+.lbtn { width:100%; background:var(--primary); color:#fff; border:none; border-radius:10px; padding:10px; font-size:14px; font-weight:800; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>📨 شاشة التواصل</h2>
+    <div id="loginError"></div>
+    <input class="inp" id="loginUsername" placeholder="اسم المستخدم" autocomplete="username">
+    <input class="inp" id="loginPassword" type="password" placeholder="كلمة المرور" autocomplete="current-password">
+    <button class="lbtn" id="loginBtn" onclick="doLogin()">دخول</button>
+  </div>
+</div>
+
+<div class="hdr">
+  <h1>📨 التواصل مع الضيوف</h1>
+  <span class="pill" id="agePill"></span>
+  <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
+  <button class="btn" onclick="loadData(true)">↻</button>
+  <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-p="queue" onclick="showTab('queue',this)">📨 المطلوب</div>
+  <div class="tab" data-p="stays" onclick="showTab('stays',this)">🛎️ الحجوزات</div>
+  <div class="tab" data-p="sched" onclick="showTab('sched',this)">🧹 الجدول</div>
+  <div class="tab" data-p="rep" onclick="showTab('rep',this)">🔧 صيانة</div>
+  <div class="tab" data-p="task" onclick="showTab('task',this)">➕ مهمة</div>
+</div>
+
+<div class="wrap">
+  <div id="bannerBox"></div>
+  <div id="p-queue"></div>
+  <div id="p-stays" style="display:none"></div>
+  <div id="p-sched" style="display:none"></div>
+  <div id="p-rep" style="display:none"></div>
+  <div id="p-task" style="display:none"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+const SCRIPT_URL_AUTH = SCRIPT_URL;
+let currentUser=null, currentUserName=null, currentUserRole=null;
+let D = { stays:[], schedule:[], repairs:[], tasks:[], today:'' };
+let lastTs = 0;
+
+/* ---- session plumbing (the الكنترول pattern: sid merged into every POST) ---- */
+function owhSid(){ try{ const s=JSON.parse(localStorage.getItem('owh_session')||'null'); return (s&&s.sid)?s.sid:''; }catch(e){ return ''; } }
+(function(){
+  const _fetch=window.fetch.bind(window);
+  window.fetch=function(url,opts){
+    let o=opts;
+    if(typeof url==='string'&&url.indexOf(SCRIPT_URL)===0&&o&&typeof o.body==='string'){
+      try{ const b=JSON.parse(o.body);
+        if(b&&b.action&&b.action!=='auth_login'&&!b.sid){ const sid=owhSid(); if(sid){ b.sid=sid; o=Object.assign({},o,{body:JSON.stringify(b)}); } }
+      }catch(e){}
+    }
+    return _fetch(url,o).then(function(res){
+      if(typeof url==='string'&&url.indexOf(SCRIPT_URL)===0){
+        res.clone().json().then(function(j){ if(j&&j.ok===false&&j.code==='AUTH') owhSessionExpired(); }).catch(function(){});
+      }
+      return res;
+    });
+  };
+})();
+let owhExpiredShown=false;
+function owhSessionExpired(){
+  if(owhExpiredShown) return; owhExpiredShown=true;
+  localStorage.removeItem('owh_session'); currentUser=null;
+  document.getElementById('loginScreen').style.display='flex';
+  const e=document.getElementById('loginError'); e.textContent='انتهت الجلسة — سجّل الدخول مرة أخرى'; e.style.display='block';
+}
+function initAuth(){
+  const saved=localStorage.getItem('owh_session');
+  if(saved){ try{ const s=JSON.parse(saved);
+    if(s&&s.username&&s.sid){ currentUser=s.username; currentUserName=s.displayName; currentUserRole=s.role; hideLoginScreen(); return; }
+    localStorage.removeItem('owh_session');
+  }catch(e){ localStorage.removeItem('owh_session'); } }
+  document.getElementById('loginScreen').style.display='flex';
+}
+async function doLogin(){
+  const username=document.getElementById('loginUsername').value.trim();
+  const password=document.getElementById('loginPassword').value.trim();
+  if(!username||!password){ showLoginError('أدخل اسم المستخدم وكلمة المرور'); return; }
+  const btn=document.getElementById('loginBtn'); btn.textContent='⏳'; btn.disabled=true;
+  try{
+    const res=await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'auth_login',username,password})});
+    const data=await res.json();
+    if(data.ok){ currentUser=data.username; currentUserName=data.displayName; currentUserRole=data.role;
+      localStorage.setItem('owh_session',JSON.stringify(data)); hideLoginScreen(); }
+    else showLoginError(data.error||'خطأ في تسجيل الدخول');
+  }catch(e){ showLoginError('خطأ في الاتصال — تحقق من الإنترنت'); }
+  btn.textContent='دخول'; btn.disabled=false;
+}
+function showLoginError(m){ const e=document.getElementById('loginError'); e.textContent=m; e.style.display='block'; }
+function hideLoginScreen(){
+  const el=document.getElementById('loginScreen');
+  if(el){ el.style.opacity='0'; setTimeout(()=>el.style.display='none',300); }
+  document.getElementById('switchUserBtn').style.display='block';
+  hydrate(); loadData(false);
+}
+function showSwitchUser(){
+  const sid=owhSid();
+  if(sid){ try{ window.fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'auth_logout',sid})}).catch(function(){}); }catch(e){} }
+  localStorage.removeItem('owh_session'); currentUser=null;
+  document.getElementById('switchUserBtn').style.display='none';
+  const el=document.getElementById('loginScreen'); el.style.opacity='1'; el.style.display='flex';
+}
+
+/* ---- api + cache-first paint with an honest age banner (house style) ---- */
+async function api(action, extra={}){
+  const res=await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra))});
+  return res.json();
+}
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+const CK='owh_comms_cache_v2';   // v2: handover/group/lang/requests/notes on every stay
+function hydrate(){
+  try{ const c=JSON.parse(localStorage.getItem(CK)||'null');
+    if(c&&c.D){ D=c.D; lastTs=c.ts||0; renderAll();
+      const mins=Math.round((Date.now()-lastTs)/60000);
+      document.getElementById('bannerBox').innerHTML=`<div class="banner">🕐 نسخة من ${mins<2?'لحظات':mins+' دقيقة'} — جاري التحديث…</div>`;
+    } }catch(e){}
+}
+async function loadData(force){
+  try{
+    const r=await api('comms_home',{force:!!force});
+    if(r&&r.ok){ D=r; lastTs=Date.now();
+      try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+      document.getElementById('bannerBox').innerHTML='';
+      document.getElementById('agePill').textContent='';
+      renderAll();
+    } else { document.getElementById('bannerBox').innerHTML=`<div class="banner">⚠️ التحديث فشل — السبب: ${(r&&r.error)||'غير معروف'}</div>`; }
+  }catch(e){ document.getElementById('bannerBox').innerHTML=`<div class="banner">⚠️ التحديث فشل — السبب: انقطاع الاتصال</div>`; }
+}
+
+/* ---- guest message templates, EN + AR (sent from Malah's own WhatsApp) ----
+   Language per guest: the stay's 🌐 field wins when it clearly says AR or EN;
+   otherwise the header EN/AR toggle sets the default. */
+function firstName(g){ return String(g||'').trim().split(/\s+/)[0]||'there'; }
+function tplDefLang(){ return localStorage.getItem('owh_tpl_lang')==='ar'?'ar':'en'; }
+function toggleTplLang(){
+  const v=tplDefLang()==='ar'?'en':'ar';
+  localStorage.setItem('owh_tpl_lang',v);
+  const b=document.getElementById('langBtn'); if(b) b.textContent='🌐 '+v.toUpperCase();
+  toast('لغة الرسائل الافتراضية: '+(v==='ar'?'عربي':'English'));
+}
+function tplLang(st){
+  const l=String(st.lang||'');
+  if(/ar|عرب/i.test(l)) return 'ar';
+  if(/en/i.test(l)) return 'en';
+  return tplDefLang();
+}
+function tplAR(k, st, occ){
+  const n=firstName(st.guest);
+  switch(k){
+    case 'welcome': return `أهلاً ${n}! 🌟 شكراً لحجزك معانا — يسعدنا نستضيفك في شقتنا. علشان نجهّز كل حاجة، ممكن تبعتلنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمهم هنبعتلك دليل البيت وفيه كل تعليمات الدخول ومعلومات مفيدة عن الشقة والمنطقة. كود الباب هيوصلك قبل ميعاد الوصول بـ٢٤ ساعة. وإحنا موجودين لأي حاجة تحتاجها — ابعتلنا هنا على الجروب. 🙏`;
+    case 'manual': return `أهلاً ${n}! ده دليل البيت 🏠 — فيه تعليمات الدخول وكل حاجة عن الشقة وأماكننا المفضلة في المنطقة. لو أي حاجة مش واضحة اسألنا هنا!`;
+    case 'code': return `أهلاً ${n}! وصولك بكرة 🎉 كود الباب: 〈CODE〉 — الدخول من الساعة ٣ العصر. رحلة سعيدة، وابعتلنا وانت في الطريق!`;
+    case 'arrival': return `أهلاً ${n}! وصولك قرّب يوم ${st.ci} — متوقع توصل الساعة كام؟ علشان نجهّز كل حاجة قبل ما توصل.`;
+    case 'settled': return `أهلاً ${n}! بنطمن عليك — كل حاجة تمام في الشقة؟ لو محتاج أي حاجة إحنا موجودين. إقامة سعيدة! 😊`;
+    case 'midstay': return `أهلاً ${n}! حابين نرتب معاك النظافة المجانية${occ&&occ!=='mid'?' يوم '+occ:''} 🧹 — وهنغيّر كمان الملايات والفوط. أنهي معاد يناسبك؟ وإزاي الإقامة معانا لحد دلوقتي؟`;
+    case 'checkout': return `أهلاً ${n}! تذكير إن المغادرة بكرة قبل الساعة ١٢ الظهر. سيب المفاتيح زي ما موضح في دليل البيت. شكراً إنك نزلت عندنا — سعدنا باستضافتك!`;
+    case 'review': return `أهلاً ${n}! شكراً مرة تانية إنك نزلت عندنا 🙏 لو الإقامة عجبتك، تقييمك يفرق معانا جداً كفريق صغير. رحلة سعيدة، ونتمنى نشوفك تاني!`;
+    default: return '';
+  }
+}
+function tpl(k, st, occ){
+  if(tplLang(st)==='ar') return tplAR(k, st, occ);
+  const n=firstName(st.guest);
+  switch(k){
+    case 'welcome': return `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you at our apartment. To get everything ready, could you please send a photo of the passport/ID of each guest? Once we receive them, we'll send you our house manual with all the check-in instructions and useful tips about the apartment and the neighborhood. Your door code will be sent 24 hours before check-in. And we're here for anything you need — just message us in this WhatsApp group. 🙏`;
+    case 'manual': return `Hi ${n}! Here is our house manual 🏠 — it has the check-in instructions, everything about the apartment, and our favorite spots in the neighborhood. If anything is unclear, just ask us here!`;
+    case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Your door code is: 〈CODE〉 — check-in from 3:00 PM. Safe travels, and message us here when you're on your way!`;
+    case 'arrival': return `Hi ${n}! Your check-in is coming up on ${st.ci} — what time do you expect to arrive? We'll make sure everything is ready and waiting for you.`;
+    case 'settled': return `Hi ${n}! Just checking in — is everything okay with the apartment? If you need anything at all, we're right here. Enjoy your stay! 😊`;
+    case 'midstay': return `Hi ${n}! We'd love to arrange your complimentary cleaning${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels for you. What time would suit you best? And how is everything going with your stay so far?`;
+    case 'checkout': return `Hi ${n}! A gentle reminder that check-out is tomorrow before 12:00 PM. Please leave the keys as instructed in the house manual. Thank you so much for staying with us — it was a pleasure hosting you!`;
+    case 'review': return `Hi ${n}! Thank you again for staying with us 🙏 If you enjoyed your stay, we'd be really grateful for a review — it means the world to a small team like ours. Safe travels, and we hope to host you again!`;
+    default: return '';
+  }
+}
+function copyTpl(stayId,k,occ){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const t=tpl(k,st,occ);
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
+    ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
+    ()=>{ prompt('انسخ الرسالة:',t); });
+}
+
+/* ---- due logic (mirror of the server's watcher) ---- */
+function nowHM(){ const d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+function stepState(st, sp){
+  if(sp.done) return 'done';
+  const today=D.today||new Date().toISOString().slice(0,10);
+  const docsDone=st.steps.some(x=>x.k==='docs'&&x.done);
+  if(sp.k==='docs') return (sp.nagD&&sp.nagD<=today)?'due':'open';
+  if(sp.gated==='docs') return docsDone?'due':'wait';
+  if(sp.k==='settled'){
+    const at=st.arrivalTime||'15:00';
+    const t2=('0'+((parseInt(at,10)+2)%24)).slice(-2)+at.slice(2,5);
+    if(st.ci<today) return 'due';
+    return (st.ci===today&&nowHM()>=t2)?'due':(st.ci===today?'soon':'open');
+  }
+  if(!sp.dueD) return 'open';
+  if(sp.dueD<=today) return 'due';
+  return (sp.dueD<= (function(){const d=new Date(today+'T12:00:00'); d.setDate(d.getDate()+2); return d.toISOString().slice(0,10);})()) ? 'soon':'open';
+}
+
+/* ---- rendering ---- */
+function showTab(p,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on')); el.classList.add('on');
+  ['queue','stays','sched','rep','task'].forEach(x=>document.getElementById('p-'+x).style.display=(x===p?'block':'none'));
+}
+function renderAll(){ renderQueue(); renderStays(); renderSched(); renderRep(); renderTask(); }
+
+function stepRow(st,sp,state){
+  const id=`${st.id}|${sp.k}|${sp.occ}`;
+  const sub=sp.k==='midstay'&&sp.occ&&sp.occ!=='mid'?`النظافة يوم ${sp.occ}`:(sp.dueD?`تستحق ${sp.dueD}`:'');
+  const tickFn=sp.k==='arrival'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
+  const copyBtn=(sp.k==='docs'||sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  return `<div class="step ${sp.done?'done':''}">
+    <div class="step-lb">${sp.label}${sp.k==='arrival'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div></div>
+    ${state==='wait'?'<span class="badge b-soon">بعد المستندات</span>':''}
+    ${sp.done?`<button class="btn" onclick="untick('${st.id}','${sp.k}','${sp.occ}')">↩</button>`:copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
+  </div>`;
+}
+
+/* ---- handover · WhatsApp group · language · requests · notes (the handover ledger) ---- */
+function metaChips(st){
+  const g=`👨‍👩‍👧 ${st.adults||0}${st.children?'+'+st.children+'ط':''}${st.infants?'+'+st.infants+'ر':''}`;
+  return `${g}${st.lang?' · 🌐 '+st.lang:''}${st.requests?' · 📌 '+st.requests:''}`;
+}
+function stayExtra(st){
+  const ho=st.handover||{}, gr=st.group||{};
+  let h='<div class="step" style="border-top:1px solid var(--border)">';
+  h+=`<div class="step-lb">🤝 التسليم لملاح<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع سارة/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
+  h+=ho.done?`<span class="badge b-ok">مع ملاح</span>`:`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
+  h+='</div><div class="step">';
+  h+=`<div class="step-lb">💬 جروب الواتساب (بملاح جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
+  h+=gr.done?`<span class="badge b-ok">✓</span>`
+    :((gr.invited?'':`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
+  h+='</div><div class="step">';
+  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
+      <button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>`;
+  h+='</div>';
+  h+=`<div class="step" style="flex-direction:column;align-items:stretch">
+    <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
+    <button class="btn" onclick="addNote('${st.id}')">➕</button></div>`;
+  (st.notes||[]).slice().reverse().forEach(n=>{ h+=`<div class="step-sub" style="padding:3px 0;border-top:1px dashed var(--border)">${n.text} <span style="color:var(--text3)">— ${n.by} ${n.at}</span></div>`; });
+  h+='</div>';
+  return h;
+}
+async function pseudoTick(stayId, step, val, msg){
+  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',val:val||''}); }catch(e){}
+  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return false; }
+  toast(msg||'✅ اتسجلت — التلجرام اتبعت'); loadData(true); return true;
+}
+function doHandover(stayId){
+  const note=prompt('🤝 تسليم الضيف لملاح\nاكتب إيه اللي حصل معاه لحد دلوقتي (على Airbnb أو في الخاص) — أسئلة، اتفاقات، أي حاجة تهم ملاح:','');
+  if(note===null) return;
+  pseudoTick(stayId,'handover',note,'🤝 اتسلّم لملاح — التلجرام فيه كل التفاصيل');
+}
+function tickGroupVal(stayId,val){ pseudoTick(stayId,'group',val,val==='invited'?'📩 اتسجلت الدعوة':'💬 الجروب جاهز'); }
+function setField(stayId,k){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const v=prompt(k==='lang'?'لغة التواصل مع الضيف (مثال: EN / AR / FR):':'الطلبات الخاصة (مثال: early check-in · سرير أطفال):', k==='lang'?(st.lang||''):(st.requests||''));
+  if(v===null) return;
+  pseudoTick(stayId,k,String(v).trim());
+}
+function addNote(stayId){
+  const v=prompt('📝 ملاحظة للكل عن الضيف (بتتبعت تلجرام لملاح وسارة وخالد):','');
+  if(v===null||!String(v).trim()) return;
+  api('comms_tick',{stayId,step:'note',occ:String(Date.now()),val:String(v).trim()})
+    .then(r=>{ if(r&&r.ok){ toast('📝 اتسجلت واتبعتت'); loadData(true); } else toast('❌ لم تُحفظ'); })
+    .catch(()=>toast('❌ لم تُحفظ'));
+}
+
+function renderQueue(){
+  const el=document.getElementById('p-queue');
+  let due=[], soon=[];
+  D.stays.forEach(st=>st.steps.forEach(sp=>{
+    const s=stepState(st,sp);
+    if(s==='due') due.push({st,sp});
+    else if(s==='soon') soon.push({st,sp});
+  }));
+  let h='';
+  if(D.tasks&&D.tasks.length){
+    h+=`<div class="sec-h">📝 مهامك</div>`;
+    D.tasks.forEach(t=>{ h+=`<div class="line">${t.overdue?'<span class="badge b-due">متأخرة</span>':''}<span style="flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span></div>`; });
+  }
+  // handover + WhatsApp-group items: upcoming stays not yet transferred / group not ready
+  const today=D.today||'';
+  const pend=D.stays.filter(st=>st.ci>=today&&(!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
+  if(pend.length){
+    h+=`<div class="sec-h">🤝 تسليم وجروبات (${pend.length})</div>`;
+    pend.forEach(st=>{
+      const bits=[];
+      if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
+      if(!(st.handover&&st.handover.done)) bits.push('🤝 لسه ماتسلمش لملاح');
+      h+=`<div class="line"><span style="flex:1"><b><bdi>${st.guest}</bdi></b> (${st.flat}) · وصول ${st.ci}<div class="step-sub">${bits.join(' · ')}</div></span>
+        ${!(st.group&&st.group.done)?`<button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
+        ${!(st.handover&&st.handover.done)?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
+    });
+  }
+  h+=`<div class="sec-h">🔴 مستحقة الآن (${due.length})</div>`;
+  h+=due.length?due.map(x=>`<div class="due-row">
+      <div style="font-size:12px;font-weight:900">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</div>
+      <div class="step-sub" style="margin:2px 0 8px">${x.st.ci} ← ${x.st.co}${x.sp.occ&&x.sp.occ!=='mid'?' · النظافة '+x.sp.occ:''}</div>
+      <div style="display:flex;gap:6px">
+        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+        ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋 نسخ الرسالة</button>`}
+        <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅ تم</button>
+      </div></div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
+  if(soon.length){
+    h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
+    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span><span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+  }
+  el.innerHTML=h;
+}
+
+function renderStays(){
+  const el=document.getElementById('p-stays');
+  if(!D.stays.length){ el.innerHTML='<div class="card">لا حجوزات في الأفق</div>'; return; }
+  el.innerHTML=D.stays.map(st=>{
+    const undone=st.steps.filter(sp=>!sp.done&&stepState(st,sp)==='due').length;
+    const open=window._open===st.id;
+    const hoB=(st.handover&&st.handover.done)?'':'<span class="badge b-soon">🤝 لسه ماتسلمش</span>';
+    return `<div class="card">
+      <div class="stay-hd" onclick="window._open=window._open==='${st.id}'?null:'${st.id}';renderStays()">
+        <div style="flex:1"><div class="stay-nm"><bdi>${st.guest}</bdi></div>
+          <div class="stay-meta">${st.flat} · ${st.ci} ← ${st.co} · ${st.nights} ليلة · ${st.portal}${st.arrivalTime?' · وصول '+st.arrivalTime:''}</div>
+          <div class="stay-meta">${metaChips(st)}</div></div>
+        ${st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(st.phone).replace(/[^0-9]/g,'')}" onclick="event.stopPropagation()">💬</a>`:''}
+        ${hoB}
+        ${undone?`<span class="badge b-due">${undone}</span>`:'<span class="badge b-ok">✓</span>'}
+      </div>
+      ${open?stayExtra(st)+st.steps.map(sp=>stepRow(st,sp,stepState(st,sp))).join(''):''}
+    </div>`;
+  }).join('');
+}
+
+function renderSched(){
+  const el=document.getElementById('p-sched');
+  const byDay={};
+  (D.schedule||[]).forEach(c=>{ (byDay[c.date]=byDay[c.date]||[]).push(c); });
+  const days=Object.keys(byDay).sort();
+  const TYPE={checkout:'تنظيف خروج',midstay:'نظافة أثناء الإقامة',weekly:'نظافة أثناء الإقامة',revision:'إعادة',codechange:'تغيير كود',custom:'تنظيف إضافي'};
+  if(!days.length){ el.innerHTML='<div class="card">لا جدول متاح</div>'; return; }
+  el.innerHTML='<div class="banner">🧹 جدول عماد والنظافة — للتنسيق مع الضيوف على مواعيد الدخول والخروج</div>'+
+    days.map(d=>`<div class="day-h">${d}${d===D.today?' — النهارده':''}</div>`+
+      byDay[d].map(c=>`<div class="line"><b>${c.flat}</b><span style="flex:1">${TYPE[c.type]||c.type}${c.time&&/^\d/.test(String(c.time))?' · '+c.time:''}</span>${c.code?`<span class="badge b-soon">كود ${c.code}</span>`:''}</div>`).join('')
+    ).join('');
+}
+
+function renderRep(){
+  const el=document.getElementById('p-rep');
+  let h='<div class="banner">🔧 الصيانة المفتوحة — عماد بيقفلها؛ افتح بلاغ جديد لو الضيف بلّغ عن عطل</div>';
+  h+=(D.repairs&&D.repairs.length)?D.repairs.map(r=>`<div class="line"><b>${r.flat||r.apt||''}</b><span style="flex:1">${r.trade||''} ${r.desc||r.note||''}</span><span class="badge b-soon">${r.date||''}</span></div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
+  h+=`<div class="sec-h">فتح بلاغ صيانة</div>
+    <input class="inp" id="rp-flat" placeholder="الشقة (8A / 17A / 28A / Zayed 2000 / 17B)">
+    <input class="inp" id="rp-desc" placeholder="المشكلة — مثال: تسريب في الحمام">
+    <button class="btn btn-ok" id="rp-btn" onclick="openRepair()">🔧 فتح البلاغ</button>`;
+  el.innerHTML=h;
+}
+async function openRepair(){
+  const flat=document.getElementById('rp-flat').value.trim(), desc=document.getElementById('rp-desc').value.trim();
+  if(!flat||!desc){ toast('اكتب الشقة والمشكلة'); return; }
+  const b=document.getElementById('rp-btn'); b.disabled=true; b.textContent='⏳';
+  let r=null; try{ r=await api('repair_open',{flat,desc,date:D.today}); }catch(e){}
+  b.disabled=false; b.textContent='🔧 فتح البلاغ';
+  if(r&&(r.ok||r.success)){ toast('✅ اتفتح البلاغ — عماد هيتبلغ'); document.getElementById('rp-desc').value=''; loadData(true); }
+  else toast('❌ لم يُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
+}
+
+function renderTask(){
+  document.getElementById('p-task').innerHTML=`
+    <div class="banner">📝 مهمة متعلقة بضيف — لعماد أو ليك</div>
+    <input class="inp" id="tk-text" placeholder="المهمة — مثال: توصيل مروحة إضافية لضيف 8A">
+    <input class="inp" id="tk-date" type="date">
+    <select class="inp" id="tk-asg"><option value="">لعماد</option><option value="malah">ليّا (ملاح)</option></select>
+    <button class="btn btn-ok" id="tk-btn" onclick="addTask()">➕ إضافة</button>`;
+  const d=document.getElementById('tk-date'); if(d&&!d.value) d.value=D.today||'';
+}
+async function addTask(){
+  const text=document.getElementById('tk-text').value.trim();
+  if(!text){ toast('اكتب المهمة'); return; }
+  const b=document.getElementById('tk-btn'); b.disabled=true; b.textContent='⏳';
+  let r=null; try{ r=await api('emad_task_add',{text,date:document.getElementById('tk-date').value,assignee:document.getElementById('tk-asg').value}); }catch(e){}
+  b.disabled=false; b.textContent='➕ إضافة';
+  if(r&&r.ok){ toast('✅ اتسجلت — التلجرام اتبعت'); document.getElementById('tk-text').value=''; loadData(true); }
+  else toast('❌ لم تُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
+}
+
+/* ---- ticks: save-then-toast, nothing local moves until the server accepts ---- */
+async function tick(stayId,k,occ){
+  const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ}); }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='✅'; }
+  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  applyTick(stayId,k,occ,true,'');
+  toast('✅ اتسجلت');
+}
+async function tickArrival(stayId,occ){
+  const v=prompt('ميعاد وصول الضيف (مثال 16:30):','15:00');
+  if(v===null) return;
+  const t=String(v).trim();
+  if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اكتب الوقت بصيغة HH:MM'); return; }
+  let r=null; try{ r=await api('comms_tick',{stayId,step:'arrival',occ,val:t}); }catch(e){}
+  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  applyTick(stayId,'arrival',occ,true,t);
+  toast('✅ الوصول '+t);
+}
+async function untick(stayId,k,occ){
+  if(!confirm('إلغاء العلامة؟')) return;
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true}); }catch(e){}
+  if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  applyTick(stayId,k,occ,false,'');
+  toast('↩ اتلغت');
+}
+function applyTick(stayId,k,occ,done,val){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const sp=st.steps.find(x=>x.k===k&&String(x.occ)===String(occ)); if(!sp) return;
+  sp.done=done; sp.doneAt=done?new Date().toISOString():''; if(k==='arrival'){ sp.val=done?val:''; st.arrivalTime=done?val:''; }
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderAll();
+}
+
+window.addEventListener('load',function(){ initAuth(); var b=document.getElementById('langBtn'); if(b) b.textContent='🌐 '+tplDefLang().toUpperCase(); });
+</script>
+</body>
+</html>
