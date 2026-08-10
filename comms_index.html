@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+else if(step==="requests") st.requests=val||"";
+    else if(step==="gender") st.gender=val||"";<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -6,17 +7,18 @@
 <title>التواصل — OWH</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-:root { --bg:#f6f4f0; --card:#fff; --border:#e5e0d8; --text1:#2d2a26; --text2:#6b655c; --text3:#a09a8f;
-  --primary:#8a6d4f; --ok:#5caa7f; --warn:#c9a24b; --danger:#cc5f5f; --blue:#4285f4; }
+:root { --bg:#f9f0f0; --card:#ffffff; --border:#f0e0e0; --text1:#3d3436; --text2:#8a7a7d; --text3:#b5a5a8;
+  --primary:#cc5f5f; --ok:#5caa7f; --warn:#c9a24b; --danger:#a84545; --blue:#4285f4; }
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Cairo',sans-serif; }
 body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 .hdr { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:10px; }
 .hdr h1 { font-size:17px; font-weight:900; flex:1; }
 .pill { font-size:10px; color:var(--text3); }
 .wrap { padding:14px 14px 0; max-width:640px; margin:0 auto; }
-.tabs { position:sticky; top:53px; z-index:19; background:var(--bg); display:flex; gap:6px; padding:10px 14px; overflow-x:auto; }
-.tab { flex-shrink:0; border:1.5px solid var(--border); background:var(--card); border-radius:20px; padding:5px 14px; font-size:12.5px; font-weight:700; color:var(--text2); cursor:pointer; }
-.tab.on { background:var(--primary); border-color:var(--primary); color:#fff; }
+.tabs { position:sticky; top:53px; z-index:19; background:var(--card); display:flex; justify-content:center; gap:2px; padding:6px 8px; overflow-x:auto; border-bottom:1px solid var(--border); }
+.tab { flex:1; max-width:88px; display:flex; flex-direction:column; align-items:center; gap:2px; border:none; background:none; border-radius:10px; padding:6px 4px; font-size:10.5px; font-weight:700; color:var(--text2); cursor:pointer; text-align:center; }
+.tab .tab-icon { font-size:19px; display:block; }
+.tab.on { background:var(--bg); color:var(--primary); }
 .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:12px; }
 .stay-hd { display:flex; align-items:center; gap:8px; cursor:pointer; }
 .stay-nm { font-weight:900; font-size:14px; flex:1; unicode-bidi:isolate; }
@@ -70,11 +72,11 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 </div>
 
 <div class="tabs">
-  <div class="tab on" data-p="queue" onclick="showTab('queue',this)">📨 المطلوب</div>
-  <div class="tab" data-p="stays" onclick="showTab('stays',this)">🛎️ الحجوزات</div>
-  <div class="tab" data-p="sched" onclick="showTab('sched',this)">🧹 الجدول</div>
-  <div class="tab" data-p="rep" onclick="showTab('rep',this)">🔧 صيانة</div>
-  <div class="tab" data-p="task" onclick="showTab('task',this)">➕ مهمة</div>
+  <div class="tab on" data-p="queue" onclick="showTab('queue',this)"><span class="tab-icon">📨</span>المطلوب</div>
+  <div class="tab" data-p="stays" onclick="showTab('stays',this)"><span class="tab-icon">🛎️</span>الحجوزات</div>
+  <div class="tab" data-p="sched" onclick="showTab('sched',this)"><span class="tab-icon">🧹</span>الجدول</div>
+  <div class="tab" data-p="rep" onclick="showTab('rep',this)"><span class="tab-icon">🔧</span>صيانة</div>
+  <div class="tab" data-p="task" onclick="showTab('task',this)"><span class="tab-icon">➕</span>مهمة</div>
 </div>
 
 <div class="wrap">
@@ -283,7 +285,7 @@ function stepRow(st,sp,state){
 /* ---- handover · WhatsApp group · language · requests · notes (the handover ledger) ---- */
 function metaChips(st){
   const g=`👨‍👩‍👧 ${st.adults||0}${st.children?'+'+st.children+'ط':''}${st.infants?'+'+st.infants+'ر':''}`;
-  return `${g}${st.lang?' · 🌐 '+st.lang:''}${st.requests?' · 📌 '+st.requests:''}`;
+  return `${g}${st.gender?" · "+(st.gender==="f"?"👩 سيدة":st.gender==="g"?"👨‍👩‍👧 مجموعة":"👨 رجل"):""}${st.lang?" · 🌐 "+st.lang:""}${st.requests?" · 📌 "+st.requests:""}`;
 }
 function stayExtra(st){
   const ho=st.handover||{}, gr=st.group||{};
@@ -293,10 +295,10 @@ function stayExtra(st){
   h+='</div><div class="step">';
   h+=`<div class="step-lb">💬 جروب الواتساب (بملاح جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
   h+=gr.done?`<span class="badge b-ok">✓</span>`
-    :((gr.invited?'':`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
+    :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
   h+='</div><div class="step">';
   h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
-      <button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>`;
+      <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>`;
   h+='</div>';
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
@@ -344,6 +346,13 @@ function setField(stayId,k){
   const v=prompt(k==='lang'?'لغة التواصل مع الضيف (مثال: EN / AR / FR):':'الطلبات الخاصة (مثال: early check-in · سرير أطفال):', k==='lang'?(st.lang||''):(st.requests||''));
   if(v===null) return;
   pseudoTick(stayId,k,String(v).trim());
+}
+function setGender(stayId){
+  const v=prompt("⚥ الضيف: اكتب m لرجل، f لسيدة، g لمجموعة/عائلة","m");
+  if(v===null) return;
+  const g={m:"m",f:"f",g:"g"}[String(v).trim().toLowerCase()];
+  if(!g){ toast("اكتب m أو f أو g"); return; }
+  pseudoTick(stayId,"gender",g,"⚥ اتسجل");
 }
 function addNote(stayId){
   const v=prompt('📝 ملاحظة للكل عن الضيف (بتتبعت تلجرام لملاح وسارة وخالد):','');
@@ -455,6 +464,7 @@ function renderTask(){
     <div class="banner">📝 مهمة متعلقة بضيف — لعماد أو ليك</div>
     <input class="inp" id="tk-text" placeholder="المهمة — مثال: توصيل مروحة إضافية لضيف 8A">
     <input class="inp" id="tk-date" type="date">
+    <input class="inp" id="tk-time" type="time">
     <select class="inp" id="tk-asg"><option value="">لعماد</option><option value="malah">ليّا (ملاح)</option></select>
     <button class="btn btn-ok" id="tk-btn" onclick="addTask()">➕ إضافة</button>`;
   const d=document.getElementById('tk-date'); if(d&&!d.value) d.value=D.today||'';
@@ -463,7 +473,7 @@ async function addTask(){
   const text=document.getElementById('tk-text').value.trim();
   if(!text){ toast('اكتب المهمة'); return; }
   const b=document.getElementById('tk-btn'); b.disabled=true; b.textContent='⏳';
-  let r=null; try{ r=await api('emad_task_add',{text,date:document.getElementById('tk-date').value,assignee:document.getElementById('tk-asg').value}); }catch(e){}
+  let r=null; try{ r=await api('emad_task_add',{text,date:document.getElementById('tk-date').value,assignee:document.getElementById("tk-asg").value,time:document.getElementById("tk-time").value}); }catch(e){}
   b.disabled=false; b.textContent='➕ إضافة';
   if(r&&r.ok){ toast('✅ اتسجلت — التلجرام اتبعت'); document.getElementById('tk-text').value=''; loadData(true); }
   else toast('❌ لم تُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
