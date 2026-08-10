@@ -183,6 +183,7 @@ async function loadData(force){
     if(r&&r.ok){ D=r; lastTs=Date.now();
       try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
       document.getElementById('bannerBox').innerHTML='';
+      refreshRepairs();
       document.getElementById('agePill').textContent='';
       renderAll();
     } else { document.getElementById('bannerBox').innerHTML=`<div class="banner">⚠️ التحديث فشل — السبب: ${(r&&r.error)||'غير معروف'}</div>`; }
@@ -677,6 +678,116 @@ function renderLog(){
     const lbl=e.step==='note'?('📝 '+e.val):e.step==='handover'?'🤝 تسليم لملاح':e.step==='group'?(e.val==='invited'?'📩 دعوة الجروب':'💬 الجروب جاهز'):e.step==='lang'?('🌐 '+e.val):e.step==='requests'?('📌 '+e.val):e.step==='gender'?'⚥ نوع الضيف':((STEP_AR[e.step]||e.step)+(e.done?' ✅':' ↩'));
     return `<div class="line"><span style="flex:1">${lbl} — <bdi>${e.stay}</bdi></span><span class="step-sub" style="white-space:nowrap">${e.by||''} · ${String(e.at).slice(11,16)}</span></div>`;
   }).join('')).join(''):'<div class="card">لا نشاط مسجّل بعد</div>';
+}
+
+
+/* ==== 14c final pass: week grid = Hub week.html grammar · repairs = Hub data + fields ==== */
+
+/* الجدول — نفس شبكة الهاب: إقامات خضراء ممتدة، نظافة وردية بكود وخروج/دخول، صيانة بيج */
+function renderSched(){
+  const el=document.getElementById('p-sched'); if(!el) return;
+  const base=new Date(); base.setDate(base.getDate()+schedOff*7);
+  const dow=(base.getDay()+1)%7;
+  const start=new Date(base); start.setDate(base.getDate()-dow);
+  const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');});
+  const DN=['السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+  const flats=[...new Set([...(D.schedule||[]).map(c=>c.flat),...D.stays.map(s=>s.flat),...(D.rep&&D.rep.open?D.rep.open.map(r=>r.flat):[])])].filter(Boolean).sort();
+  const C={line:'#ecdede',occ:'#e4efe1',occ2:'#d4e7cf',clean:'#f5dede',mid:'#d6e2f2',rev:'#ecdcf0',rep:'#ece0cf'};
+  const short=g=>String(g||'').trim().split(/\s+/)[0];
+  const cleansAt=(f,d)=>(D.schedule||[]).filter(c=>c.flat===f&&c.date===d);
+  const repAt=(f,d)=>((D.rep&&D.rep.open)||D.repairs||[]).find(r=>(r.flat||r.apt)===f&&String(r.date||'').slice(0,10)===d);
+  const stayIn=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci===d);
+  const stayOut=(f,d)=>D.stays.find(s=>s.flat===f&&s.co===d);
+  const covering=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci<d&&s.co>d);
+  let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <button class="btn" onclick="schedShift(1)">‹</button>
+    <div style="flex:1;text-align:center;font-weight:900;font-size:12.5px">${days[0]} ← ${days[6]}${schedOff===0?' (الأسبوع الحالي)':''}</div>
+    <button class="btn" onclick="schedShift(-1)">›</button></div>
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:640px;table-layout:fixed;font-size:10.5px">
+    <tr><th style="border:1px solid ${C.line};background:#fff;padding:2px;width:58px"></th>${days.map((d,i)=>`<th style="border:1px solid ${C.line};padding:2px;font-size:9.5px;background:#fff;${d===D.today?'color:var(--primary);font-weight:900':'color:var(--text2)'}">${DN[i]}<br>${d.slice(5)}</th>`).join('')}</tr>`;
+  flats.forEach(f=>{
+    h+=`<tr><td style="border:1px solid ${C.line};font-weight:700;padding:2px 3px;background:#fff;font-size:11px;white-space:nowrap">${f}</td>`;
+    let alt=0, di=0;
+    while(di<7){
+      const d=days[di], cls=cleansAt(f,d), rp=repAt(f,d), sin=stayIn(f,d), sout=stayOut(f,d), cov=covering(f,d);
+      if(cls.length||rp||sin||sout){
+        // event cell — the week.html clean-cell grammar: out فوق، النوع والوقت والكود، in تحت
+        let cell='', bg=C.clean, hasClean=cls.length>0;
+        if(rp&&!hasClean) bg=C.rep;
+        if(hasClean){ const t=cls[0].type; if(t==='midstay'||t==='weekly') bg=C.mid; else if(t==='revision'||t==='codechange') bg=C.rev; }
+        if(!hasClean&&!rp&&(sin||sout)) bg=sin?C.occ:'#fff';
+        if(sout) cell+=`<div style="font-size:9px;color:var(--text2)">out <bdi>${short(sout.guest)}</bdi></div>`;
+        cls.slice().sort((a,b)=>String(a.time||'99')<String(b.time||'99')?-1:1).forEach(c=>{
+          cell+=`<div style="font-weight:800">${c.time&&/^\d/.test(String(c.time))?c.time:''}${c.type==='revision'?' إعادة':c.type==='codechange'?' كود':(c.type==='midstay'||c.type==='weekly')?' أثناء الإقامة':''}</div>`;
+          if(c.code) cell+=`<div style="font-weight:900;color:var(--primary)">🔑 ${c.code}</div>`;
+        });
+        if(rp) cell+=`<div style="background:${C.rep};border-radius:4px;padding:0 3px;margin-top:1px">🔧 ${rp.trade||''}${rp.time&&/^\d/.test(String(rp.time))?' '+rp.time:''}</div>`;
+        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' '+sin.arrivalTime:''}</div>`;
+        h+=`<td style="border:1px solid ${C.line};padding:2px;vertical-align:middle;text-align:center;height:46px;background:${bg}">${cell}</td>`;
+        di++;
+      } else if(cov){
+        // stay span — merge consecutive covered days with no events (week.html colspan)
+        let span=1;
+        while(di+span<7&&covering(f,days[di+span])===cov&&!cleansAt(f,days[di+span]).length&&!repAt(f,days[di+span])&&!stayIn(f,days[di+span])&&!stayOut(f,days[di+span])) span++;
+        const bg=(alt++%2)?C.occ2:C.occ;
+        h+=`<td colspan="${span}" style="border:1px solid ${C.line};padding:2px;text-align:center;background:${bg};height:46px"><div style="font-weight:800;font-size:10.5px"><bdi>${cov.guest}</bdi> (${(cov.adults||0)+(cov.children||0)+(cov.infants||0)||1})</div></td>`;
+        di+=span;
+      } else { h+=`<td style="border:1px solid ${C.line};background:#fff;height:46px"></td>`; di++; }
+    }
+    h+='</tr>';
+  });
+  h+=`</table></div>
+  <div class="step-sub" style="margin-top:6px;line-height:2">
+    <span style="background:${C.occ};border-radius:4px;padding:1px 6px">إقامة</span>
+    <span style="background:${C.clean};border-radius:4px;padding:1px 6px">تنظيف خروج</span>
+    <span style="background:${C.mid};border-radius:4px;padding:1px 6px">أثناء الإقامة</span>
+    <span style="background:${C.rev};border-radius:4px;padding:1px 6px">إعادة/كود</span>
+    <span style="background:${C.rep};border-radius:4px;padding:1px 6px">🔧 صيانة</span>
+    · in وصول · out مغادرة · 🔑 كود الباب</div>`;
+  el.innerHTML=h;
+}
+
+/* صيانة — بيانات الهاب الحقيقية (repairs_data): التذاكر المفتوحة بالكامل + فتح بلاغ بكل الحقول.
+   عماد وحده يقفل — القاعدة كما هي. */
+function renderRep(){
+  const el=document.getElementById('p-rep'); if(!el) return;
+  const R=D.rep||{open:[],trades:[],flats:[]};
+  let h='<div class="banner">🔧 الصيانة المفتوحة (من الهاب مباشرة) — عماد وحده يقفل البلاغات</div>';
+  h+=(R.open&&R.open.length)?R.open.map(r=>`<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <b style="font-size:13px">${r.flat}</b>
+        <span class="badge b-soon">${r.trade||'—'}</span>
+        <span class="step-sub" style="flex:1;text-align:left">${r.date||''}${r.time&&/^\d/.test(String(r.time))?' · '+r.time:''}</span>
+      </div>
+      <div style="font-size:12px;margin-top:4px">${r.what||'—'}</div>
+    </div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
+  const fl=(R.flats&&R.flats.length)?R.flats:['8A','17A','28A','Zayed 2000','17B'];
+  h+=`<div class="sec-h">فتح بلاغ صيانة</div>
+    <select class="inp" id="rp-flat">${fl.map(f=>`<option>${f}</option>`).join('')}</select>
+    <select class="inp" id="rp-trade">${(R.trades||[]).map(t=>`<option>${t}</option>`).join('')}<option value="__new">➕ نوع جديد…</option></select>
+    <input class="inp" id="rp-what" placeholder="المشكلة — مثال: تسريب في حمام الضيوف">
+    <input class="inp" id="rp-date" type="date">
+    <input class="inp" id="rp-time" type="time">
+    <button class="btn btn-ok" id="rp-btn" onclick="openRepair()">🔧 فتح البلاغ</button>`;
+  el.innerHTML=h;
+  const d=document.getElementById('rp-date'); if(d&&!d.value) d.value=D.today||'';
+}
+async function openRepair(){
+  const flat=document.getElementById('rp-flat').value;
+  let trade=document.getElementById('rp-trade').value;
+  const what=document.getElementById('rp-what').value.trim();
+  if(trade==='__new'){ const nt=prompt('اسم النوع الجديد:',''); if(!nt||!nt.trim()) return; trade=nt.trim(); }
+  if(!what){ toast('اكتب المشكلة'); return; }
+  const b=document.getElementById('rp-btn'); b.disabled=true; b.textContent='⏳';
+  let r=null; try{ r=await api('repair_open',{flat,trade,what,newTrade:trade&&!(D.rep&&D.rep.trades||[]).includes(trade)?trade:'',date:document.getElementById('rp-date').value||D.today,time:document.getElementById('rp-time').value||''}); }catch(e){}
+  b.disabled=false; b.textContent='🔧 فتح البلاغ';
+  if(r&&(r.ok||r.success)){ toast('✅ اتفتح البلاغ — عماد هيتبلغ'); document.getElementById('rp-what').value=''; refreshRepairs(); }
+  else toast('❌ لم يُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
+}
+async function refreshRepairs(){
+  try{ const r=await api('repairs_data'); if(r&&r.ok){ D.rep={open:r.open||[],trades:r.trades||[],flats:r.flats||[]};
+    try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){} renderRep(); renderSched(); } }catch(e){}
 }
 
 window.addEventListener('load',function(){ initAuth(); var b=document.getElementById('langBtn'); if(b) b.textContent='🌐 '+tplDefLang().toUpperCase(); });
