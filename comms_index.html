@@ -63,6 +63,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
   <span class="pill" id="agePill"></span>
+  <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
   <button class="btn" onclick="loadData(true)">↻</button>
   <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
@@ -147,6 +148,7 @@ function hideLoginScreen(){
   const el=document.getElementById('loginScreen');
   if(el){ el.style.opacity='0'; setTimeout(()=>el.style.display='none',300); }
   document.getElementById('switchUserBtn').style.display='block';
+  if(currentUser==='sarah'||currentUser==='khaled'){ const hb=document.getElementById('homeBtn'); if(hb) hb.style.display=''; }
   hydrate(); loadData(false);
 }
 function showSwitchUser(){
