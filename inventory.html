@@ -595,6 +595,7 @@ window.addEventListener('load',function(){
   <a class="nav-item" href="index.html#review"><span class="ni">📦</span>مراجعة</a>
   <a class="nav-item active" href="inventory.html"><span class="ni">🗂️</span>المخزون</a>
   <a class="nav-item" href="index.html#stats"><span class="ni">📊</span>إحصائيات</a>
+  <a class="nav-item" id="nav-comms" style="display:none" href="comms_index.html"><span class="ni">📨</span>التواصل</a>
 </nav>
 
 <!-- ═══ MODALS ═══ -->
@@ -2562,6 +2563,9 @@ function onAuthReady() {
   currentUserName = displayName;
   const lbl = document.getElementById('user-label');
   if (lbl) lbl.textContent = displayName;
+  // 📨 comms tab appears for Sarah/Khaled only (Emad's account is refused by it server-side)
+  const nc = document.getElementById('nav-comms');
+  if (nc && (u === 'sarah' || u === 'khaled')) nc.style.display = '';
 
   if (loadCache()) {
     // Instant load from cache, then refresh silently in the background
