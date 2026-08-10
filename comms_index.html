@@ -72,11 +72,12 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 </div>
 
 <div class="tabs">
-  <div class="tab on" data-p="queue" onclick="showTab('queue',this)"><span class="tab-icon">📨</span>المطلوب</div>
+  <div class="tab on" data-p="queue" onclick="showTab('queue',this)"><span class="tab-icon">🏠</span>الرئيسية</div>
   <div class="tab" data-p="stays" onclick="showTab('stays',this)"><span class="tab-icon">🛎️</span>الحجوزات</div>
   <div class="tab" data-p="sched" onclick="showTab('sched',this)"><span class="tab-icon">🧹</span>الجدول</div>
   <div class="tab" data-p="rep" onclick="showTab('rep',this)"><span class="tab-icon">🔧</span>صيانة</div>
   <div class="tab" data-p="task" onclick="showTab('task',this)"><span class="tab-icon">➕</span>مهمة</div>
+  <div class="tab" data-p="log" onclick="showTab('log',this)"><span class="tab-icon">📜</span>السجل</div>
 </div>
 
 <div class="wrap">
@@ -86,6 +87,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
   <div id="p-sched" style="display:none"></div>
   <div id="p-rep" style="display:none"></div>
   <div id="p-task" style="display:none"></div>
+  <div id="p-log" style="display:none"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -266,9 +268,9 @@ function stepState(st, sp){
 /* ---- rendering ---- */
 function showTab(p,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on')); el.classList.add('on');
-  ['queue','stays','sched','rep','task'].forEach(x=>document.getElementById('p-'+x).style.display=(x===p?'block':'none'));
+  ['queue','stays','sched','rep','task','log'].forEach(x=>document.getElementById('p-'+x).style.display=(x===p?'block':'none'));
 }
-function renderAll(){ renderQueue(); renderStays(); renderSched(); renderRep(); renderTask(); }
+function renderAll(){ renderQueue(); renderStays(); renderSched(); renderRep(); renderTask(); try{ renderLog(); }catch(e){} }
 
 function stepRow(st,sp,state){
   const id=`${st.id}|${sp.k}|${sp.occ}`;
@@ -445,6 +447,8 @@ function renderRep(){
   h+=(D.repairs&&D.repairs.length)?D.repairs.map(r=>`<div class="line"><b>${r.flat||r.apt||''}</b><span style="flex:1">${r.trade||''} ${r.desc||r.note||''}</span><span class="badge b-soon">${r.date||''}</span></div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
   h+=`<div class="sec-h">فتح بلاغ صيانة</div>
     <input class="inp" id="rp-flat" placeholder="الشقة (8A / 17A / 28A / Zayed 2000 / 17B)">
+    <input class="inp" id="rp-date" type="date">
+    <input class="inp" id="rp-time" type="time">
     <input class="inp" id="rp-desc" placeholder="المشكلة — مثال: تسريب في الحمام">
     <button class="btn btn-ok" id="rp-btn" onclick="openRepair()">🔧 فتح البلاغ</button>`;
   el.innerHTML=h;
@@ -453,7 +457,7 @@ async function openRepair(){
   const flat=document.getElementById('rp-flat').value.trim(), desc=document.getElementById('rp-desc').value.trim();
   if(!flat||!desc){ toast('اكتب الشقة والمشكلة'); return; }
   const b=document.getElementById('rp-btn'); b.disabled=true; b.textContent='⏳';
-  let r=null; try{ r=await api('repair_open',{flat,desc,date:D.today}); }catch(e){}
+  let r=null; try{ r=await api('repair_open',{flat,desc:desc+(document.getElementById('rp-time')&&document.getElementById('rp-time').value?' — الساعة '+document.getElementById('rp-time').value:''),date:(document.getElementById('rp-date')&&document.getElementById('rp-date').value)||D.today}); }catch(e){}
   b.disabled=false; b.textContent='🔧 فتح البلاغ';
   if(r&&(r.ok||r.success)){ toast('✅ اتفتح البلاغ — عماد هيتبلغ'); document.getElementById('rp-desc').value=''; loadData(true); }
   else toast('❌ لم يُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
@@ -569,6 +573,110 @@ Safe journey!`;
     case 'review': return `Hi ${n}! We hope you enjoyed your stay with us, and we hope to host you again soon 🙏 Your review would mean the world to a small team like ours. Safe travels!`;
     default: return '';
   }
+}
+
+
+/* ==== 14c continuation (overrides): to-do home · سجل log · week-grid schedule ==== */
+const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
+
+async function toggleTask(id,done){
+  let r=null; try{ r=await api('emad_task_toggle',{id,done}); }catch(e){}
+  if(!r||!r.ok){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  const t=(D.tasks||[]).find(x=>x.id===id); if(t) t.done=done;
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderAll(); toast(done?'✅ تمت':'↩ رجعت');
+}
+
+/* الرئيسية — مهام النهارده أولاً (زي شاشة عماد): تعلّم ✅ لما تخلص */
+function renderQueue(){
+  const el=document.getElementById('p-queue'); if(!el) return;
+  const today=D.today||'';
+  let due=[], soon=[];
+  D.stays.forEach(st=>st.steps.forEach(sp=>{
+    const s=stepState(st,sp);
+    if(s==='due') due.push({st,sp}); else if(s==='soon') soon.push({st,sp});
+  }));
+  let h=`<div class="sec-h">✅ مهام النهارده (${(D.tasks||[]).filter(t=>!t.done).length+due.length})</div>`;
+  (D.tasks||[]).forEach(t=>{
+    h+=`<div class="line">${t.overdue?'<span class="badge b-due">متأخرة</span>':''}
+      <span style="flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">📝 ${t.text}</span>
+      ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}</div>`;
+  });
+  h+=due.length?due.map(x=>`<div class="due-row">
+      <div style="font-size:12px;font-weight:900">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</div>
+      <div class="step-sub" style="margin:2px 0 8px">${x.st.ci} ← ${x.st.co}${x.sp.occ&&x.sp.occ!=='mid'?' · النظافة '+x.sp.occ:''}</div>
+      <div style="display:flex;gap:6px">
+        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+        ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋 نسخ الرسالة</button>`}
+        <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅ تم</button>
+      </div></div>`).join('')
+    :((D.tasks||[]).some(t=>!t.done)?'':`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`);
+  const pend=D.stays.filter(st=>st.ci>=today&&(!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
+  if(pend.length){
+    h+=`<div class="sec-h">🤝 تسليم وجروبات (${pend.length})</div>`;
+    pend.forEach(st=>{
+      const bits=[];
+      if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
+      if(!(st.handover&&st.handover.done)) bits.push('🤝 لسه ماتسلمش لملاح');
+      h+=`<div class="line"><span style="flex:1"><b><bdi>${st.guest}</bdi></b> (${st.flat}) · وصول ${st.ci}<div class="step-sub">${bits.join(' · ')}</div></span>
+        ${!(st.group&&st.group.done)?`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋</button><button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
+        ${!(st.handover&&st.handover.done)?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
+    });
+  }
+  if(soon.length){
+    h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
+    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span><span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+  }
+  el.innerHTML=h;
+}
+
+/* الجدول — شبكة الأسبوع: الشقق صفوف والأيام أعمدة، نظافة + صيانة + دخول/خروج الضيوف */
+let schedOff=0;
+function schedShift(n){ schedOff+=n; renderSched(); }
+function renderSched(){
+  const el=document.getElementById('p-sched'); if(!el) return;
+  const TYPE={checkout:'تنظيف خروج',midstay:'نظافة',weekly:'نظافة',revision:'إعادة',codechange:'تغيير كود',custom:'إضافي'};
+  const base=new Date(); base.setDate(base.getDate()+schedOff*7);
+  const dow=(base.getDay()+1)%7;                       // week starts Saturday
+  const start=new Date(base); start.setDate(base.getDate()-dow);
+  const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');});
+  const flats=[...new Set([...(D.schedule||[]).map(c=>c.flat),...D.stays.map(s=>s.flat),...(D.repairs||[]).map(r=>r.flat||r.apt)])].filter(Boolean).sort();
+  const cell={};
+  (D.schedule||[]).forEach(c=>{ if(days.indexOf(c.date)>-1)
+    (cell[c.flat+'|'+c.date]=cell[c.flat+'|'+c.date]||[]).push(`<div style="background:#f5d9d9;border-radius:5px;padding:1px 4px;margin:1px 0">${TYPE[c.type]||c.type}${c.time&&/^\d/.test(String(c.time))?' '+c.time:''}${c.code?'<br>🔑 '+c.code:''}</div>`); });
+  (D.repairs||[]).forEach(r=>{ const f=r.flat||r.apt, d=String(r.date||'').slice(0,10); if(f&&days.indexOf(d)>-1)
+    (cell[f+'|'+d]=cell[f+'|'+d]||[]).push(`<div style="background:#ece0cf;border-radius:5px;padding:1px 4px;margin:1px 0">🔧 ${r.trade||''}</div>`); });
+  D.stays.forEach(s=>{
+    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?' '+s.arrivalTime:''}</div>`);
+    if(days.indexOf(s.co)>-1)(cell[s.flat+'|'+s.co]=cell[s.flat+'|'+s.co]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi></div>`);
+  });
+  const DN=['السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+  let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <button class="btn" onclick="schedShift(1)">‹</button>
+    <div style="flex:1;text-align:center;font-weight:900;font-size:12.5px">${days[0]} ← ${days[6]}${schedOff===0?' (الأسبوع الحالي)':''}</div>
+    <button class="btn" onclick="schedShift(-1)">›</button></div>
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:560px;font-size:10px">
+    <tr><th style="border:1px solid var(--border);background:var(--card);padding:3px;position:sticky;right:0">الشقة</th>${days.map((d,i)=>`<th style="border:1px solid var(--border);padding:3px;background:${d===D.today?'rgba(204,95,95,.12)':'var(--card)'}">${DN[i]}<br>${d.slice(5)}</th>`).join('')}</tr>`;
+  flats.forEach(f=>{
+    h+=`<tr><td style="border:1px solid var(--border);font-weight:900;padding:3px;background:var(--card);position:sticky;right:0;white-space:nowrap">${f}</td>`;
+    days.forEach(d=>{ h+=`<td style="border:1px solid var(--border);padding:2px;vertical-align:top;min-width:72px;${d===D.today?'background:rgba(204,95,95,.05)':''}">${(cell[f+'|'+d]||[]).join('')}</td>`; });
+    h+='</tr>';
+  });
+  h+='</table></div><div class="step-sub" style="margin-top:6px">▶ وصول · ◀ مغادرة · 🔑 كود الباب · وردي = نظافة · بيج = صيانة</div>';
+  el.innerHTML=h;
+}
+
+/* السجل — كل اللي اتعلّم، لكل ضيف بالتاريخ والساعة */
+function renderLog(){
+  const el=document.getElementById('p-log'); if(!el) return;
+  const byDay={};
+  (D.log||[]).forEach(e=>{ const d=String(e.at).slice(0,10); (byDay[d]=byDay[d]||[]).push(e); });
+  const days=Object.keys(byDay).sort().reverse();
+  el.innerHTML=days.length?days.map(d=>`<div class="day-h">${d}${d===D.today?' — النهارده':''}</div>`+byDay[d].map(e=>{
+    const lbl=e.step==='note'?('📝 '+e.val):e.step==='handover'?'🤝 تسليم لملاح':e.step==='group'?(e.val==='invited'?'📩 دعوة الجروب':'💬 الجروب جاهز'):e.step==='lang'?('🌐 '+e.val):e.step==='requests'?('📌 '+e.val):e.step==='gender'?'⚥ نوع الضيف':((STEP_AR[e.step]||e.step)+(e.done?' ✅':' ↩'));
+    return `<div class="line"><span style="flex:1">${lbl} — <bdi>${e.stay}</bdi></span><span class="step-sub" style="white-space:nowrap">${e.by||''} · ${String(e.at).slice(11,16)}</span></div>`;
+  }).join('')).join(''):'<div class="card">لا نشاط مسجّل بعد</div>';
 }
 
 window.addEventListener('load',function(){ initAuth(); var b=document.getElementById('langBtn'); if(b) b.textContent='🌐 '+tplDefLang().toUpperCase(); });
