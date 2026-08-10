@@ -188,6 +188,7 @@ async function loadData(force){
 /* ---- guest message templates, EN + AR (sent from Malah's own WhatsApp) ----
    Language per guest: the stay's 🌐 field wins when it clearly says AR or EN;
    otherwise the header EN/AR toggle sets the default. */
+function codeFor(st){ let best=null; (D.schedule||[]).forEach(c=>{ if(c.flat===st.flat&&c.code&&c.date<=st.ci&&(!best||c.date>best.date)) best=c; }); return best?best.code:'〈CODE〉'; }
 function firstName(g){ return String(g||'').trim().split(/\s+/)[0]||'there'; }
 function tplDefLang(){ return localStorage.getItem('owh_tpl_lang')==='ar'?'ar':'en'; }
 function toggleTplLang(){
@@ -205,10 +206,11 @@ function tplLang(st){
 function tplAR(k, st, occ){
   const n=firstName(st.guest);
   switch(k){
-    case 'welcome': return `أهلاً ${n}! 🌟 شكراً لحجزك معانا — يسعدنا نستضيفك في شقتنا. علشان نجهّز كل حاجة، ممكن تبعتلنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمهم هنبعتلك دليل البيت وفيه كل تعليمات الدخول ومعلومات مفيدة عن الشقة والمنطقة. كود الباب هيوصلك قبل ميعاد الوصول بـ٢٤ ساعة. وإحنا موجودين لأي حاجة تحتاجها — ابعتلنا هنا على الجروب. 🙏`;
+    case 'welcome': return `أهلاً ${n}! 🌟 شكراً لحجزك معانا — يسعدنا نستضيفك. علشان نجهّز كل حاجة، ممكن تبعتلنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمهم هنبعتلك دليل البيت وفيه كل تعليمات الدخول ومعلومات مفيدة عن الشقة والمنطقة. كود الباب هيوصلك قبل ميعاد الوصول بـ٢٤ ساعة. إحنا دايماً موجودين هنا على الجروب لأي حاجة تحتاجها. 🙏`;
+    case 'groupintro': return `أهلاً ${n}! معاك سارة 🌟 وخالد معانا في الجروب، وحابين نعرّفك على ملاح من فريق الدعم — هيكون معاك طول الإقامة وهيعتني بيك في كل حاجة، وهيتواصل معاك حالاً بكل اللي تحتاجه. نورتنا!`;
     case 'manual': return `أهلاً ${n}! ده دليل البيت 🏠 — فيه تعليمات الدخول وكل حاجة عن الشقة وأماكننا المفضلة في المنطقة. لو أي حاجة مش واضحة اسألنا هنا!`;
-    case 'code': return `أهلاً ${n}! وصولك بكرة 🎉 كود الباب: 〈CODE〉 — الدخول من الساعة ٣ العصر. رحلة سعيدة، وابعتلنا وانت في الطريق!`;
-    case 'arrival': return `أهلاً ${n}! وصولك قرّب يوم ${st.ci} — متوقع توصل الساعة كام؟ علشان نجهّز كل حاجة قبل ما توصل.`;
+    case 'code': return `أهلاً ${n}! وصولك بكرة 🎉 كود الباب: ${codeFor(st)} — الدخول من الساعة ٣ العصر. رحلة سعيدة، وابعتلنا وانت في الطريق!`;
+    case 'arrival': return `أهلاً ${n}! بنجهّز كل حاجة لإقامتك — متوقع توصل الساعة كام؟ علشان نستقبلك على أكمل وجه.`;
     case 'settled': return `أهلاً ${n}! بنطمن عليك — كل حاجة تمام في الشقة؟ لو محتاج أي حاجة إحنا موجودين. إقامة سعيدة! 😊`;
     case 'midstay': return `أهلاً ${n}! حابين نرتب معاك النظافة المجانية${occ&&occ!=='mid'?' يوم '+occ:''} 🧹 — وهنغيّر كمان الملايات والفوط. أنهي معاد يناسبك؟ وإزاي الإقامة معانا لحد دلوقتي؟`;
     case 'checkout': return `أهلاً ${n}! تذكير إن المغادرة بكرة قبل الساعة ١٢ الظهر. سيب المفاتيح زي ما موضح في دليل البيت. شكراً إنك نزلت عندنا — سعدنا باستضافتك!`;
@@ -220,10 +222,11 @@ function tpl(k, st, occ){
   if(tplLang(st)==='ar') return tplAR(k, st, occ);
   const n=firstName(st.guest);
   switch(k){
-    case 'welcome': return `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you at our apartment. To get everything ready, could you please send a photo of the passport/ID of each guest? Once we receive them, we'll send you our house manual with all the check-in instructions and useful tips about the apartment and the neighborhood. Your door code will be sent 24 hours before check-in. And we're here for anything you need — just message us in this WhatsApp group. 🙏`;
+    case 'welcome': return `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you. To get everything ready, could you please send a photo of the passport/ID of each guest? Once we receive them, we'll send you our house manual with all the check-in instructions and useful tips about the apartment and the neighborhood. Your door code will be sent 24 hours before check-in. We're always here on this group for anything you need. 🙏`;
+    case 'groupintro': return `Hi ${n}! This is Sarah 🌟 Khaled is with us in the group too, and we would like to introduce Malah from our support team — he will be your main contact throughout your stay and will take great care of you. He will be in touch shortly with everything you need. Welcome!`;
     case 'manual': return `Hi ${n}! Here is our house manual 🏠 — it has the check-in instructions, everything about the apartment, and our favorite spots in the neighborhood. If anything is unclear, just ask us here!`;
-    case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Your door code is: 〈CODE〉 — check-in from 3:00 PM. Safe travels, and message us here when you're on your way!`;
-    case 'arrival': return `Hi ${n}! Your check-in is coming up on ${st.ci} — what time do you expect to arrive? We'll make sure everything is ready and waiting for you.`;
+    case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Your door code is: ${codeFor(st)} — check-in from 3:00 PM. Safe travels, and message us here when you're on your way!`;
+    case 'arrival': return `Hi ${n}! We are getting everything ready for your stay — what time do you expect to arrive? We'll have everything ready and waiting for you.`;
     case 'settled': return `Hi ${n}! Just checking in — is everything okay with the apartment? If you need anything at all, we're right here. Enjoy your stay! 😊`;
     case 'midstay': return `Hi ${n}! We'd love to arrange your complimentary cleaning${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels for you. What time would suit you best? And how is everything going with your stay so far?`;
     case 'checkout': return `Hi ${n}! A gentle reminder that check-out is tomorrow before 12:00 PM. Please leave the keys as instructed in the house manual. Thank you so much for staying with us — it was a pleasure hosting you!`;
@@ -302,15 +305,38 @@ function stayExtra(st){
   h+='</div>';
   return h;
 }
-async function pseudoTick(stayId, step, val, msg){
-  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',val:val||''}); }catch(e){}
+/* PERF (Sarah 2026-08-10): no full reloads after a tick — the server gets the guest label from
+   us, we mutate our own copy, and the background refresh reconciles later. */
+function tagOf(st){ return `${st.guest} (${st.flat})`; }
+async function pseudoTick(stayId, step, val, msg, snap){
+  const st=D.stays.find(s=>s.id===stayId);
+  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',val:val||'',tag:st?tagOf(st):'',snap:snap||''}); }catch(e){}
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return false; }
-  toast(msg||'✅ اتسجلت — التلجرام اتبعت'); loadData(true); return true;
+  if(st){
+    const now=new Date().toISOString().slice(0,10);
+    if(step==='handover') st.handover={done:true,by:currentUserName,at:now,note:val||''};
+    else if(step==='group') st.group={done:val!=='invited',by:currentUserName,at:now,invited:val==='invited'};
+    else if(step==='lang') st.lang=val||'';
+    else if(step==='requests') st.requests=val||'';
+    try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+    renderAll();
+  }
+  toast(msg||'✅ اتسجلت'); return true;
 }
 function doHandover(stayId){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   const note=prompt('🤝 تسليم الضيف لملاح\nاكتب إيه اللي حصل معاه لحد دلوقتي (على Airbnb أو في الخاص) — أسئلة، اتفاقات، أي حاجة تهم ملاح:','');
   if(note===null) return;
-  pseudoTick(stayId,'handover',note,'🤝 اتسلّم لملاح — التلجرام فيه كل التفاصيل');
+  // the snapshot is built HERE from what we're looking at — the server sends it verbatim
+  const doneL=st.steps.filter(x=>x.done).map(x=>'✅ '+x.label+(x.by?' ('+x.by+')':''));
+  const next=st.steps.filter(x=>!x.done&&x.k!=='docs');
+  const snap=`${st.ci} ← ${st.co}`+(st.lang?`\n🌐 اللغة: ${st.lang}`:'')+
+    `\n👨‍👩‍👧 ${st.adults||0} كبار`+(st.children?` + ${st.children} أطفال`:'')+(st.infants?` + ${st.infants} رضّع`:'')+
+    (st.requests?`\n📌 طلبات خاصة: ${st.requests}`:'')+
+    ((st.notes&&st.notes.length)?`\n📝 ملاحظات سابقة:\n`+st.notes.map(n=>'• '+n.text).join('\n'):'')+
+    `\n\nاللي اتعمل قبل التسليم:\n`+(doneL.length?doneL.join('\n'):'— لسه مفيش')+
+    (next.length?`\n\nأول خطوة عليك: ${next[0].label}`:'');
+  pseudoTick(stayId,'handover',note,'🤝 اتسلّم لملاح — التلجرام فيه كل التفاصيل',snap);
 }
 function tickGroupVal(stayId,val){ pseudoTick(stayId,'group',val,val==='invited'?'📩 اتسجلت الدعوة':'💬 الجروب جاهز'); }
 function setField(stayId,k){
@@ -322,8 +348,8 @@ function setField(stayId,k){
 function addNote(stayId){
   const v=prompt('📝 ملاحظة للكل عن الضيف (بتتبعت تلجرام لملاح وسارة وخالد):','');
   if(v===null||!String(v).trim()) return;
-  api('comms_tick',{stayId,step:'note',occ:String(Date.now()),val:String(v).trim()})
-    .then(r=>{ if(r&&r.ok){ toast('📝 اتسجلت واتبعتت'); loadData(true); } else toast('❌ لم تُحفظ'); })
+  api('comms_tick',{stayId,step:'note',occ:String(Date.now()),val:String(v).trim(),tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()})
+    .then(r=>{ if(r&&r.ok){ const s=D.stays.find(x=>x.id===stayId); if(s){ (s.notes=s.notes||[]).push({at:new Date().toISOString().slice(0,10),by:currentUserName,text:String(v).trim()}); renderAll(); } toast('📝 اتسجلت'); } else toast('❌ لم تُحفظ'); })
     .catch(()=>toast('❌ لم تُحفظ'));
 }
 
@@ -446,7 +472,7 @@ async function addTask(){
 /* ---- ticks: save-then-toast, nothing local moves until the server accepts ---- */
 async function tick(stayId,k,occ){
   const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ}); }catch(e){}
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
   if(btn){ btn.disabled=false; btn.textContent='✅'; }
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,true,'');
@@ -457,14 +483,14 @@ async function tickArrival(stayId,occ){
   if(v===null) return;
   const t=String(v).trim();
   if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اكتب الوقت بصيغة HH:MM'); return; }
-  let r=null; try{ r=await api('comms_tick',{stayId,step:'arrival',occ,val:t}); }catch(e){}
+  let r=null; try{ r=await api('comms_tick',{stayId,step:'arrival',occ,val:t,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
   applyTick(stayId,'arrival',occ,true,t);
   toast('✅ الوصول '+t);
 }
 async function untick(stayId,k,occ){
   if(!confirm('إلغاء العلامة؟')) return;
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true}); }catch(e){}
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
   if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,false,'');
   toast('↩ اتلغت');
@@ -475,6 +501,64 @@ function applyTick(stayId,k,occ,done,val){
   sp.done=done; sp.doneAt=done?new Date().toISOString():''; if(k==='arrival'){ sp.val=done?val:''; st.arrivalTime=done?val:''; }
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   renderAll();
+}
+
+
+/* ==== FINAL TEMPLATES (Sarah's revision 2026-08-10). Function declarations override the
+   earlier versions above. G() picks the gendered Arabic form from the stay's gender setting
+   ('f' = lady, 'g' = group, default man). Latin text is kept out of Arabic sentences so
+   WhatsApp's bidi never scrambles them; the door code sits on its own line. ==== */
+function tplAR(k, st, occ){
+  const n=firstName(st.guest), gd=String(st.gender||'m');
+  const G=(m,f,p)=>gd==='f'?f:(gd==='g'?p:m);
+  switch(k){
+    case 'groupintro': return `أهلاً ${n}! معك سارة 🌟 وخالد معنا في الجروب، ونحب ${G('نعرّفك','نعرّفك','نعرّفكم')} على ملاح من فريق الدعم — هيكون ${G('معك','معك','معكم')} طوال الإقامة ليهتم بكل ما ${G('تحتاجه','تحتاجينه','تحتاجونه')}، وكلنا هنا ${G('معك','معك','معكم')} على الجروب. ${G('نوّرتنا','نوّرتينا','نوّرتونا')}!`;
+    case 'welcome': return `أهلاً ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟 حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمها هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت. كود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — وأنا موجود دائماً هنا على الجروب. 🙏`;
+    case 'manual': return `أهلاً ${n}! هذا دليل البيت 🏠 ${G('خذ','خذي','خذوا')} دقائق ${G('واطّلع','واطّلعي','واطّلعوا')} عليه من فضلك — هيسهّل الإقامة كثيراً. ${G('ستجد','ستجدين','ستجدون')} فيه: تعليمات الدخول، وأماكن كل شيء في البيت (المكواة، أدوات المطبخ، وغيرها)، وطريقة تشغيل الأجهزة (التكييف، الغسالة، التلفزيون)، وما حولك من محلات البقالة وتطبيقات التوصيل وأماكننا المفضلة القريبة. أي شيء غير واضح ${G('اسألني','اسأليني','اسألوني')} هنا!`;
+    case 'arrival': return `أهلاً ${n}! نجهّز البيت لإقامتك — متوقع ${G('تصل','تصلي','تصلوا')} الساعة كم؟ حتى يكون كل شيء جاهزاً قبل الوصول.`;
+    case 'code': return `أهلاً ${n}! الوصول بكرة 🎉 الدخول متاح من الساعة ٣ عصراً. كود الباب هو:
+${codeFor(st)}
+رحلة سعيدة — من فضلك ${G('ابعت','ابعتي','ابعتوا')} لنا رسالة وأنت في الطريق حتى نتأكد أن كل شيء جاهز للوصول.`;
+    case 'settled': return `أهلاً ${n}! نحب نطمن ان كل شئ تمام وعند ${G('توقعاتك','توقعاتك','توقعاتكم')}؟ لو في أي شيء أحنا موجودين للمساعدة. إقامة سعيدة! 😊`;
+    case 'midstay': return `أهلاً ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
+    case 'checkout': return `أهلاً ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة غداً قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
+✅ ${G('أغلق','أغلقي','أغلقوا')} كل النوافذ والبلكونات
+✅ ${G('اجمع','اجمعي','اجمعوا')} القمامة في المكان المخصص
+✅ ${G('أطفئ','أطفئي','أطفئوا')} التكييفات والتلفزيونات
+✅ ${G('ضع','ضعي','ضعوا')} الفوط المستعملة على حوض الحمام الرئيسي${st.flat==='Zayed 2000'?'':'\n✅ '+G('أعد','أعيدي','أعيدوا')+' كارت بوابة الكمبوند إلى مكانه (علّاقة المفاتيح أو الدولاب)'}
+✅ ${G('ألقِ','ألقي','ألقوا')} نظرة سريعة على الأغراض الشخصية
+✅ ${G('اقفل','اقفلي','اقفلوا')} باب البيت و${G('أعد','أعيدي','أعيدوا')} المفتاح إلى صندوق المفاتيح — ${G('غيّر','غيّري','غيّروا')} الأرقام ثم ${G('أغلق','أغلقي','أغلقوا')} الغطاء الأسود
+✅ ${G('أخبرنا','أخبرينا','أخبرونا')} بمجرد المغادرة
+رحلة سعيدة!`;
+    case 'review': return `أهلاً ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا، ونتمنى ${G('نستضيفك','نستضيفك','نستضيفكم')} مرة أخرى قريباً 🙏 ${G('تقييمك','تقييمك','تقييمكم')} يعني لنا الكثير كفريق صغير. رحلة سعيدة!`;
+    default: return '';
+  }
+}
+function tpl(k, st, occ){
+  if(tplLang(st)==='ar') return tplAR(k, st, occ);
+  const n=firstName(st.guest);
+  switch(k){
+    case 'groupintro': return `Hi ${n}! This is Sarah 🌟 Khaled is with us in the group too, and we would like to introduce Malah from our support team — he will be with you throughout your stay to take care of everything you need, and we are all here on the group with you. Welcome!`;
+    case 'welcome': return `Hello ${n}! I'm glad to be here to support you with anything you need during your stay 🌟 To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest? Once we receive them, I'll send you our house manual with all the check-in instructions and everything about the home. Your door code will be sent 24 hours before check-in — and I'm always here on this group whenever you need me. 🙏`;
+    case 'manual': return `Hi ${n}! Here is our house manual 🏠 Please take a few minutes to go through it — it will make your stay much smoother. Inside you'll find: the check-in instructions, where everything is in the home (ironing board, utensils, extras), how the devices work (A/C, washing machine, TV), and what's around you — groceries, delivery apps, and our favorite places nearby. Anything unclear, just ask me here!`;
+    case 'arrival': return `Hi ${n}! We're preparing the home for your stay — what time do you expect to arrive? We'll make sure everything is set before you get there.`;
+    case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Check-in is anytime from 3:00 PM. Your door code is:
+${codeFor(st)}
+Safe travels — please message us on your way so we make sure everything is ready for your arrival.`;
+    case 'settled': return `Hi ${n}! I hope you've settled in nicely — is everything meeting your expectations? If there's anything at all, we're right here to help. Enjoy your stay! 😊`;
+    case 'midstay': return `Hi ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
+    case 'checkout': return `Hi ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is tomorrow by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
+✅ Close & lock all windows and balconies
+✅ Gather the trash & place it in the dedicated takeout area
+✅ Switch off all ACs & TVs
+✅ Place all used towels on the sink in the main bathroom${st.flat==='Zayed 2000'?'':'\n✅ Return the compound gate card to its place (key hanger or closet)'}
+✅ Take a quick look around for personal items
+✅ Lock the door & return the key to the lockbox — shuffle the code, then close the black cover
+✅ Let us know once you've checked out
+Safe journey!`;
+    case 'review': return `Hi ${n}! We hope you enjoyed your stay with us, and we hope to host you again soon 🙏 Your review would mean the world to a small team like ours. Safe travels!`;
+    default: return '';
+  }
 }
 
 window.addEventListener('load',function(){ initAuth(); var b=document.getElementById('langBtn'); if(b) b.textContent='🌐 '+tplDefLang().toUpperCase(); });
