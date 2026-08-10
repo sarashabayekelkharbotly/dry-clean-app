@@ -362,6 +362,11 @@ window.addEventListener('load',function(){
   <button class="nav-tab" onclick="window.location.href='inventory.html'">
     <span class="tab-icon">🗂️</span>المخزون
   </button>
+  <!-- 📨 comms is Sarah/Khaled's tab (Sarah 2026-08-10) — hidden for Emad, whose account the
+       comms actions refuse server-side anyway; a dead tab would only confuse him -->
+  <button class="nav-tab" id="nav-comms" style="display:none" onclick="window.location.href='comms_index.html'">
+    <span class="tab-icon">📨</span>التواصل
+  </button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -816,6 +821,9 @@ function onAuthReady() {
   // Remove the app lock
   const lock = document.getElementById('appLock');
   if (lock) lock.style.display = 'none';
+  // 📨 comms tab appears for Sarah/Khaled only (Emad's account is refused by it server-side)
+  const nc = document.getElementById('nav-comms');
+  if (nc && (currentUser === 'sarah' || currentUser === 'khaled')) nc.style.display = '';
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('newDate').valueAsDate = new Date();
   const userEl = document.getElementById('currentUserDisplay');
