@@ -63,7 +63,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v4</span>
+  <span class="pill">v5</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
@@ -324,10 +324,13 @@ function stayExtra(st){
   const ho=st.handover||{}, gr=st.group||{};
   let h='<div class="step" style="border-top:1px solid var(--border)">';
   h+=`<div class="step-lb">🤝 التسليم لملاح<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع سارة/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
-  h+=ho.done?`<span class="badge b-ok">مع ملاح</span>`:`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
+  /* ↩ تراجع — لازم يكون ممكن نلغي علامة اتحطت بالغلط (أو من الـbackfill) لحد ما الحاجة
+     تتعمل فعلاً (Sarah 2026-08-11) */
+  h+=ho.done?`<span class="badge b-ok">مع ملاح</span><button class="btn" onclick="undoFlag('${st.id}','handover')">↩</button>`
+            :`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
   h+='</div><div class="step">';
   h+=`<div class="step-lb">💬 جروب الواتساب (بملاح جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
-  h+=gr.done?`<span class="badge b-ok">✓</span>`
+  h+=gr.done?`<span class="badge b-ok">✓</span><button class="btn" onclick="undoFlag('${st.id}','group')">↩</button>`
     :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
   h+='</div><div class="step">';
   h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
@@ -375,6 +378,17 @@ function doHandover(stayId){
   pseudoTick(stayId,'handover',note,'🤝 اتسلّم لملاح — التلجرام فيه كل التفاصيل',snap);
 }
 function tickGroupVal(stayId,val){ pseudoTick(stayId,'group',val,val==='invited'?'📩 اتسجلت الدعوة':'💬 الجروب جاهز'); }
+/* ↩ إلغاء علامة التسليم أو الجروب — بيرجّع الضيف للستة سارة/خالد لحد ما تتعمل فعلاً */
+async function undoFlag(stayId,step){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  if(!confirm(step==='handover'?'إلغاء علامة التسليم؟ الضيف هيرجع في لستة «لسه ماتسلمش».':'إلغاء علامة الجروب؟')) return;
+  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',undo:true,tag:tagOf(st)}); }catch(e){}
+  if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  if(step==='handover') st.handover={done:false,by:'',at:'',note:''};
+  else st.group={done:false,by:'',at:'',invited:false};
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderAll(); toast('↩ اتلغت');
+}
 function setField(stayId,k){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   const v=prompt(k==='lang'?'لغة التواصل مع الضيف (مثال: EN / AR / FR):':'الطلبات الخاصة (مثال: early check-in · سرير أطفال):', k==='lang'?(st.lang||''):(st.requests||''));
@@ -414,9 +428,13 @@ function renderQueue(){
   /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  const pend=currentUser==='malah'?[]:D.stays.filter(st=>st.ci>=today&&st.ci<=wk7&&(!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
+  /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
+     خالص، وهما بالظبط اللي لسه ماتسلموش (Sarah 2026-08-11) */
+  const pend=currentUser==='malah'?[]:D.stays.filter(st=>
+    ((st.ci>=today&&st.ci<=wk7)||(st.ci<=today&&st.co>today))&&
+    (!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
   if(pend.length){
-    h+=`<div class="sec-h">🤝 تسليم وجروبات — عليكم انتم (${pend.length})</div>`;
+    h+=`<div class="sec-h">🤝 تسليم وجروبات — على خالد وسارة (${pend.length})</div>`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
@@ -435,7 +453,15 @@ function renderQueue(){
     </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
-    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span><span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+    /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
+       على طول من هنا (Sarah 2026-08-11) */
+    h+=soon.map(x=>{
+      const notHanded=!(x.st.handover&&x.st.handover.done);
+      return `<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
+        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span>
+        ${notHanded?'<span class="badge b-due">🤝 لسه ماتسلمش</span>':''}
+        ${(notHanded&&currentUser!=='malah')?`<button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`:''}</div>`;
+    }).join('');
   }
   el.innerHTML=h;
 }
@@ -663,9 +689,13 @@ function renderQueue(){
   /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  const pend=currentUser==='malah'?[]:D.stays.filter(st=>st.ci>=today&&st.ci<=wk7&&(!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
+  /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
+     خالص، وهما بالظبط اللي لسه ماتسلموش (Sarah 2026-08-11) */
+  const pend=currentUser==='malah'?[]:D.stays.filter(st=>
+    ((st.ci>=today&&st.ci<=wk7)||(st.ci<=today&&st.co>today))&&
+    (!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
   if(pend.length){
-    h+=`<div class="sec-h">🤝 تسليم وجروبات — عليكم انتم (${pend.length})</div>`;
+    h+=`<div class="sec-h">🤝 تسليم وجروبات — على خالد وسارة (${pend.length})</div>`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
@@ -677,7 +707,15 @@ function renderQueue(){
   }
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
-    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span><span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+    /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
+       على طول من هنا (Sarah 2026-08-11) */
+    h+=soon.map(x=>{
+      const notHanded=!(x.st.handover&&x.st.handover.done);
+      return `<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
+        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span>
+        ${notHanded?'<span class="badge b-due">🤝 لسه ماتسلمش</span>':''}
+        ${(notHanded&&currentUser!=='malah')?`<button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`:''}</div>`;
+    }).join('');
   }
   el.innerHTML=h;
 }
