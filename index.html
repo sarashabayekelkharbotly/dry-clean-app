@@ -1212,6 +1212,19 @@ async function emadTaskToggle(id, done){
   try { await callScript({ action: 'emad_task_toggle', id, done }); }
   catch(e) { if (t) { t.done = !done; renderHome(); } }
 }
+
+/* ✏️ reschedule/reword a task — prompt flow, saved server-side, telegrams the assignee */
+async function emadTaskEditUI(id) {
+  const t = (EMAD.tasks || []).find(x => x.id === id); if (!t) return;
+  const tx = prompt('نص المهمة:', t.text); if (tx === null) return;
+  const dt = prompt('التاريخ (YYYY-MM-DD):', t.date); if (dt === null) return;
+  const tm = prompt('الساعة (HH:MM أو فاضي):', t.time || ''); if (tm === null) return;
+  try {
+    const r = await callScript({ action: 'emad_task_edit', id, text: tx.trim(), date: dt.trim(), time: tm.trim() });
+    if (r && r.ok) { t.text = r.text; t.date = r.date; t.time = r.time; renderHome(); toast('✏️ اتعدلت'); }
+    else toast('❌ لم يتم — ' + ((r && r.error) || 'حاول مرة أخرى'));
+  } catch (e) { toast('❌ لم يتم — تحقق من الإنترنت'); }
+}
 async function emadTaskDelete(id){
   if (!confirm('حذف هذه المهمة؟')) return;
   try {
@@ -1658,11 +1671,16 @@ function renderEmadPanel() {
       else
         timed.push({t: tk, h: row('🧹', `${emadTaskLine(c)} <span style="color:var(--text3);font-size:10.5px">— اضغط لما تبدأ</span>`, { click: `emadCleanStart(${args})` })});
     });
-  // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر
+  // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر.
+  // Each shows its AGE since it was added (Sarah 2026-08-11: "so Emad feels how long it's pending")
+  // and ✏️ reschedules/rewords it (server emad_task_edit, announced to the assignee).
   (EMAD.tasks || []).forEach(t => {
     const tm = (t.time && /^\d{2}:\d{2}$/.test(t.time)) ? t.time : '';
-    const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}` +
+    const ageDays = t.addedAt ? Math.max(0, Math.floor((new Date(todayK + 'T12:00:00') - new Date(String(t.addedAt).slice(0,10) + 'T12:00:00')) / 86400000)) : 0;
+    const ageTxt = ageDays > 0 ? ` <span style="color:${ageDays >= 3 ? '#cc5f5f' : 'var(--text3)'};font-size:11px;font-weight:700">⏳ من ${ageDays} يوم</span>` : '';
+    const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}${ageTxt}` +
       `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
+      ` <span onclick="event.stopPropagation();emadTaskEditUI('${t.id}')" style="cursor:pointer;font-size:11px;padding:0 4px">✏️</span>` +
       ` <span onclick="event.stopPropagation();emadTaskDelete('${t.id}')" style="color:#cc5f5f;cursor:pointer;font-size:11px;padding:0 4px">✕</span>`;
     timed.push({t: tm || '98:99', h: `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
