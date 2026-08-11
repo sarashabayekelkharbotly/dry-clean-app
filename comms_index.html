@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v7</span>
+  <span class="pill">v8</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -472,12 +472,15 @@ function renderQueue(){
     });
   }
   h+=`<div class="sec-h">🔴 مستحقة الآن (${due.length})</div>`;
-  h+=due.length?due.map(x=>`<div class="line">
+  h+=due.length?due.map(x=>{
+      const nh=!(x.st.handover&&x.st.handover.done);   // only owners ever reach these rows
+      return `<div class="line">
       <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${nh?`<span class="badge b-due">🤝 سلّموه الأول</span><button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`
+          :`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
       ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-    </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`}
+    </div>`;}).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
     /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
@@ -693,7 +696,12 @@ function renderQueue(){
   const el=document.getElementById('p-queue'); if(!el) return;
   const today=D.today||'';
   let due=[], soon=[];
+  /* NOT HIS GUEST, NOT HIS TASK (Sarah 2026-08-12): a stay that was never handed over must not
+     appear in Malah's to-do at all — those steps belong to Sarah/Khaled until they hand it over.
+     He still sees such guests further down (with the 🤝 badge) so he knows what's coming. */
   D.stays.forEach(st=>st.steps.forEach(sp=>{
+    const handed=!!(st.handover&&st.handover.done);
+    if(currentUser==='malah'&&!handed) return;
     const s=stepState(st,sp);
     if(s==='due') due.push({st,sp}); else if(s==='soon') soon.push({st,sp});
   }));
@@ -706,12 +714,15 @@ function renderQueue(){
       <button class="btn" onclick="editTask('${t.id}')">✏️</button>
       ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}</div>`;
   });
-  h+=due.length?due.map(x=>`<div class="line">
+  h+=due.length?due.map(x=>{
+      const nh=!(x.st.handover&&x.st.handover.done);   // only owners ever reach these rows
+      return `<div class="line">
       <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${nh?`<span class="badge b-due">🤝 سلّموه الأول</span><button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`
+          :`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
       ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-    </div>`).join('')
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`}
+    </div>`;}).join('')
     :((D.tasks||[]).some(t=>!t.done)?'':`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`);
   /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
