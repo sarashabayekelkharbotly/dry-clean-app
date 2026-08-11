@@ -1,5 +1,4 @@
-else if(step==="requests") st.requests=val||"";
-    else if(step==="gender") st.gender=val||"";<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -22,7 +21,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:12px; }
 .stay-hd { display:flex; align-items:center; gap:8px; cursor:pointer; }
 .stay-nm { font-weight:900; font-size:14px; flex:1; unicode-bidi:isolate; }
-.stay-meta { font-size:11px; color:var(--text2); margin-top:2px; }
+.stay-meta { font-size:11px; color:var(--text2); margin-top:2px; direction:rtl; unicode-bidi:plaintext; text-align:right; }
 .badge { font-size:10.5px; font-weight:700; border-radius:8px; padding:2px 8px; flex-shrink:0; }
 .b-due { background:rgba(204,95,95,.12); color:var(--danger); }
 .b-ok { background:rgba(92,170,127,.12); color:var(--ok); }
@@ -64,6 +63,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
+  <span class="pill">v3</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
@@ -323,6 +323,7 @@ async function pseudoTick(stayId, step, val, msg, snap){
     else if(step==='group') st.group={done:val!=='invited',by:currentUserName,at:now,invited:val==='invited'};
     else if(step==='lang') st.lang=val||'';
     else if(step==='requests') st.requests=val||'';
+    else if(step==='gender') st.gender=val||'';
     try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
     renderAll();
   }
@@ -393,14 +394,12 @@ function renderQueue(){
     });
   }
   h+=`<div class="sec-h">🔴 مستحقة الآن (${due.length})</div>`;
-  h+=due.length?due.map(x=>`<div class="due-row">
-      <div style="font-size:12px;font-weight:900">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</div>
-      <div class="step-sub" style="margin:2px 0 8px">${x.st.ci} ← ${x.st.co}${x.sp.occ&&x.sp.occ!=='mid'?' · النظافة '+x.sp.occ:''}</div>
-      <div style="display:flex;gap:6px">
-        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-        ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋 نسخ الرسالة</button>`}
-        <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅ تم</button>
-      </div></div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
+  h+=due.length?due.map(x=>`<div class="line">
+      <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
+      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
+    </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
     h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span><span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
@@ -415,7 +414,10 @@ function renderStays(){
     const undone=st.steps.filter(sp=>!sp.done&&stepState(st,sp)==='due').length;
     const open=window._open===st.id;
     const hoB=(st.handover&&st.handover.done)?'':'<span class="badge b-soon">🤝 لسه ماتسلمش</span>';
-    return `<div class="card">
+    const today=D.today||'';
+    const wk=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.toISOString().slice(0,10)})();
+    const cardBg=(st.ci<=today&&st.co>today)?'#e4efe1':(st.ci>today&&st.ci<=wk)?'#eef6ec':(st.ci>wk)?'#f4f2f2':'#fff';
+    return `<div class="card" style="background:${cardBg}">
       <div class="stay-hd" onclick="window._open=window._open==='${st.id}'?null:'${st.id}';renderStays()">
         <div style="flex:1"><div class="stay-nm"><bdi>${st.guest}</bdi></div>
           <div class="stay-meta">${st.flat} · ${st.ci} ← ${st.co} · ${st.nights} ليلة · ${st.portal}${st.arrivalTime?' · وصول '+st.arrivalTime:''}</div>
@@ -535,7 +537,7 @@ function tplAR(k, st, occ){
 ${codeFor(st)}
 رحلة سعيدة — من فضلك ${G('ابعت','ابعتي','ابعتوا')} لنا رسالة وأنت في الطريق حتى نتأكد أن كل شيء جاهز للوصول.`;
     case 'settled': return `أهلاً ${n}! نحب نطمن ان كل شئ تمام وعند ${G('توقعاتك','توقعاتك','توقعاتكم')}؟ لو في أي شيء أحنا موجودين للمساعدة. إقامة سعيدة! 😊`;
-    case 'midstay': return `أهلاً ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
+    case 'midstay': if(occ==='mid') return `أهلاً ${n}! نطمئن عليك في منتصف الإقامة — كيف كل شيء معك؟ لو تحتاج أي شيء نحن هنا. 😊`; return `أهلاً ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
     case 'checkout': return `أهلاً ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة غداً قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
 ✅ ${G('أغلق','أغلقي','أغلقوا')} كل النوافذ والبلكونات
 ✅ ${G('اجمع','اجمعي','اجمعوا')} القمامة في المكان المخصص
@@ -561,7 +563,7 @@ function tpl(k, st, occ){
 ${codeFor(st)}
 Safe travels — please message us on your way so we make sure everything is ready for your arrival.`;
     case 'settled': return `Hi ${n}! I hope you've settled in nicely — is everything meeting your expectations? If there's anything at all, we're right here to help. Enjoy your stay! 😊`;
-    case 'midstay': return `Hi ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
+    case 'midstay': if(occ==='mid') return `Hi ${n}! Just checking in halfway through your stay — how is everything going? If there is anything you need, we are right here. 😊`; return `Hi ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
     case 'checkout': return `Hi ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is tomorrow by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
 ✅ Close & lock all windows and balconies
 ✅ Gather the trash & place it in the dedicated takeout area
@@ -603,14 +605,12 @@ function renderQueue(){
       <span style="flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">📝 ${t.text}</span>
       ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}</div>`;
   });
-  h+=due.length?due.map(x=>`<div class="due-row">
-      <div style="font-size:12px;font-weight:900">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</div>
-      <div class="step-sub" style="margin:2px 0 8px">${x.st.ci} ← ${x.st.co}${x.sp.occ&&x.sp.occ!=='mid'?' · النظافة '+x.sp.occ:''}</div>
-      <div style="display:flex;gap:6px">
-        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-        ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋 نسخ الرسالة</button>`}
-        <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅ تم</button>
-      </div></div>`).join('')
+  h+=due.length?due.map(x=>`<div class="line">
+      <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
+      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${(x.sp.k==='docs'||x.sp.k==='security')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrival'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
+    </div>`).join('')
     :((D.tasks||[]).some(t=>!t.done)?'':`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`);
   const pend=D.stays.filter(st=>st.ci>=today&&(!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
   if(pend.length){
@@ -676,7 +676,7 @@ function renderLog(){
   const days=Object.keys(byDay).sort().reverse();
   el.innerHTML=days.length?days.map(d=>`<div class="day-h">${d}${d===D.today?' — النهارده':''}</div>`+byDay[d].map(e=>{
     const lbl=e.step==='note'?('📝 '+e.val):e.step==='handover'?'🤝 تسليم لملاح':e.step==='group'?(e.val==='invited'?'📩 دعوة الجروب':'💬 الجروب جاهز'):e.step==='lang'?('🌐 '+e.val):e.step==='requests'?('📌 '+e.val):e.step==='gender'?'⚥ نوع الضيف':((STEP_AR[e.step]||e.step)+(e.done?' ✅':' ↩'));
-    return `<div class="line"><span style="flex:1">${lbl} — <bdi>${e.stay}</bdi></span><span class="step-sub" style="white-space:nowrap">${e.by||''} · ${String(e.at).slice(11,16)}</span></div>`;
+    return `<div class="line"><span style="flex:1">${lbl} — <bdi>${e.stay}</bdi></span><span class="step-sub" style="white-space:nowrap">${e.by||''} · ${(function(){try{return new Date(e.at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}catch(_){return ''}})()}</span></div>`;
   }).join('')).join(''):'<div class="card">لا نشاط مسجّل بعد</div>';
 }
 
