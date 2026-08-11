@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v8</span>
+  <span class="pill">v9</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -457,11 +457,14 @@ function renderQueue(){
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
      خالص، وهما بالظبط اللي لسه ماتسلموش (Sarah 2026-08-11) */
-  const pend=currentUser==='malah'?[]:D.stays.filter(st=>
+  const pend=D.stays.filter(st=>
     ((st.ci>=today&&st.ci<=wk7)||(st.ci<=today&&st.co>today))&&
     (!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
   if(pend.length){
-    h+=`<div class="sec-h">🤝 تسليم وجروبات — على خالد وسارة (${pend.length})</div>`;
+    // Malah sees the same list read-only — it is what is coming to him, not work he can start
+    h+=`<div class="sec-h">${currentUser==='malah'
+      ? `🤝 جاي قدامك — لسه ماتسلمش (${pend.length})`
+      : `🤝 تسليم وجروبات — على خالد وسارة (${pend.length})`}</div>`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
@@ -472,26 +475,19 @@ function renderQueue(){
     });
   }
   h+=`<div class="sec-h">🔴 مستحقة الآن (${due.length})</div>`;
-  h+=due.length?due.map(x=>{
-      const nh=!(x.st.handover&&x.st.handover.done);   // only owners ever reach these rows
-      return `<div class="line">
+  h+=due.length?due.map(x=>`<div class="line">
       <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${nh?`<span class="badge b-due">🤝 سلّموه الأول</span><button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`
-          :`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
       ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`}
-    </div>`;}).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
+    </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
     /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
        على طول من هنا (Sarah 2026-08-11) */
-    h+=soon.map(x=>{
-      const notHanded=!(x.st.handover&&x.st.handover.done);
-      return `<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span>
-        ${notHanded?'<span class="badge b-due">🤝 لسه ماتسلمش</span>':''}
-        ${(notHanded&&currentUser!=='malah')?`<button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`:''}</div>`;
-    }).join('');
+    // only handed-over stays reach here, so these rows are always genuinely his next work
+    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
+        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
   }
   el.innerHTML=h;
 }
@@ -696,15 +692,16 @@ function renderQueue(){
   const el=document.getElementById('p-queue'); if(!el) return;
   const today=D.today||'';
   let due=[], soon=[];
-  /* NOT HIS GUEST, NOT HIS TASK (Sarah 2026-08-12): a stay that was never handed over must not
-     appear in Malah's to-do at all — those steps belong to Sarah/Khaled until they hand it over.
-     He still sees such guests further down (with the 🤝 badge) so he knows what's coming. */
-  D.stays.forEach(st=>st.steps.forEach(sp=>{
-    const handed=!!(st.handover&&st.handover.done);
-    if(currentUser==='malah'&&!handed) return;
-    const s=stepState(st,sp);
-    if(s==='due') due.push({st,sp}); else if(s==='soon') soon.push({st,sp});
-  }));
+  /* HANDOVER IS THE GATE (Sarah 2026-08-12). A stay that was not handed over produces NO to-do
+     rows for ANYONE — not Malah, not Sarah, not Khaled. Such a guest lives in the 🤝 section
+     below and nowhere else; the moment the handover is ticked, their steps move up here. */
+  D.stays.forEach(st=>{
+    if(!(st.handover&&st.handover.done)) return;
+    st.steps.forEach(sp=>{
+      const s=stepState(st,sp);
+      if(s==='due') due.push({st,sp}); else if(s==='soon') soon.push({st,sp});
+    });
+  });
   let h=`<div class="sec-h">✅ مهام النهارده (${(D.tasks||[]).filter(t=>!t.done).length+due.length})</div>`;
   (D.tasks||[]).forEach(t=>{
     const age=t.addedAt?daysSince(t.addedAt):0;
@@ -714,46 +711,43 @@ function renderQueue(){
       <button class="btn" onclick="editTask('${t.id}')">✏️</button>
       ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}</div>`;
   });
-  h+=due.length?due.map(x=>{
-      const nh=!(x.st.handover&&x.st.handover.done);   // only owners ever reach these rows
-      return `<div class="line">
+  h+=due.length?due.map(x=>`<div class="line">
       <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${nh?`<span class="badge b-due">🤝 سلّموه الأول</span><button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`
-          :`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
       ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`}
-    </div>`;}).join('')
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
+    </div>`).join('')
     :((D.tasks||[]).some(t=>!t.done)?'':`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`);
   /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
      خالص، وهما بالظبط اللي لسه ماتسلموش (Sarah 2026-08-11) */
-  const pend=currentUser==='malah'?[]:D.stays.filter(st=>
+  const pend=D.stays.filter(st=>
     ((st.ci>=today&&st.ci<=wk7)||(st.ci<=today&&st.co>today))&&
     (!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
   if(pend.length){
-    h+=`<div class="sec-h">🤝 تسليم وجروبات — على خالد وسارة (${pend.length})</div>`;
+    // Malah sees the same list read-only — it is what is coming to him, not work he can start
+    h+=`<div class="sec-h">${currentUser==='malah'
+      ? `🤝 جاي قدامك — لسه ماتسلمش (${pend.length})`
+      : `🤝 تسليم وجروبات — على خالد وسارة (${pend.length})`}</div>`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
       if(!(st.handover&&st.handover.done)) bits.push('🤝 لسه ماتسلمش لملاح');
+      const own=currentUser!=='malah';   // only Sarah/Khaled can act here
       h+=`<div class="line"><span style="flex:1"><b><bdi>${st.guest}</bdi></b> (${st.flat}) · وصول ${st.ci}<div class="step-sub">${bits.join(' · ')}</div></span>
-        ${!(st.group&&st.group.done)?`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋</button><button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
-        ${!(st.handover&&st.handover.done)?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
+        ${(own&&!(st.group&&st.group.done))?`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋</button><button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
+        ${(own&&!(st.handover&&st.handover.done))?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
     });
   }
   if(soon.length){
     h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
     /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
        على طول من هنا (Sarah 2026-08-11) */
-    h+=soon.map(x=>{
-      const notHanded=!(x.st.handover&&x.st.handover.done);
-      return `<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span>
-        ${notHanded?'<span class="badge b-due">🤝 لسه ماتسلمش</span>':''}
-        ${(notHanded&&currentUser!=='malah')?`<button class="btn btn-ok" onclick="doHandover('${x.st.id}')">🤝</button>`:''}</div>`;
-    }).join('');
+    // only handed-over stays reach here, so these rows are always genuinely his next work
+    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
+        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
   }
   el.innerHTML=h;
 }
