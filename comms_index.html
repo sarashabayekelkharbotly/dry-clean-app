@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>التواصل — OWH</title>
+<!-- ADD-TO-HOME-SCREEN (Sarah 2026-08-12: Malah's shortcut showed a plain "G"). Android needs a
+     manifest with a ≥192px icon to make a real app icon; without one Chrome writes a letter badge.
+     apple-touch-icon covers iPhones, rel=icon the browser tab. -->
+<link rel="manifest" href="comms.webmanifest">
+<link rel="icon" href="owh-icon-192.png">
+<link rel="apple-touch-icon" href="owh-icon-192.png">
+<meta name="theme-color" content="#cc5f5f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="التواصل">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root { --bg:#f9f0f0; --card:#ffffff; --border:#f0e0e0; --text1:#3d3436; --text2:#8a7a7d; --text3:#b5a5a8;
@@ -63,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v6</span>
+  <span class="pill">v7</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
