@@ -63,8 +63,9 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v5</span>
+  <span class="pill">v6</span>
   <span class="pill" id="agePill"></span>
+  <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
   <button class="btn" onclick="loadData(true)">↻</button>
@@ -152,7 +153,10 @@ function hideLoginScreen(){
   const el=document.getElementById('loginScreen');
   if(el){ el.style.opacity='0'; setTimeout(()=>el.style.display='none',300); }
   document.getElementById('switchUserBtn').style.display='block';
-  if(currentUser==='sarah'||currentUser==='khaled'){ const hb=document.getElementById('homeBtn'); if(hb) hb.style.display=''; }
+  if(currentUser==='sarah'||currentUser==='khaled'){
+    const hb=document.getElementById('homeBtn'); if(hb) hb.style.display='';
+    const bb=document.getElementById('briefBtn'); if(bb){ bb.style.display=''; bb.textContent=(new Date().getHours()>=17)?'🌙':'☀️'; }
+  }
   hydrate(); loadData(false);
 }
 function showSwitchUser(){
@@ -263,6 +267,20 @@ async function copyTpl(stayId,k,occ){
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
     ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
     ()=>{ prompt('انسخ الرسالة:',t); });
+}
+/* ☀️/🌙 إرسال الملخص دلوقتي — نفس الدوال اللي الـtriggers بتشغّلها، فاللي بتبعتيه بإيدك
+   هو نفسه اللي بيتبعت لوحده (سارة وخالد بس — حساب ملاح مرفوض من السيرفر) */
+async function sendBriefNow(){
+  if(isReadonly && !isReadonly()) return;
+  const which = confirm('إرسال خطة الصباح دلوقتي؟\n\n(OK = خطة الصباح · Cancel = ملخص المساء)') ? 'morning' : 'evening';
+  if(!confirm(which==='morning'
+      ? 'خطة الصباح هتتبعت دلوقتي لسارة وخالد وعماد وملاح. تمام؟'
+      : 'ملخص المساء هيتبعت دلوقتي لسارة وخالد وعماد وملاح. تمام؟')) return;
+  const b=document.getElementById('briefBtn'); if(b){ b.disabled=true; b.textContent='⏳'; }
+  let r=null; try{ r=await api('briefs_send',{which}); }catch(e){}
+  if(b){ b.disabled=false; b.textContent = which==='morning'?'☀️':'🌙'; }
+  if(!r||r.ok===false){ toast('❌ لم يتم الإرسال — '+((r&&r.error)||'حاول مرة أخرى')); return; }
+  toast(which==='morning'?'☀️ اتبعتت خطة اليوم':'🌙 اتبعت ملخص المساء');
 }
 function daysSince(ymd){ try{ return Math.max(0,Math.floor((new Date(D.today+'T12:00:00')-new Date(ymd+'T12:00:00'))/86400000)); }catch(e){ return 0; } }
 async function editTask(id){
