@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v9</span>
+  <span class="pill">v10</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -482,12 +482,26 @@ function renderQueue(){
       <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
     </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
   if(soon.length){
-    h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
+    h+=`<div class="sec-h">🟡 خلال يومين — 📨 ملاح (${soon.length})</div>`;
     /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
        على طول من هنا (Sarah 2026-08-11) */
     // only handed-over stays reach here, so these rows are always genuinely his next work
     h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
         <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+  }
+  /* الجزء التاني من «خلال يومين» — شغل سارة وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
+     تسليم. مفصول ومعنون علشان كل واحد يعرف اللي عليه (Sarah 2026-08-12). */
+  const d2=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+  const soonOwn=pend.filter(st=>st.ci>=today&&st.ci<=d2);
+  if(soonOwn.length){
+    h+=`<div class="sec-h">🟡 خلال يومين — 🤝 سارة وخالد (${soonOwn.length})</div>`;
+    soonOwn.forEach(st=>{
+      const need=[];
+      if(!(st.group&&st.group.done)) need.push('💬 الجروب');
+      if(!(st.handover&&st.handover.done)) need.push('🤝 التسليم');
+      h+=`<div class="line"><span class="badge b-soon">${st.ci}</span>
+        <span style="flex:1">${need.join(' + ')} — <bdi>${st.guest}</bdi> (${st.flat})</span></div>`;
+    });
   }
   el.innerHTML=h;
 }
@@ -742,12 +756,26 @@ function renderQueue(){
     });
   }
   if(soon.length){
-    h+=`<div class="sec-h">🟡 خلال يومين (${soon.length})</div>`;
+    h+=`<div class="sec-h">🟡 خلال يومين — 📨 ملاح (${soon.length})</div>`;
     /* اللي جاي قدام — وجنبه تنبيه لو الضيف لسه ماتسلمش لملاح، ولسارة/خالد زرار التسليم
        على طول من هنا (Sarah 2026-08-11) */
     // only handed-over stays reach here, so these rows are always genuinely his next work
     h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
         <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+  }
+  /* الجزء التاني من «خلال يومين» — شغل سارة وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
+     تسليم. مفصول ومعنون علشان كل واحد يعرف اللي عليه (Sarah 2026-08-12). */
+  const d2=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+  const soonOwn=pend.filter(st=>st.ci>=today&&st.ci<=d2);
+  if(soonOwn.length){
+    h+=`<div class="sec-h">🟡 خلال يومين — 🤝 سارة وخالد (${soonOwn.length})</div>`;
+    soonOwn.forEach(st=>{
+      const need=[];
+      if(!(st.group&&st.group.done)) need.push('💬 الجروب');
+      if(!(st.handover&&st.handover.done)) need.push('🤝 التسليم');
+      h+=`<div class="line"><span class="badge b-soon">${st.ci}</span>
+        <span style="flex:1">${need.join(' + ')} — <bdi>${st.guest}</bdi> (${st.flat})</span></div>`;
+    });
   }
   el.innerHTML=h;
 }
