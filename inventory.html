@@ -1679,6 +1679,37 @@ function renderStats() {
     }
     html += `</div>`;
 
+    /* ── 📐 سجل الجرد — تصحيحات العد (Sarah 2026-08-11: "how would I see what Emad did?").
+       التصحيحات مش استهلاك — مستبعدة من كل الإحصائيات — فبتتعرض هنا لوحدها: مين عدّ إيه،
+       من كام لكام، وصافي الفرق (ده مقياس الفاقد الحقيقي). ── */
+    {
+      const corr = events.filter(e => e.type === 'correction' && String(e.timestamp || '').startsWith(selectedStatMonth));
+      if (corr.length) {
+        const net = {};
+        corr.forEach(e => { const k = e.itemName || ''; net[k] = (net[k] || 0) + (Number(e.qty) || 0); });
+        const netList = Object.entries(net).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+        const down = netList.filter(([, v]) => v < 0).reduce((s, [, v]) => s + v, 0);
+        const up   = netList.filter(([, v]) => v > 0).reduce((s, [, v]) => s + v, 0);
+        html += `<div class="insight-card" style="margin-bottom:16px">
+          <div class="insight-title">📐 تصحيحات الجرد — ${monthLabel}</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${corr.length} تصحيح · ناقص ${Math.abs(down)} · زيادة ${up}
+            <span style="color:var(--text3)"> — مش محسوبة كاستهلاك</span></div>`;
+        netList.forEach(([name, v]) => {
+          const item = items.find(i => i.ar === name);
+          html += `<div class="insight-row">
+            <div><div class="insight-name">${item?.emoji || ''} ${name}</div></div>
+            <div style="font-size:13px;font-weight:900;color:${v < 0 ? '#e53935' : '#43a047'}">${v > 0 ? '+' : ''}${v}</div>
+          </div>`;
+        });
+        html += `<div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.7">`;
+        corr.slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp))).slice(0, 25).forEach(e => {
+          const t = String(e.timestamp || '');
+          html += `<div>• ${e.itemName} — ${e.note || ''} <span style="color:var(--text3)">(${e.user || ''} · ${t.slice(0, 10)})</span></div>`;
+        });
+        html += `</div></div>`;
+      }
+    }
+
     // ── Q6: Consumption this month ──
     // Use consume events + negative adjust/par_change events (Emad's − taps)
     const consumeEvents = events.filter(e => {
