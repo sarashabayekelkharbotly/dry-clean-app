@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v11</span>
+  <span class="pill">v13</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -603,9 +603,14 @@ async function addTask(){
 }
 
 /* ---- ticks: save-then-toast, nothing local moves until the server accepts ---- */
+/* NOTHING IS SHOWN AS DONE BEFORE THE SHEET ACCEPTED IT (Sarah's standing rule, restated
+   2026-08-12: optimistic ticks "showed errors in previous versions"). So the speed has to come
+   from the server, not from pretending — see commsTick and the session cache. The button shows
+   ⏳ while it waits so the screen never looks frozen. */
 async function tick(stayId,k,occ){
   const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
+  const st=D.stays.find(x=>x.id===stayId);
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,tag:st?tagOf(st):''}); }catch(e){}
   if(btn){ btn.disabled=false; btn.textContent='✅'; }
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,true,'');
@@ -623,7 +628,8 @@ async function tickArrival(stayId,occ){
 }
 async function untick(stayId,k,occ){
   if(!confirm('إلغاء العلامة؟')) return;
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
+  const st=D.stays.find(x=>x.id===stayId);
+  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true,tag:st?tagOf(st):''}); }catch(e){}
   if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,false,'');
   toast('↩ اتلغت');
