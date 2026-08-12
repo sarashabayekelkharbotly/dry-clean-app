@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v15</span>
+  <span class="pill">v16</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -346,11 +346,17 @@ function renderMain(){ renderQueue(); renderStays(); }
 
 function stepRow(st,sp,state){
   const id=`${st.id}|${sp.k}|${sp.occ}`;
-  const sub=sp.k==='midstay'&&sp.occ&&sp.occ!=='mid'?`النظافة يوم ${sp.occ}`:(sp.dueD?`تستحق ${sp.dueD}`:'');
+  /* A long stay has SEVERAL cleans, so it has several coordination steps — with the date buried in
+     the grey sub-line they read as the same row twice (Sarah 2026-08-12, Iman's 85 nights). The
+     occurrence date now sits in the label itself, and the sub-line carries both dates. */
+  const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
+  const sub=(sp.occ&&sp.occ!=='mid')
+    ? `النظافة يوم ${sp.occ}${sp.dueD?` · تستحق ${sp.dueD}`:''}`
+    : (sp.dueD?`تستحق ${sp.dueD}`:'');
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
   return `<div class="step ${sp.done?'done':''}">
-    <div class="step-lb">${sp.label}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div></div>
+    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div></div>
     ${state==='wait'?'<span class="badge b-soon">بعد المستندات</span>':''}
     ${sp.done?`<button class="btn" onclick="untick('${st.id}','${sp.k}','${sp.occ}')">↩</button>`:copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
