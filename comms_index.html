@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v10</span>
+  <span class="pill">v11</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -254,24 +254,35 @@ function tpl(k, st, occ){
 }
 /* اللغة والنوع الأول (Sarah 2026-08-11): أول نسخ لرسالة ضيف من غير 🌐/⚥ بيسأل عليهم قبل ما
    ينسخ — علشان أول رسالة تطلع صح من أول مرة. */
-async function ensureLangGender(st){
+/* COPY MUST BE INSTANT (Sarah 2026-08-12: "it asks for the gender again, and copying is slow").
+   Two causes: the server saved gender but never returned it, so every refresh forgot it — and the
+   copy waited for that save before touching the clipboard. Now the answers are taken locally, the
+   text is copied immediately, and the save rides in the background. */
+function saveField(stayId,step,val){
+  const st=D.stays.find(s=>s.id===stayId);
+  api('comms_tick',{stayId,step,occ:'',val,tag:st?tagOf(st):''})
+    .then(r=>{ if(!r||r.ok!==true) toast('⚠️ «'+step+'» لم تُحفظ — جرّب تاني'); })
+    .catch(()=>toast('⚠️ «'+step+'» لم تُحفظ — جرّب تاني'));
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+}
+function ensureLangGender(st){
   if(!st.lang){
-    const v=prompt('🌐 لغة التواصل مع الضيف الأول (EN أو AR):','EN');
+    const v=prompt('🌐 لغة التواصل مع الضيف (EN أو AR):','EN');
     if(v===null) return false;
     const lv=String(v).trim().toUpperCase(); if(!lv){ toast('اكتب EN أو AR'); return false; }
-    if(!await pseudoTick(st.id,'lang',lv,'🌐 اتسجلت')) return false;
+    st.lang=lv; saveField(st.id,'lang',lv);
   }
   if(!st.gender){
     const g=prompt('⚥ نوع الضيف: m رجل · f سيدة · g مجموعة/عائلة','m');
     if(g===null) return false;
     const gv={m:'m',f:'f',g:'g'}[String(g).trim().toLowerCase()]; if(!gv){ toast('اكتب m أو f أو g'); return false; }
-    if(!await pseudoTick(st.id,'gender',gv,'⚥ اتسجل')) return false;
+    st.gender=gv; saveField(st.id,'gender',gv);
   }
   return true;
 }
-async function copyTpl(stayId,k,occ){
+function copyTpl(stayId,k,occ){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
-  if(!await ensureLangGender(st)) return;
+  if(!ensureLangGender(st)) return;
   const t=tpl(k,st,occ);
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
     ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
@@ -301,7 +312,7 @@ async function editTask(id){
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
   t.text=r.text; t.date=r.date; t.time=r.time;
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderAll(); toast('✏️ اتعدلت — التلجرام اتبعت');
+  renderMain(); toast('✏️ اتعدلت — التلجرام اتبعت');
 }
 
 /* ---- due logic (mirror of the server's watcher) ---- */
@@ -329,6 +340,9 @@ function showTab(p,el){
   ['queue','stays','sched','rep','task','log'].forEach(x=>document.getElementById('p-'+x).style.display=(x===p?'block':'none'));
 }
 function renderAll(){ renderQueue(); renderStays(); renderSched(); renderRep(); renderTask(); try{ renderLog(); }catch(e){} }
+/* After a tick only the to-do and the stay cards can have changed — rebuilding the week grid, the
+   repairs list and the log as well is what made every tap feel heavy (Sarah 2026-08-12). */
+function renderMain(){ renderQueue(); renderStays(); }
 
 function stepRow(st,sp,state){
   const id=`${st.id}|${sp.k}|${sp.occ}`;
@@ -366,7 +380,10 @@ function stayExtra(st){
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
     <button class="btn" onclick="addNote('${st.id}')">➕</button></div>`;
-  (st.notes||[]).slice().reverse().forEach(n=>{ h+=`<div class="step-sub" style="padding:3px 0;border-top:1px dashed var(--border)">${n.text} <span style="color:var(--text3)">— ${n.by} ${n.at}</span></div>`; });
+  /* الملاحظات (اللي اتقال على Airbnb) لازم تبان زي 📌 الطلبات الخاصة — غامق وأسود، مش رمادي
+     صغير يعدي من غير ما حد ياخد باله (سارة 2026-08-12) */
+  (st.notes||[]).slice().reverse().forEach(n=>{ h+=`<div style="padding:4px 0;border-top:1px dashed var(--border);font-size:12.5px;font-weight:800;color:var(--text1)">${n.text}
+    <span style="font-weight:400;font-size:10.5px;color:var(--text3)">— ${n.by} ${n.at}</span></div>`; });
   h+='</div>';
   return h;
 }
@@ -385,7 +402,7 @@ async function pseudoTick(stayId, step, val, msg, snap){
     else if(step==='requests') st.requests=val||'';
     else if(step==='gender') st.gender=val||'';
     try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-    renderAll();
+    renderMain();
   }
   toast(msg||'✅ اتسجلت'); return true;
 }
@@ -414,7 +431,7 @@ async function undoFlag(stayId,step){
   if(step==='handover') st.handover={done:false,by:'',at:'',note:''};
   else st.group={done:false,by:'',at:'',invited:false};
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderAll(); toast('↩ اتلغت');
+  renderMain(); toast('↩ اتلغت');
 }
 function setField(stayId,k){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
@@ -616,7 +633,7 @@ function applyTick(stayId,k,occ,done,val){
   const sp=st.steps.find(x=>x.k===k&&String(x.occ)===String(occ)); if(!sp) return;
   sp.done=done; sp.doneAt=done?new Date().toISOString():''; if(k==='arrivaltime'){ sp.val=done?val:''; st.arrivalTime=done?val:''; }
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderAll();
+  renderMain();
 }
 
 
@@ -637,9 +654,13 @@ function tplAR(k, st, occ){
   const G=(m,f,p)=>gd==='f'?f:(gd==='g'?p:m);
   switch(k){
     case 'groupintro': return `أهلاً ${n}! معك سارة 🌟 وخالد معنا في الجروب، ونحب ${G('نعرّفك','نعرّفك','نعرّفكم')} على ملاح من فريق الدعم — هيكون ${G('معك','معك','معكم')} طوال الإقامة ليهتم بكل ما ${G('تحتاجه','تحتاجينه','تحتاجونه')}، وكلنا هنا ${G('معك','معك','معكم')} على الجروب. ${G('نوّرتنا','نوّرتينا','نوّرتونا')}!`;
-    case 'welcome': return currentUser==='malah'
-      ? `أهلاً ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟 حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمها هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت. كود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — وأنا موجود دائماً هنا على الجروب. 🙏`
-      : `أهلاً ${n}! 🌟 شكراً لحجزك معنا — يسعدنا نستضيفك. حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟ أول ما نستلمها هنبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت. كود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — ونحن دائماً موجودون لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. 🙏`;
+    case 'docsask': return `أهلاً ${n}! 🌟 حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟ شكراً 🙏`;
+    /* لو المستندات اتطلبت خلاص (على Airbnb مثلاً) الترحيب مابيطلبهاش تاني — سارة 2026-08-12 */
+    case 'welcome': { var askedAR = (st.steps||[]).some(function(x){ return x.k==='docsask' && x.done; });
+      var docsAR = askedAR ? '' : ` حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟`;
+      return currentUser==='malah'
+      ? `أهلاً ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟${docsAR} هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — وأنا موجود دائماً هنا على الجروب. 🙏`
+      : `أهلاً ${n}! 🌟 شكراً لحجزك معنا — يسعدنا نستضيفك.${docsAR} هنبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — ونحن دائماً موجودون لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. 🙏`; }
     case 'manual': return `${malahIntroAR(st,G)}أهلاً ${n}! هذا دليل البيت 🏠 ${G('خذ','خذي','خذوا')} دقائق ${G('واطّلع','واطّلعي','واطّلعوا')} عليه من فضلك — هيسهّل الإقامة كثيراً. ${G('ستجد','ستجدين','ستجدون')} فيه: تعليمات الدخول، وأماكن كل شيء في البيت (المكواة، أدوات المطبخ، وغيرها)، وطريقة تشغيل الأجهزة (التكييف، الغسالة، التلفزيون)، وما حولك من محلات البقالة وتطبيقات التوصيل وأماكننا المفضلة القريبة. أي شيء غير واضح ${G('اسألني','اسأليني','اسألوني')} هنا!`;
     case 'arrival': case 'arrivalask': return `أهلاً ${n}! نجهّز البيت لإقامتك — متوقع ${G('تصل','تصلي','تصلوا')} الساعة كم؟ حتى يكون كل شيء جاهزاً قبل الوصول.`;
     case 'code': return `أهلاً ${n}! الوصول بكرة 🎉 الدخول متاح من الساعة ٣ عصراً. كود الباب هو:
@@ -665,9 +686,13 @@ function tpl(k, st, occ){
   const n=firstName(st.guest);
   switch(k){
     case 'groupintro': return `Hi ${n}! This is Sarah 🌟 Khaled is with us in the group too, and we would like to introduce Malah from our support team — he will be with you throughout your stay to take care of everything you need, and we are all here on the group with you. Welcome!`;
-    case 'welcome': return currentUser==='malah'
-      ? `Hello ${n}! I'm glad to be here to support you with anything you need during your stay 🌟 To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest? Once we receive them, I'll send you our house manual with all the check-in instructions and everything about the home. Your door code will be sent 24 hours before check-in — and I'm always here on this group whenever you need me. 🙏`
-      : `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you. To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest? Once we receive them, we'll send you our house manual with all the check-in instructions and everything about the home. Your door code will be sent 24 hours before check-in — and we're always here for anything you need. 🙏`;
+    case 'docsask': return `Hello ${n}! 🌟 To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest? Thank you 🙏`;
+    // if the documents were already requested (on Airbnb, say), the welcome never asks again
+    case 'welcome': { const asked=(st.steps||[]).some(x=>x.k==='docsask'&&x.done);
+      const docsEN = asked ? '' : ' To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest?';
+      return currentUser==='malah'
+      ? `Hello ${n}! I'm glad to be here to support you with anything you need during your stay 🌟${docsEN} I'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and I'm always here on this group whenever you need me. 🙏`
+      : `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you.${docsEN} We'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and we're always here for anything you need. 🙏`; }
     case 'manual': return `${malahIntroEN(st)}Hi ${n}! Here is our house manual 🏠 Please take a few minutes to go through it — it will make your stay much smoother. Inside you'll find: the check-in instructions, where everything is in the home (ironing board, utensils, extras), how the devices work (A/C, washing machine, TV), and what's around you — groceries, delivery apps, and our favorite places nearby. Anything unclear, just ask me here!`;
     case 'arrival': case 'arrivalask': return `Hi ${n}! We're preparing the home for your stay — what time do you expect to arrive? We'll make sure everything is set before you get there.`;
     case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Check-in is anytime from 3:00 PM. Your door code is:
@@ -698,7 +723,7 @@ async function toggleTask(id,done){
   if(!r||!r.ok){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   const t=(D.tasks||[]).find(x=>x.id===id); if(t) t.done=done;
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderAll(); toast(done?'✅ تمت':'↩ رجعت');
+  renderMain(); toast(done?'✅ تمت':'↩ رجعت');
 }
 
 /* الرئيسية — مهام النهارده أولاً (زي شاشة عماد): تعلّم ✅ لما تخلص */
