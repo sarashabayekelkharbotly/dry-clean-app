@@ -1388,10 +1388,14 @@ async function emadMeterPrompt(){
   if (v === null) return;
   const b = parseFloat(String(v).replace(/[^\d.]/g, ''));
   if (isNaN(b) || b < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
+  /* لو حط الكارت في العداد بياخد قراءتين: اللي لقاه واللي بقى بعد الشحن. مفيش مبالغ —
+     الشرايح والرسوم بتخلي الرصيد يزيد أقل من المدفوع، فالمقارنة نفسها غلط (سارة 2026-08-12) */
+  const av = prompt('لو حطيت الكارت في العداد، اكتب الرصيد بعد الشحن — سيبها فاضية لو ماحطتش:', '');
+  const af = (av === null || String(av).trim() === '') ? '' : String(av).replace(/[^\d.]/g, '');
   try {
-    const r = await callScript({ action: 'meter_log', balance: b });
+    const r = await callScript({ action: 'meter_log', balance: b, after: af });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-    showToast('✅ تم تسجيل القراءة');
+    showToast(r.note ? 'ℹ️ ' + r.note : '✅ تم تسجيل القراءة');
     ELEC = null;                                      // the electricity screen recomputes next open
     loadEmadHome();                                   // the home task flips to ✅ on its own
     if (document.getElementById('page-elec')?.classList.contains('active')) renderElecScreen(true);
@@ -1541,9 +1545,10 @@ async function elecSave(){
   try {
     const r = ELEC_EDIT
       ? await callScript({ action: 'meter_edit', row: ELEC_EDIT.row, at: ELEC_EDIT.at, balance: b, date: d })
-      : await callScript({ action: 'meter_log', balance: b, date: d });
+      : await callScript({ action: 'meter_log', balance: b, date: d,
+          after: (document.getElementById('elecAfter') || {}).value || '' });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-    showToast(ELEC_EDIT ? '✅ تم التعديل' : '✅ تم تسجيل القراءة');
+    showToast(r.note ? 'ℹ️ ' + r.note : (ELEC_EDIT ? '✅ تم التعديل' : '✅ تم تسجيل القراءة'));
     await elecRefresh();
   } catch(e) { showToast('❌ لم يتم الحفظ — ' + (e.message || 'حاول مرة أخرى')); }
 }
@@ -1593,12 +1598,28 @@ function renderElecBody(){
   const age = E._ts ? Date.now() - E._ts : 0;
   const staleNote = age > 60000
     ? `<div style="font-size:10.5px;color:#8a6420;background:#efe4d4;border-radius:8px;padding:4px 8px;margin-bottom:8px">⏳ الأرقام دي ${agoText(E._ts)} — جاري التحديث…</div>` : '';
-  let h = staleNote + `
+  /* حالة واحدة واضحة فوق الشاشة — الأرضية (٤٠٠ ج) هي الإنذار الأساسي لأنها مش محتاجة أي حسابات،
+     والتقدير جنبها وبس (سارة 2026-08-12) */
+  const stCol = { low:'#cc5f5f', stale:'#c9a24b', soon:'#c9a24b', cardempty:'#c9a24b', ok:'#5caa7f', none:'#8a7a7d' }[E.status || 'none'] || '#8a7a7d';
+  const stIcon = { low:'🔴', stale:'🕐', soon:'🟡', cardempty:'💳', ok:'🟢', none:'⚪' }[E.status || 'none'] || '⚪';
+  let h = staleNote + (E.statusText ? `<div class="card" style="padding:10px 12px;margin-bottom:12px;border-right:4px solid ${stCol}">
+      <div style="font-size:13px;font-weight:900;color:${stCol}">${stIcon} ${E.statusText}</div>
+    </div>` : '') + `
     <div class="stats-grid" style="margin-bottom:12px">
       <div class="stat-card"><div class="stat-value">${E.balance != null ? E.balance : '—'}</div><div class="stat-label">آخر قراءة (جنيه)${E.lastAt ? `<br><span dir="ltr" style="font-size:9.5px">${String(E.lastAt).slice(0,10)}</span>` : ''}</div></div>
-      <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)${E.rateBasis==='recharges' ? '<br><span style="font-size:9px">تقديري من الشحنات — سجّل قراءتين للدقة</span>' : ''}</div></div>
+      <div class="stat-card"><div class="stat-value">${E.ratePerDay > 0 ? '~'+Math.round(E.ratePerDay) : '—'}</div><div class="stat-label">استهلاك يومي (جنيه)${
+        E.ratePerDay > 0
+          ? (E.cleanIntervals ? `<br><span style="font-size:9px">من ${E.cleanIntervals} فترة من غير شحن</span>` : (E.rateBasis==='recharges' ? '<br><span style="font-size:9px">تقديري من الشحنات</span>' : ''))
+          : '<br><span style="font-size:9px">محتاج قراءتين ورا بعض من غير شحن بينهم</span>'}</div></div>
       <div class="stat-card"${soon ? ' style="border:2px solid #cc5f5f"' : ''}><div class="stat-value"${soon ? ' style="color:#cc5f5f"' : ''}>${E.depletion ? E.depletion.slice(5).split('-').reverse().join('/') : '—'}</div><div class="stat-label">${soon ? '⚠️ ينفد قريباً' : 'ينفد تقريباً'}</div></div>
     </div>
+    ${E.cardEmpty != null ? `<div class="card" style="padding:9px 12px;margin-bottom:12px;${E.cardEmpty ? 'border:2px solid #cc5f5f' : ''}">
+      <div style="font-size:12.5px;font-weight:800">💳 الكارت المشحون: ${E.cardEmpty
+        ? '<span style="color:#cc5f5f">فاضي — خالد لازم يشحنه</span>'
+        : 'فيه ' + Math.round(E.cardLoaded) + ' ج · جاهز للعداد'}</div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:3px">${E.lastInsertion
+        ? 'آخر مرة اتحط في العداد: ' + E.lastInsertion : 'لسه ماتحطش في العداد'} — الشحن بيتسجل في WeShare تحت Studio Electricity</div>
+    </div>` : ''}
     <div class="card" style="padding:10px 12px;margin-bottom:14px">
       <div style="font-weight:800;font-size:12.5px;margin-bottom:6px" id="elecFormTitle">${ELEC_EDIT ? '✏️ تعديل قراءة' : '⚡ قراءة جديدة'}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
@@ -1609,6 +1630,11 @@ function renderElecBody(){
         <button onclick="elecSave()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:9px 16px;cursor:pointer">${ELEC_EDIT ? 'حفظ' : 'سجّل'}</button>
         ${ELEC_EDIT ? `<button onclick="elecEditCancel()" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;background:none;font-family:'Cairo',sans-serif;font-size:13px;padding:9px 10px;cursor:pointer">✕</button>` : ''}
       </div>
+      ${ELEC_EDIT ? '' : `<div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input id="elecAfter" type="number" inputmode="numeric" placeholder="حطيت الكارت؟ اكتب الرصيد بعد الشحن"
+          style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:12.5px">
+      </div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px;line-height:1.6">لو حطيت الكارت في العداد: فوق اكتب الرصيد اللي لقيته، وهنا الرصيد بعد الشحن. مش لازم يساوي المبلغ المشحون — الشرايح والرسوم بتفرق، وإحنا مش بنقارن.</div>`}
     </div>`;
   if (E.readings && E.readings.length < 2)
     h += `<div class="card" style="padding:10px;margin-bottom:12px;font-size:12px;color:var(--text3)">الحسابات تبدأ من القراءة الثانية — سجّل الرصيد مع كل تنظيف.</div>`;
