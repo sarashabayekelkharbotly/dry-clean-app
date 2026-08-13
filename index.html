@@ -1868,7 +1868,8 @@ function renderEmadGrid(todayK) {
   const sched = EMAD.schedule || [];
   if (!sched.length) return '';
   const base = new Date(todayK + 'T12:00:00');
-  const sat = new Date(base); sat.setDate(sat.getDate() - ((sat.getDay() + 1) % 7));   // this week's Saturday
+  // the week runs FRIDAY → THURSDAY, same as the Hub's schedule (Sarah 2026-08-13)
+  const sat = new Date(base); sat.setDate(sat.getDate() - ((sat.getDay() + 2) % 7));   // this week's Friday
   const flats = EMAD_FLAT_ORDER.filter(f => sched.some(c => c.flat === f))
     .concat([...new Set(sched.map(c => c.flat))].filter(f => EMAD_FLAT_ORDER.indexOf(f) < 0));
   let h = `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
