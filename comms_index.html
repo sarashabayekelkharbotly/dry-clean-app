@@ -72,7 +72,7 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v16</span>
+  <span class="pill">v18</span>
   <span class="pill" id="agePill"></span>
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
@@ -871,7 +871,7 @@ function renderSched(){
   const el=document.getElementById('p-sched'); if(!el) return;
   const TYPE={checkout:'تنظيف خروج',midstay:'نظافة',weekly:'نظافة',revision:'إعادة',codechange:'تغيير كود',custom:'إضافي'};
   const base=new Date(); base.setDate(base.getDate()+schedOff*7);
-  const dow=(base.getDay()+1)%7;                       // week starts Saturday
+  const dow=(base.getDay()+2)%7;                       // week starts FRIDAY (Sarah 2026-08-13)
   const start=new Date(base); start.setDate(base.getDate()-dow);
   const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i);
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');});
@@ -885,7 +885,7 @@ function renderSched(){
     if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?' '+s.arrivalTime:''}</div>`);
     if(days.indexOf(s.co)>-1)(cell[s.flat+'|'+s.co]=cell[s.flat+'|'+s.co]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi></div>`);
   });
-  const DN=['السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+  const DN=['الجمعة','السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس'];
   let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <button class="btn" onclick="schedShift(1)">‹</button>
     <div style="flex:1;text-align:center;font-weight:900;font-size:12.5px">${days[0]} ← ${days[6]}${schedOff===0?' (الأسبوع الحالي)':''}</div>
@@ -920,11 +920,11 @@ function renderLog(){
 function renderSched(){
   const el=document.getElementById('p-sched'); if(!el) return;
   const base=new Date(); base.setDate(base.getDate()+schedOff*7);
-  const dow=(base.getDay()+1)%7;
+  const dow=(base.getDay()+2)%7;                       // week starts FRIDAY (Sarah 2026-08-13)
   const start=new Date(base); start.setDate(base.getDate()-dow);
   const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i);
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');});
-  const DN=['السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+  const DN=['الجمعة','السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس'];
   const flats=[...new Set([...(D.schedule||[]).map(c=>c.flat),...D.stays.map(s=>s.flat),...(D.rep&&D.rep.open?D.rep.open.map(r=>r.flat):[])])].filter(Boolean).sort();
   const C={line:'#ecdede',occ:'#e4efe1',occ2:'#d4e7cf',clean:'#f5dede',mid:'#d6e2f2',rev:'#ecdcf0',rep:'#ece0cf'};
   const short=g=>String(g||'').trim().split(/\s+/)[0];
