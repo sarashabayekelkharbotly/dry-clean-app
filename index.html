@@ -1344,6 +1344,8 @@ function clogShiftMonth(delta){
   if (m > nowM) return;
   CLOG_MONTH = m; renderCleanLog(true);
 }
+// task text is typed by hand and lands in innerHTML — escape it (the cleans' fields already are)
+function clogEsc(s){ return String(s==null?'':s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]); }
 async function renderCleanLog(force){
   const el = document.getElementById('logContent');
   if (!CLOG_MONTH) CLOG_MONTH = emadYmdOf(new Date()).slice(0,7);
@@ -1394,14 +1396,31 @@ async function renderCleanLog(force){
   </div>`;
   const flatBits = Object.keys(byFlat).filter(f => byFlat[f]).map(f => `${emadFlatAr(f)}: <b>${byFlat[f]}</b>`);
   if (flatBits.length) h += `<div style="font-size:12px;color:#555;margin-bottom:10px;text-align:center">${flatBits.join(' · ')}</div>`;
-  // ---- the log, newest first, grouped by day
-  if (!rows.length) h += `<div style="text-align:center;color:#888;padding:20px">لا توجد نظافات مسجلة في هذا الشهر</div>`;
+  /* ---- the log, newest first, grouped by day. EVERY TASK IS IN IT, not only the cleans (Sarah
+     2026-08-16): a clean was the only thing that left a trace, so the month's record showed the
+     routine and hid the lock-code trips, the meter readings, الجرد and anything typed by hand.
+     Undone tasks stay in — "nobody did this" is the whole point of keeping a log. */
+  const tasks = CLOG.tasks || [];
+  const nDone = tasks.filter(t => t.done).length;
+  if (tasks.length) h += `<div style="font-size:12px;color:#555;margin-bottom:10px;text-align:center">مهام الشهر: <b>${tasks.length}</b> · اتعملت <b>${nDone}</b>${tasks.length>nDone?` · فاضل <b style="color:#cc5f5f">${tasks.length-nDone}</b>`:''}</div>`;
+  if (!rows.length && !tasks.length) h += `<div style="text-align:center;color:#888;padding:20px">مافيش حاجة مسجلة في الشهر ده</div>`;
   const days = {};
   rows.forEach(r => { (days[r.date] = days[r.date] || []).push(r); });
-  Object.keys(days).sort().reverse().forEach(d => {
+  const tDays = {};
+  tasks.forEach(t => { (tDays[t.date] = tDays[t.date] || []).push(t); });
+  Object.keys(Object.assign({}, days, tDays)).sort().reverse().forEach(d => {
     const dd = new Date(d + 'T12:00:00');
     h += `<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px;color:#6b5d4f">${dd.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'})}${d===todayK?' — اليوم':''}</div>`;
-    days[d].sort((a,b)=>String(a.sched||a.started).localeCompare(String(b.sched||b.started))).forEach(r => {
+    // tasks first when untimed, otherwise they interleave by clock with the cleans
+    (tDays[d] || []).sort((a,b)=>String(a.time||'98:99').localeCompare(String(b.time||'98:99'))).forEach(t => {
+      h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;border-right:3px solid ${t.done?'#2e7d32':'#cc5f5f'}">
+        <div style="display:flex;justify-content:space-between;gap:6px">
+          <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}</div>
+          <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'ملاح':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
+        </div>
+      </div>`;
+    });
+    (days[d] || []).sort((a,b)=>String(a.sched||a.started).localeCompare(String(b.sched||b.started))).forEach(r => {
       const ot = clogOnTime(r);
       const badge = !r.started ? '⬜' : r.ended ? (ot === false ? '⏰' : '✅') : '🟢';
       const dur = (clogMin(r.started)!==null && clogMin(r.ended)!==null) ? (clogMin(r.ended)-clogMin(r.started)) : null;
