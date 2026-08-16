@@ -206,7 +206,31 @@ async function loadData(force){
 /* ---- guest message templates, EN + AR (sent from Malah's own WhatsApp) ----
    Language per guest: the stay's 🌐 field wins when it clearly says AR or EN;
    otherwise the header EN/AR toggle sets the default. */
-function codeFor(st){ let best=null; (D.schedule||[]).forEach(c=>{ if(c.flat===st.flat&&c.code&&c.date<=st.ci&&(!best||c.date>best.date)) best=c; }); return best?best.code:'〈CODE〉'; }
+/* §5.5: A GUEST'S CODE IS THEIR ARRIVAL DATE, DDMM. This used to read the code off the most recent
+   visit on or before check-in, which is a different thing entirely — it is whatever was keyed in
+   last, not what this guest is entitled to. Mona Alqahtani booked Zayed 2000 on her own check-in
+   day; the newest row before her was the 15-Aug checkout carrying the default 0107, so that is the
+   code she was sent (Sarah 2026-08-16). A visit does not DEFINE the code, it only decides whether
+   anybody has physically set it — so the code is derived, and the visits are used to answer the
+   separate question of whether it is real yet. */
+function ciAdd(ci,n){ const d=new Date(ci+'T12:00:00'); d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function codeNeed(st){ const ci=String(st.ci||''); return ci?ci.slice(8,10)+ci.slice(5,7):''; }
+function codeFor(st){
+  const need=codeNeed(st); if(!need) return '〈CODE〉';
+  const from=ciAdd(st.ci,-2), today=(D&&D.today)||'';
+  // a visit still to come carrying a DIFFERENT code is a deliberate hand-set one — that wins
+  let hand=null;
+  (D.schedule||[]).forEach(c=>{ if(c.flat===st.flat&&c.code&&c.date>=from&&c.date<=st.ci&&c.date>=today&&c.code!==need&&(!hand||c.date>hand.date)) hand=c; });
+  return hand?hand.code:need;
+}
+/* Has anyone actually been asked to set it? Same test as the Hub and as الكنترول's watcher: some
+   visit inside the two-day window carrying exactly this code. If not, the lock still holds the old
+   one and the message must not go out as if it were true. */
+function codeIsSet(st){
+  const need=codeNeed(st), from=ciAdd(st.ci,-2);
+  return (D.schedule||[]).some(c=>c.flat===st.flat&&c.date>=from&&c.date<=st.ci&&(c.code||'')===need);
+}
 function firstName(g){ return String(g||'').trim().split(/\s+/)[0]||'there'; }
 function tplDefLang(){ return localStorage.getItem('owh_tpl_lang')==='ar'?'ar':'en'; }
 function toggleTplLang(){
@@ -355,8 +379,13 @@ function stepRow(st,sp,state){
     : (sp.dueD?`تستحق ${sp.dueD}`:'');
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
+     message carries the code the guest is ENTITLED to; if no visit has been asked to set it, that
+     code is not on the door yet and sending it strands the guest outside. */
+  const codeWarn=(sp.k==='code'&&!sp.done&&!codeIsSet(st))
+    ? `<div class="step-sub" style="color:#cc5f5f;font-weight:800">⚠️ الكود ${codeFor(st)} لسه محدش غيّره على الباب — اتأكد مع عماد قبل ما تبعته</div>` : '';
   return `<div class="step ${sp.done?'done':''}">
-    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div></div>
+    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
     ${state==='wait'?'<span class="badge b-soon">بعد المستندات</span>':''}
     ${sp.done?`<button class="btn" onclick="untick('${st.id}','${sp.k}','${sp.occ}')">↩</button>`:copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
