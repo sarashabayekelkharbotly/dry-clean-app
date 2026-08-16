@@ -1164,7 +1164,9 @@ let EMAD = null, emadMissingOpen = false, EMAD_ERR = false;
 async function dcSyncFinish(r){
   ELEC = null;
   await Promise.all([loadAllData(true), loadEmadHome(true)]);   // force = bypass the server cache after a pipeline run
-  showToast('✅ تمت المزامنة' + (r && r.pending ? ` — ${r.pending} في انتظار التأكيد` : ''));
+  // name what was refreshed: the comms screen is a separate page, so "it synced too" is not obvious
+  showToast('✅ تمت المزامنة' + (r && r.pending ? ` — ${r.pending} في انتظار التأكيد` : '') +
+            (r && r.refreshed ? ' · شاشة التواصل اتحدّثت كمان' : ''));
 }
 async function dcSyncWatch(btn, since){   // `since` is only used for the on-screen counter
   // the connection dropped, the run did not — poll the record the server keeps
