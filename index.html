@@ -1154,16 +1154,54 @@ async function loadAllData(silent = false) {
 // ============================================================
 let EMAD = null, emadMissingOpen = false, EMAD_ERR = false;
 // §7 ③ — runs the Hub's whole pipeline; the token lives server-side, this button only asks for it
+/* المزامنة الشاملة = the Hub's whole pipeline, fourteen steps, minutes not seconds. It used to run
+   on the ordinary 25-second call with one retry, so the phone gave up long before the server
+   finished, fired a SECOND full pipeline, gave up again and reported failure — while the sync had
+   in fact completed both times and الكنترول stayed on stale data because the refresh only runs on
+   the success path (Sarah 2026-08-16). Now: five minutes of patience, never a retry, a visible
+   counter, and — if the phone still loses the thread — we ASK the server how the run ended instead
+   of assuming the worst. */
+async function dcSyncFinish(r){
+  ELEC = null;
+  await Promise.all([loadAllData(true), loadEmadHome(true)]);   // force = bypass the server cache after a pipeline run
+  showToast('✅ تمت المزامنة' + (r && r.pending ? ` — ${r.pending} في انتظار التأكيد` : ''));
+}
+async function dcSyncWatch(btn, since){   // `since` is only used for the on-screen counter
+  // the connection dropped, the run did not — poll the record the server keeps
+  for (let i = 0; i < 40; i++) {                                 // 40 × 10s ≈ 6½ minutes
+    await new Promise(r => setTimeout(r, 10000));
+    if (btn) btn.textContent = `⏳ بتكمل في الخلفية… ${Math.round((Date.now()-since)/1000)}ث`;
+    let s = null;
+    try { s = await callScript({ action: 'hub_sync_status' }, { timeout: 20000, retries: 0 }); } catch(e) { continue; }
+    if (!s || s.ok !== true) continue;
+    if (s.running) continue;
+    // "is this MY run?" is answered entirely on the server's clock — see dcSyncState_
+    if (s.endedAt && s.startedAt && (s.now - s.endedAt) < 600000 && (s.now - s.startedAt) < 720000) {
+      if (s.result && s.result.ok) { await dcSyncFinish(s.result); return true; }
+      showToast('❌ فشلت المزامنة — ' + ((s.result && s.result.error) || 'من غير سبب واضح'));
+      return true;
+    }
+  }
+  showToast('⚠️ المزامنة أخدت أكتر من ٦ دقايق — افتح الهب وشوف');
+  return false;
+}
 async function dcSyncAll(){
   const btn = document.getElementById('dcSyncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري المزامنة...'; }
+  const since = Date.now();
+  let tick = null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري المزامنة...';
+    tick = setInterval(() => { btn.textContent = `⏳ جاري المزامنة… ${Math.round((Date.now()-since)/1000)}ث`; }, 1000); }
   try {
-    const r = await callScript({ action: 'hub_sync_all' });
-    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-    showToast('✅ تمت المزامنة' + (r.pending ? ` — ${r.pending} في انتظار التأكيد` : ''));
-    ELEC = null;
-    await Promise.all([loadAllData(true), loadEmadHome(true)]);   // force = bypass the server cache after a pipeline run
-  } catch(e) { showToast('❌ فشلت المزامنة — ' + (e.message || 'حاول مرة أخرى')); }
+    const r = await callScript({ action: 'hub_sync_all' }, { timeout: 300000, retries: 0 });
+    if (r && r.code === 'BUSY') showToast('⏳ ' + (r.error || 'المزامنة شغالة دلوقتي'));
+    else if (!r || r.ok !== true) showToast('❌ فشلت المزامنة — ' + ((r && r.error) || 'حاول مرة أخرى'));
+    else await dcSyncFinish(r);
+  } catch(e) {
+    // aborted / network dropped — the pipeline is still running on the server, so wait for it
+    if (tick) { clearInterval(tick); tick = null; }
+    await dcSyncWatch(btn, since);
+  }
+  if (tick) clearInterval(tick);
   if (btn) { btn.disabled = false; btn.textContent = '🔄 مزامنة شاملة'; }
 }
 
@@ -2781,8 +2819,10 @@ async function updateSheetCell(range, value) {
   if (!res.ok) throw new Error('Update failed');
   return res.json();
 }
-async function callScript(body) {
-  return callScriptWithRetry(body, 1);
+async function callScript(body, opts) {
+  opts = opts || {};
+  // a long pipeline needs its own patience AND no retry — a retry there runs the whole thing twice
+  return callScriptWithRetry(body, opts.retries === undefined ? 1 : opts.retries, opts.timeout || 25000);
 }
 
 // Apps Script has "cold start" latency — the first call after a period of
