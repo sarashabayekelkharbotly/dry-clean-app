@@ -1258,17 +1258,33 @@ async function emadTaskToggle(id, done){
   catch(e) { if (t) { t.done = !done; renderHome(); } }
 }
 
-/* ✏️ reschedule/reword a task — prompt flow, saved server-side, telegrams the assignee */
+/* ✏️ reschedule/reword a task — prompt flow, saved server-side, telegrams the assignee.
+   The three confirmations here called toast(), which does not exist in this app — it is showToast()
+   (2026-08-16). So a successful edit threw a ReferenceError the moment it saved, the catch called
+   the same missing function and threw again: the edit had gone through, and the screen said
+   nothing. Fixed, and the clock now accepts what a person actually types — 930, 9:30, ٩:٣٠ all
+   become 09:30, since a prompt has no time picker to keep the format honest. */
+function emadTimeNorm(s) {
+  s = String(s || '').trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  if (!s) return '';
+  let m = s.match(/^(\d{1,2})\s*[:.]?\s*(\d{2})$/) || s.match(/^(\d{1,2})$/);
+  if (!m) return null;                                          // unparseable — say so, don't drop it
+  const h = +m[1], mi = m[2] === undefined ? 0 : +m[2];
+  if (h > 23 || mi > 59) return null;
+  return ('0' + h).slice(-2) + ':' + ('0' + mi).slice(-2);
+}
 async function emadTaskEditUI(id) {
   const t = (EMAD.tasks || []).find(x => x.id === id); if (!t) return;
   const tx = prompt('نص المهمة:', t.text); if (tx === null) return;
   const dt = prompt('التاريخ (YYYY-MM-DD):', t.date); if (dt === null) return;
-  const tm = prompt('الساعة (HH:MM أو فاضي):', t.time || ''); if (tm === null) return;
+  const raw = prompt('الساعة (زي 09:30 — سيبها فاضية لو من غير وقت):', t.time || ''); if (raw === null) return;
+  const tm = emadTimeNorm(raw);
+  if (tm === null) { showToast('❌ الوقت مش مفهوم — اكتبه زي 09:30'); return; }
   try {
-    const r = await callScript({ action: 'emad_task_edit', id, text: tx.trim(), date: dt.trim(), time: tm.trim() });
-    if (r && r.ok) { t.text = r.text; t.date = r.date; t.time = r.time; renderHome(); toast('✏️ اتعدلت'); }
-    else toast('❌ لم يتم — ' + ((r && r.error) || 'حاول مرة أخرى'));
-  } catch (e) { toast('❌ لم يتم — تحقق من الإنترنت'); }
+    const r = await callScript({ action: 'emad_task_edit', id, text: tx.trim(), date: dt.trim(), time: tm });
+    if (r && r.ok) { t.text = r.text; t.date = r.date; t.time = r.time; renderHome(); showToast('✏️ اتعدلت'); }
+    else showToast('❌ لم يتم — ' + ((r && r.error) || 'حاول مرة أخرى'));
+  } catch (e) { showToast('❌ لم يتم — تحقق من الإنترنت'); }
 }
 async function emadTaskDelete(id){
   if (!confirm('حذف هذه المهمة؟')) return;
