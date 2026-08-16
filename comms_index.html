@@ -228,8 +228,11 @@ function codeFor(st){
    visit inside the two-day window carrying exactly this code. If not, the lock still holds the old
    one and the message must not go out as if it were true. */
 function codeIsSet(st){
-  const need=codeNeed(st), from=ciAdd(st.ci,-2);
-  return (D.schedule||[]).some(c=>c.flat===st.flat&&c.date>=from&&c.date<=st.ci&&(c.code||'')===need);
+  const need=codeNeed(st), from=ciAdd(st.ci,-2), today=(D&&D.today)||st.ci;
+  // guest already in → a visit any time up to today can be the one that set it; still to come →
+  // it has to happen by the arrival day, or they reach a door that has not been changed
+  const upto = st.ci>today ? st.ci : today;
+  return (D.schedule||[]).some(c=>c.flat===st.flat&&c.date>=from&&c.date<=upto&&(c.code||'')===need);
 }
 function firstName(g){ return String(g||'').trim().split(/\s+/)[0]||'there'; }
 function tplDefLang(){ return localStorage.getItem('owh_tpl_lang')==='ar'?'ar':'en'; }
