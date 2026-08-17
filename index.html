@@ -1258,32 +1258,30 @@ async function emadTaskToggle(id, done){
   catch(e) { if (t) { t.done = !done; renderHome(); } }
 }
 
-/* ✏️ reschedule/reword a task — prompt flow, saved server-side, telegrams the assignee.
-   The three confirmations here called toast(), which does not exist in this app — it is showToast()
-   (2026-08-16). So a successful edit threw a ReferenceError the moment it saved, the catch called
-   the same missing function and threw again: the edit had gone through, and the screen said
-   nothing. Fixed, and the clock now accepts what a person actually types — 930, 9:30, ٩:٣٠ all
-   become 09:30, since a prompt has no time picker to keep the format honest. */
-function emadTimeNorm(s) {
-  s = String(s || '').trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-  if (!s) return '';
-  let m = s.match(/^(\d{1,2})\s*[:.]?\s*(\d{2})$/) || s.match(/^(\d{1,2})$/);
-  if (!m) return null;                                          // unparseable — say so, don't drop it
-  const h = +m[1], mi = m[2] === undefined ? 0 : +m[2];
-  if (h > 23 || mi > 59) return null;
-  return ('0' + h).slice(-2) + ':' + ('0' + mi).slice(-2);
-}
-async function emadTaskEditUI(id) {
+/* ✏️ EDIT A TASK IN PLACE. This was a prompt() flow, which also reported through a toast() that
+   does not exist in this app — so a successful edit threw the moment it saved and the screen said
+   nothing (fixed 2026-08-16). The prompts themselves went too (2026-08-18): typing a date into a
+   prompt box on a phone is why nobody ever rescheduled anything. */
+/* Which task is open for editing — the row re-renders with real inputs inside it, so the list never
+   moves under you and the date/time come from the phone's own pickers. */
+var EMAD_EDIT = null;
+function emadTaskEditUI(id) { EMAD_EDIT = (EMAD_EDIT === id) ? null : id; renderHome(); }
+function emadTaskEditCancel() { EMAD_EDIT = null; renderHome(); }
+async function emadTaskEditSave(id) {
   const t = (EMAD.tasks || []).find(x => x.id === id); if (!t) return;
-  const tx = prompt('نص المهمة:', t.text); if (tx === null) return;
-  const dt = prompt('التاريخ (YYYY-MM-DD):', t.date); if (dt === null) return;
-  const raw = prompt('الساعة (زي 09:30 — سيبها فاضية لو من غير وقت):', t.time || ''); if (raw === null) return;
-  const tm = emadTimeNorm(raw);
-  if (tm === null) { showToast('❌ الوقت مش مفهوم — اكتبه زي 09:30'); return; }
+  const tx = (document.getElementById('te_tx_' + id) || {}).value || '';
+  const dt = (document.getElementById('te_dt_' + id) || {}).value || '';
+  const tm = (document.getElementById('te_tm_' + id) || {}).value || '';
+  if (!tx.trim()) { showToast('❌ اكتب نص المهمة'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) { showToast('❌ اختار التاريخ'); return; }
   try {
-    const r = await callScript({ action: 'emad_task_edit', id, text: tx.trim(), date: dt.trim(), time: tm });
-    if (r && r.ok) { t.text = r.text; t.date = r.date; t.time = r.time; renderHome(); showToast('✏️ اتعدلت'); }
-    else showToast('❌ لم يتم — ' + ((r && r.error) || 'حاول مرة أخرى'));
+    const r = await callScript({ action: 'emad_task_edit', id, text: tx.trim(), date: dt, time: tm });
+    if (r && r.ok) {
+      t.text = r.text; t.date = r.date; t.time = r.time;
+      EMAD_EDIT = null; renderHome();
+      // the server re-announces to the assignee, so say what actually changed
+      showToast('✏️ اتعدلت — ' + r.date + (r.time ? ' الساعة ' + r.time : ' من غير وقت'));
+    } else showToast('❌ لم يتم — ' + ((r && r.error) || 'حاول مرة أخرى'));
   } catch (e) { showToast('❌ لم يتم — تحقق من الإنترنت'); }
 }
 async function emadTaskDelete(id){
@@ -1346,6 +1344,23 @@ function clogShiftMonth(delta){
 }
 // task text is typed by hand and lands in innerHTML — escape it (the cleans' fields already are)
 function clogEsc(s){ return String(s==null?'':s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]); }
+/* Reject a task from the log — the to-do drops done tasks at midnight, so this is the only surface
+   left once a day has passed. Confirm first: reopening pings whoever it belongs to. */
+async function clogReopen(id){
+  if (!confirm('ترجّع المهمة دي تاني؟ هتظهر عنده من جديد وهيوصله إشعار.')) return;
+  await clogSetDone(id, false);
+}
+function clogMarkDone(id){ clogSetDone(id, true); }
+async function clogSetDone(id, done){
+  try {
+    const r = await callScript({ action:'emad_task_toggle', id, done });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    CLOG = null;                                    // the month has changed — refetch, never patch
+    await renderCleanLog(true);
+    if (EMAD && EMAD.tasks) { const t = EMAD.tasks.find(x => x.id === id); if (t) t.done = done; }
+    showToast(done ? '✅ اتسجلت' : '↩ رجعت — واتبعت له إشعار');
+  } catch(e){ showToast('❌ لم يتم — حاول مرة أخرى'); }
+}
 async function renderCleanLog(force){
   const el = document.getElementById('logContent');
   if (!CLOG_MONTH) CLOG_MONTH = emadYmdOf(new Date()).slice(0,7);
@@ -1412,11 +1427,21 @@ async function renderCleanLog(force){
     const dd = new Date(d + 'T12:00:00');
     h += `<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px;color:#6b5d4f">${dd.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'})}${d===todayK?' — اليوم':''}</div>`;
     // tasks first when untimed, otherwise they interleave by clock with the cleans
+    /* A done task vanishes from the to-do at midnight, so the LOG is the only place left to reject
+       one (Sarah 2026-08-18: "he checks it and it disappears... i didn't accept the way he finished
+       it"). ↩ sends it back — the tick comes off and he is told, because it had already left his
+       list and he would never notice on his own. */
     (tDays[d] || []).sort((a,b)=>String(a.time||'98:99').localeCompare(String(b.time||'98:99'))).forEach(t => {
       h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;border-right:3px solid ${t.done?'#2e7d32':'#cc5f5f'}">
         <div style="display:flex;justify-content:space-between;gap:6px">
           <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}</div>
           <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'ملاح':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px">
+          <span style="font-size:10.5px;color:#8a7a7a">${t.done?(t.doneAt?'اتعملت '+t.doneAt:'اتعملت'):'لسه'}</span>
+          ${t.done
+            ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogReopen('${t.id}')">↩ رجّعها</button>`
+            : `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogMarkDone('${t.id}')">✅ اتعملت</button>`}
         </div>
       </div>`;
     });
@@ -1788,9 +1813,23 @@ function renderEmadPanel() {
       `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
       ` <span onclick="event.stopPropagation();emadTaskEditUI('${t.id}')" style="cursor:pointer;font-size:11px;padding:0 4px">✏️</span>` +
       ` <span onclick="event.stopPropagation();emadTaskDelete('${t.id}')" style="color:#cc5f5f;cursor:pointer;font-size:11px;padding:0 4px">✕</span>`;
-    timed.push({t: tm || '98:99', h: `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
+    /* ✏️ opens the row IN PLACE (Sarah 2026-08-18). It used to fire three prompt() boxes one after
+       another, and typing "2026-08-21" into a prompt on a phone is a punishment — so rescheduling a
+       task never actually happened. Real date and time pickers, the text alongside them, and the
+       row keeps its place in the list while you edit. */
+    const ed = (EMAD_EDIT === t.id);
+    const editor = !ed ? '' : `<div style="padding:6px 0 2px" onclick="event.stopPropagation()">
+        <input id="te_tx_${t.id}" value="${clogEsc(t.text).replace(/"/g,'&quot;')}" style="width:100%;font-family:'Cairo',sans-serif;font-size:13px;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 8px;margin-bottom:5px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="date" id="te_dt_${t.id}" value="${t.date}" style="font-family:'Cairo',sans-serif;font-size:12px;border:1px solid var(--border,#ddd);border-radius:8px;padding:5px 6px">
+          <input type="time" id="te_tm_${t.id}" value="${tm}" style="font-family:'Cairo',sans-serif;font-size:12px;border:1px solid var(--border,#ddd);border-radius:8px;padding:5px 6px">
+          <button class="btn btn-sm" onclick="emadTaskEditSave('${t.id}')">حفظ</button>
+          <button class="btn btn-outline btn-sm" onclick="emadTaskEditCancel()">إلغاء</button>
+        </div></div>`;
+    timed.push({t: tm || '98:99', h: `<div style="padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0)">
+      <div style="display:flex;gap:8px;align-items:flex-start;cursor:pointer" onclick="emadTaskToggle('${t.id}',${t.done ? 'false' : 'true'})">
       <span style="font-size:15px;flex-shrink:0">${t.done ? '✅' : '⬜'}</span>
-      <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>`});
+      <span style="font-size:13px;line-height:1.6${t.done ? ';text-decoration:line-through;opacity:.45' : ''}">${txt}</span></div>${editor}</div>`});
   });
   timed.sort((a, b) => String(a.t) < String(b.t) ? -1 : 1).forEach(x => todo += x.h);
   /* today's repairs — tapping one opens the CLOSE form, not a cosmetic tick: a repair is done when
