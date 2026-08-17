@@ -914,7 +914,8 @@ function renderSched(){
   (D.repairs||[]).forEach(r=>{ const f=r.flat||r.apt, d=String(r.date||'').slice(0,10); if(f&&days.indexOf(d)>-1)
     (cell[f+'|'+d]=cell[f+'|'+d]||[]).push(`<div style="background:#ece0cf;border-radius:5px;padding:1px 4px;margin:1px 0">🔧 ${r.trade||''}</div>`); });
   D.stays.forEach(s=>{
-    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?' '+s.arrivalTime:''}</div>`);
+    // the time the guest gave reads as a time, not as a number stuck to a name (Sarah 2026-08-18)
+    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?` <span style="white-space:nowrap">🕒 ${s.arrivalTime}</span>`:''}</div>`);
     if(days.indexOf(s.co)>-1)(cell[s.flat+'|'+s.co]=cell[s.flat+'|'+s.co]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi></div>`);
   });
   const DN=['الجمعة','السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس'];
