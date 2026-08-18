@@ -18,7 +18,7 @@
 :root { --bg:#f9f0f0; --card:#ffffff; --border:#f0e0e0; --text1:#3d3436; --text2:#8a7a7d; --text3:#b5a5a8;
   --primary:#cc5f5f; --ok:#5caa7f; --warn:#c9a24b; --danger:#a84545; --blue:#4285f4; }
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Cairo',sans-serif; }
-body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
+body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* white ground, like الكنترول (Sarah 2026-08-18) */
 .hdr { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:10px; }
 .hdr h1 { font-size:17px; font-weight:900; flex:1; }
 .pill { font-size:10px; color:var(--text3); }
@@ -44,7 +44,27 @@ body { background:var(--bg); color:var(--text1); padding-bottom:80px; }
 .btn:disabled { opacity:.5; }
 .wa { text-decoration:none; font-size:15px; }
 .due-row { background:rgba(204,95,95,.05); border:1px solid rgba(204,95,95,.25); border-radius:12px; padding:10px 12px; margin-bottom:10px; }
-.sec-h { font-size:13px; font-weight:900; color:var(--text2); margin:16px 0 8px; }
+/* HOME READS LIKE الكنترول's (Sarah 2026-08-18) — she finds it much clearer, and two screens the
+   same team uses all day should not need two different reading habits. White ground, the section
+   title large and BLACK, and only the person it belongs to in the house pink, so a glance answers
+   "whose is this" before you read a word. */
+.sec-h { font-size:15px; font-weight:900; color:var(--text1); margin:18px 0 8px; letter-spacing:0; }
+.sec-h .who { color:var(--primary); }
+.sec-h .n { color:var(--text3); font-weight:700; font-size:12.5px; }
+.home-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:4px 14px 8px; margin-bottom:12px; }
+/* one row: tickbox · text · actions — the emoji column is fixed so the text starts on one line */
+.trow { display:flex; gap:8px; align-items:flex-start; padding:8px 0; border-bottom:1px solid #f4ecec; }
+.trow:last-child { border-bottom:0; }
+.trow .tk { font-size:15px; flex-shrink:0; line-height:1.35; }
+.trow .tx { flex:1; font-size:13px; line-height:1.6; }
+.trow .tx b { font-weight:800; }
+/* DONE IS STRUCK THROUGH, NOT GONE (Sarah 2026-08-18). A line that vanishes the moment it is
+   ticked takes its own evidence with it — you cannot see that it was done, or undo it. */
+.trow.is-done .tx { text-decoration:line-through; opacity:.45; }
+.trow .sub { font-size:10.5px; color:var(--text3); margin-top:2px; }
+.trow .nm { color:var(--primary); font-weight:700; }
+.trow .late { color:var(--danger); font-weight:800; }
+.trow .tm { font-weight:800; color:var(--text1); }
 .day-h { font-size:12px; font-weight:900; color:var(--primary); margin:12px 0 6px; }
 .line { display:flex; gap:8px; align-items:center; font-size:12.5px; padding:6px 0; border-bottom:1px dashed var(--border); }
 .banner { font-size:11px; color:#8a6d1f; background:rgba(201,162,75,.12); border-radius:10px; padding:6px 10px; margin-bottom:10px; }
@@ -492,96 +512,6 @@ function addNote(stayId){
     .catch(()=>toast('❌ لم تُحفظ'));
 }
 
-function renderQueue(){
-  const el=document.getElementById('p-queue');
-  let due=[], soon=[];
-  D.stays.forEach(st=>st.steps.forEach(sp=>{
-    const s=stepState(st,sp);
-    if(s==='due') due.push({st,sp});
-    else if(s==='soon') soon.push({st,sp});
-  }));
-  let h='';
-  if(D.tasks&&D.tasks.length){
-    h+=`<div class="sec-h">📝 مهامك</div>`;
-    D.tasks.forEach(t=>{ h+=`<div class="line">${t.overdue?'<span class="badge b-due">متأخرة</span>':''}<span style="flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span></div>`; });
-  }
-  // handover + WhatsApp-group items: upcoming stays not yet transferred / group not ready
-  const today=D.today||'';
-  /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
-     (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
-  const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
-     خالص، وهما بالظبط اللي لسه ماتسلموش (Sarah 2026-08-11) */
-  const pend=D.stays.filter(st=>
-    ((st.ci>=today&&st.ci<=wk7)||(st.ci<=today&&st.co>today))&&
-    (!(st.handover&&st.handover.done)||!(st.group&&st.group.done)));
-  if(pend.length){
-    // Malah sees the same list read-only — it is what is coming to him, not work he can start
-    h+=`<div class="sec-h">${currentUser==='malah'
-      ? `🤝 جاي قدامك — لسه ماتسلمش (${pend.length})`
-      : `🤝 تسليم وجروبات — على خالد وسارة (${pend.length})`}</div>`;
-    pend.forEach(st=>{
-      const bits=[];
-      if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
-      if(!(st.handover&&st.handover.done)) bits.push('🤝 لسه ماتسلمش لملاح');
-      h+=`<div class="line"><span style="flex:1"><b><bdi>${st.guest}</bdi></b> (${st.flat}) · وصول ${st.ci}<div class="step-sub">${bits.join(' · ')}</div></span>
-        ${!(st.group&&st.group.done)?`<button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
-        ${!(st.handover&&st.handover.done)?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
-    });
-  }
-  h+=`<div class="sec-h">🔴 مستحقة الآن (${due.length})</div>`;
-  h+=due.length?due.map(x=>`<div class="line">
-      <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-      ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-    </div>`).join(''):`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`;
-  /* OUR OWN GUESTS' LADDER — the ones we did not hand over. Same steps, same copy button, same
-     tick, so the trail exists whoever does the work (Sarah 2026-08-12). Malah never sees it. */
-  if(currentUser!=='malah'){
-    h+=`<div class="sec-h">📋 خطوات ضيوف عندنا — على خالد وسارة (${dueOwn.length})</div>`;
-    if(dueOwn.length) h+=dueOwn.map(x=>`<div class="line">
-        <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-        ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-        <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-      </div>`).join('');
-    else h+=`<div class="line"><span class="step-sub">— مفيش خطوات مستحقة على ضيوف لسه ماتسلمتش</span></div>`;
-  }
-  /* BOTH 48h SECTIONS STAY ON SCREEN (Sarah 2026-08-12: "this is not appearing now"). They used to
-     disappear when empty, which reads as a bug rather than "nothing due" — and Malah's is empty
-     precisely when nobody has been handed to him, which is worth SAYING, not hiding. */
-  h+=`<div class="sec-h">🟡 خلال يومين — 📨 ملاح (${soon.length})</div>`;
-  if(soon.length)
-    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
-  else {
-    const waiting=D.stays.filter(st=>!(st.handover&&st.handover.done)&&st.co>today).length;
-    h+=`<div class="line"><span class="step-sub">— مفيش${waiting?` · فيه ${waiting} ضيف لسه ماتسلمش، خطواتهم مش هتظهر هنا غير بعد التسليم`:''}</span></div>`;
-  }
-  /* الجزء التاني من «خلال يومين» — شغل سارة وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
-     تسليم. مفصول ومعنون علشان كل واحد يعرف اللي عليه (Sarah 2026-08-12). */
-  const d2=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  const soonOwn=pend.filter(st=>st.ci>=today&&st.ci<=d2);
-  h+=`<div class="sec-h">🟡 خلال يومين — 🤝 سارة وخالد (${soonOwn.length+soonOwn2.length})</div>`;
-  if(soonOwn.length){
-    soonOwn.forEach(st=>{
-      const need=[];
-      if(!(st.group&&st.group.done)) need.push('💬 الجروب');
-      if(!(st.handover&&st.handover.done)) need.push('🤝 التسليم');
-      h+=`<div class="line"><span class="badge b-soon">${st.ci}</span>
-        <span style="flex:1">${need.join(' + ')} — <bdi>${st.guest}</bdi> (${st.flat})</span>
-        ${currentUser!=='malah'?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
-    });
-  }
-  // …plus the ladder steps coming due on the guests we kept, so nothing sneaks up on us either
-  if(soonOwn2.length) h+=soonOwn2.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-      <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
-  if(!soonOwn.length && !soonOwn2.length)
-    h+=`<div class="line"><span class="step-sub">— مفيش حاجة علينا خلال يومين</span></div>`;
-  el.innerHTML=h;
-}
-
 function renderStays(){
   const el=document.getElementById('p-stays');
   if(!D.stays.length){ el.innerHTML='<div class="card">لا حجوزات في الأفق</div>'; return; }
@@ -811,22 +741,39 @@ function renderQueue(){
       else      { if(s==='due') dueOwn.push({st,sp}); else soonOwn2.push({st,sp}); }
     });
   });
-  let h=`<div class="sec-h">✅ مهام النهارده (${(D.tasks||[]).filter(t=>!t.done).length+due.length})</div>`;
+  /* one row, drawn the same way everywhere on this screen — tickbox, text, buttons */
+  const trow=(tick,tx,btns,done)=>`<div class="trow${done?' is-done':''}">
+      <span class="tk">${tick}</span><span class="tx">${tx}</span>${btns||''}</div>`;
+  const stepTx=x=>`<b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi>
+      <div class="sub">${x.st.flat}${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</div>`;
+  const stepBtns=x=>`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
+      ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
+      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`;
+  const nDone=(D.tasks||[]).filter(t=>t.done).length;
+  let h=`<div class="sec-h">✅ مهام النهارده <span class="n">(${(D.tasks||[]).filter(t=>!t.done).length+due.length}${nDone?` · ${nDone} خلصت`:''})</span></div><div class="home-card">`;
   (D.tasks||[]).forEach(t=>{
     const age=t.addedAt?daysSince(t.addedAt):0;
-    h+=`<div class="line">${t.overdue?'<span class="badge b-due">متأخرة</span>':''}
-      <span style="flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">📝 ${t.text}
-        <div class="step-sub">${t.time?'الساعة '+t.time+' · ':''}${age>0?'مضافة من '+age+' يوم':'مضافة النهارده'}</div></span>
-      <button class="btn" onclick="editTask('${t.id}')">✏️</button>
-      ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}</div>`;
+    h+=trow(t.done?'✅':'⬜',
+      `${t.time?`<span class="tm">${t.time}</span> · `:''}${t.text}${t.overdue&&!t.done?` <span class="late">(متأخرة)</span>`:''}
+       <div class="sub">${age>0?`⏳ من ${age} يوم`:'مضافة النهارده'}${t.by?` — <span class="nm">${t.by}</span>`:''}</div>`,
+      `<button class="btn" onclick="editTask('${t.id}')">✏️</button>
+       ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}`,
+      t.done);
   });
-  h+=due.length?due.map(x=>`<div class="line">
-      <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-      ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-      ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-      <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-    </div>`).join('')
-    :((D.tasks||[]).some(t=>!t.done)?'':`<div class="card" style="color:var(--ok);font-size:13px">✨ لا يوجد شيء مستحق الآن</div>`);
+  h+=due.length?due.map(x=>trow('⬜',stepTx(x),stepBtns(x),false)).join('')
+    :((D.tasks||[]).length?'':`<div class="trow"><span class="tk">✨</span><span class="tx" style="color:var(--ok)">لا يوجد شيء مستحق الآن</span></div>`);
+  /* WHAT WAS TICKED TODAY STAYS ON SCREEN, struck through (Sarah 2026-08-18: "whatever is done is
+     marked done and striken through not vanishing"). A step used to leave the list the instant it
+     was ticked, so the day's work erased itself as it was done — nothing to check against, and no
+     way back if it was ticked by mistake. */
+  const doneToday=[];
+  D.stays.forEach(st=>{
+    if(currentUser==='malah' && !(st.handover&&st.handover.done)) return;
+    st.steps.forEach(sp=>{ if(sp.done && String(sp.doneAt||'').slice(0,10)===today) doneToday.push({st,sp}); });
+  });
+  doneToday.forEach(x=>{ h+=trow('✅',stepTx(x),
+    `<button class="btn" onclick="untick('${x.st.id}','${x.sp.k}','${x.sp.occ}')">↩</button>`,true); });
+  h+='</div>';
   /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لملاح، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
@@ -838,61 +785,57 @@ function renderQueue(){
   if(pend.length){
     // Malah sees the same list read-only — it is what is coming to him, not work he can start
     h+=`<div class="sec-h">${currentUser==='malah'
-      ? `🤝 جاي قدامك — لسه ماتسلمش (${pend.length})`
-      : `🤝 تسليم وجروبات — على خالد وسارة (${pend.length})`}</div>`;
+      ? `🤝 جاي قدامك — لسه ماتسلمش <span class="n">(${pend.length})</span>`
+      : `🤝 تسليم وجروبات — <span class="who">خالد وسارة</span> <span class="n">(${pend.length})</span>`}</div><div class="home-card">`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
       if(!(st.handover&&st.handover.done)) bits.push('🤝 لسه ماتسلمش لملاح');
       const own=currentUser!=='malah';   // only Sarah/Khaled can act here
-      h+=`<div class="line"><span style="flex:1"><b><bdi>${st.guest}</bdi></b> (${st.flat}) · وصول ${st.ci}<div class="step-sub">${bits.join(' · ')}</div></span>
-        ${(own&&!(st.group&&st.group.done))?`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋</button><button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
-        ${(own&&!(st.handover&&st.handover.done))?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
+      h+=trow('🤝',`<b><bdi>${st.guest}</bdi></b> — ${st.flat}<div class="sub">وصول ${st.ci} · ${bits.join(' · ')}</div>`,
+        `${(own&&!(st.group&&st.group.done))?`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋</button><button class="btn" onclick="tickGroupVal('${st.id}','')">💬 جاهز</button>`:''}
+         ${(own&&!(st.handover&&st.handover.done))?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}`,false);
     });
+    h+='</div>';
   }
   /* OUR OWN GUESTS' LADDER — the ones we did not hand over. Same steps, same copy button, same
      tick, so the trail exists whoever does the work (Sarah 2026-08-12). Malah never sees it. */
   if(currentUser!=='malah'){
-    h+=`<div class="sec-h">📋 خطوات ضيوف عندنا — على خالد وسارة (${dueOwn.length})</div>`;
-    if(dueOwn.length) h+=dueOwn.map(x=>`<div class="line">
-        <span style="flex:1"><b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi> <span class="step-sub">(${x.st.flat})${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</span></span>
-        ${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
-        ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
-        <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>
-      </div>`).join('');
-    else h+=`<div class="line"><span class="step-sub">— مفيش خطوات مستحقة على ضيوف لسه ماتسلمتش</span></div>`;
+    h+=`<div class="sec-h">📋 خطوات ضيوف عندنا — <span class="who">خالد وسارة</span> <span class="n">(${dueOwn.length})</span></div><div class="home-card">`;
+    if(dueOwn.length) h+=dueOwn.map(x=>trow('⬜',stepTx(x),stepBtns(x),false)).join('');
+    else h+=`<div class="trow"><span class="tk">✨</span><span class="tx sub">مفيش خطوات مستحقة على ضيوف لسه ماتسلمتش</span></div>`;
+    h+='</div>';
   }
   /* BOTH 48h SECTIONS STAY ON SCREEN (Sarah 2026-08-12: "this is not appearing now"). They used to
      disappear when empty, which reads as a bug rather than "nothing due" — and Malah's is empty
      precisely when nobody has been handed to him, which is worth SAYING, not hiding. */
-  h+=`<div class="sec-h">🟡 خلال يومين — 📨 ملاح (${soon.length})</div>`;
+  h+=`<div class="sec-h">🟡 خلال يومين — 📨 <span class="who">ملاح</span> <span class="n">(${soon.length})</span></div><div class="home-card">`;
   if(soon.length)
-    h+=soon.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-        <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+    h+=soon.map(x=>trow('🕒',`${x.sp.label} — <bdi>${x.st.guest}</bdi><div class="sub">${x.st.flat} · ${x.sp.dueD||''}</div>`,'',false)).join('');
   else {
     const waiting=D.stays.filter(st=>!(st.handover&&st.handover.done)&&st.co>today).length;
-    h+=`<div class="line"><span class="step-sub">— مفيش${waiting?` · فيه ${waiting} ضيف لسه ماتسلمش، خطواتهم مش هتظهر هنا غير بعد التسليم`:''}</span></div>`;
+    h+=`<div class="trow"><span class="tk">—</span><span class="tx sub">مفيش${waiting?` · فيه ${waiting} ضيف لسه ماتسلمش، خطواتهم مش هتظهر هنا غير بعد التسليم`:''}</span></div>`;
   }
+  h+='</div>';
   /* الجزء التاني من «خلال يومين» — شغل سارة وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
      تسليم. مفصول ومعنون علشان كل واحد يعرف اللي عليه (Sarah 2026-08-12). */
   const d2=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const soonOwn=pend.filter(st=>st.ci>=today&&st.ci<=d2);
-  h+=`<div class="sec-h">🟡 خلال يومين — 🤝 سارة وخالد (${soonOwn.length+soonOwn2.length})</div>`;
+  h+=`<div class="sec-h">🟡 خلال يومين — 🤝 <span class="who">سارة وخالد</span> <span class="n">(${soonOwn.length+soonOwn2.length})</span></div><div class="home-card">`;
   if(soonOwn.length){
     soonOwn.forEach(st=>{
       const need=[];
       if(!(st.group&&st.group.done)) need.push('💬 الجروب');
       if(!(st.handover&&st.handover.done)) need.push('🤝 التسليم');
-      h+=`<div class="line"><span class="badge b-soon">${st.ci}</span>
-        <span style="flex:1">${need.join(' + ')} — <bdi>${st.guest}</bdi> (${st.flat})</span>
-        ${currentUser!=='malah'?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:''}</div>`;
+      h+=trow('🕒',`${need.join(' + ')} — <bdi>${st.guest}</bdi><div class="sub">${st.flat} · وصول ${st.ci}</div>`,
+        currentUser!=='malah'?`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝</button>`:'',false);
     });
   }
   // …plus the ladder steps coming due on the guests we kept, so nothing sneaks up on us either
-  if(soonOwn2.length) h+=soonOwn2.map(x=>`<div class="line"><span class="badge b-soon">${x.sp.dueD||''}</span>
-      <span style="flex:1">${x.sp.label} — <bdi>${x.st.guest}</bdi> (${x.st.flat})</span></div>`).join('');
+  if(soonOwn2.length) h+=soonOwn2.map(x=>trow('🕒',`${x.sp.label} — <bdi>${x.st.guest}</bdi><div class="sub">${x.st.flat} · ${x.sp.dueD||''}</div>`,'',false)).join('');
   if(!soonOwn.length && !soonOwn2.length)
-    h+=`<div class="line"><span class="step-sub">— مفيش حاجة علينا خلال يومين</span></div>`;
+    h+=`<div class="trow"><span class="tk">—</span><span class="tx sub">مفيش حاجة علينا خلال يومين</span></div>`;
+  h+='</div>';
   el.innerHTML=h;
 }
 
