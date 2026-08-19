@@ -386,9 +386,13 @@ function nowHM(){ const d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('
 function stepState(st, sp){
   if(sp.done) return 'done';
   const today=D.today||new Date().toISOString().slice(0,10);
-  const docsDone=st.steps.some(x=>x.k==='docs'&&x.done);
   if(sp.k==='docs') return (sp.nagD&&sp.nagD<=today)?'due':'open';
-  if(sp.gated==='docs') return docsDone?'due':'wait';
+  /* ANY gate, not just 'docs' (Sarah 2026-08-19: "it doesn't have a time stamp so i am not sure it
+     will appear in the tasks" — she was right). A gated step carries no due DATE; being unlocked is
+     what makes it due. This tested for the literal string 'docs', so the new location step — gated
+     on the manual — fell through to the no-date branch and sat quietly as 'open', never reaching
+     the to-do. Reading the gate itself covers the manual, the location, and whatever comes next. */
+  if(sp.gated) return st.steps.some(x=>x.k===sp.gated&&x.done)?'due':'wait';
   if(sp.k==='settled'){
     const at=st.arrivalTime||'15:00';
     const t2=('0'+((parseInt(at,10)+2)%24)).slice(-2)+at.slice(2,5);
