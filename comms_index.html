@@ -414,15 +414,31 @@ function renderAll(){ renderQueue(); renderStays(); renderSched(); renderRep(); 
    repairs list and the log as well is what made every tap feel heavy (Sarah 2026-08-12). */
 function renderMain(){ renderQueue(); renderStays(); }
 
+/* WHEN IS THIS DUE? (Sarah 2026-08-19: "it still doesn't have a timestamp"). A gated step carries no
+   due date — the gate opening IS its timing — so the sub-line came out blank and the row looked
+   undated and untrustworthy, even after it started reaching the to-do. Now it says so in words: once
+   the gate is ticked, the date it was ticked; before that, which step it is waiting on. */
+function gateOf(st,sp){ return sp.gated ? (st.steps||[]).find(x=>x.k===sp.gated) : null; }
+function gateName(k){ return STEP_AR[k]||'الخطوة اللي قبلها'; }
+function dueTxt(st,sp){
+  if(sp.dueD) return `تستحق ${sp.dueD}`;
+  const g=gateOf(st,sp); if(!g) return '';
+  if(!g.done) return `بعد ${gateName(sp.gated)}`;
+  const at=String(g.doneAt||'').slice(0,10), today=D.today||'';
+  if(!at) return 'مستحقة دلوقتي';
+  // due since the gate opened — so it goes late the day after, exactly like a dated step
+  return at<today ? `⚠️ متأخرة من ${at}` : `مستحقة من ${at}`;
+}
 function stepRow(st,sp,state){
   const id=`${st.id}|${sp.k}|${sp.occ}`;
   /* A long stay has SEVERAL cleans, so it has several coordination steps — with the date buried in
      the grey sub-line they read as the same row twice (Sarah 2026-08-12, Iman's 85 nights). The
      occurrence date now sits in the label itself, and the sub-line carries both dates. */
   const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
+  const dt=dueTxt(st,sp);
   const sub=(sp.occ&&sp.occ!=='mid')
-    ? `النظافة يوم ${sp.occ}${sp.dueD?` · تستحق ${sp.dueD}`:''}`
-    : (sp.dueD?`تستحق ${sp.dueD}`:'');
+    ? `النظافة يوم ${sp.occ}${dt?` · ${dt}`:''}`
+    : dt;
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
   /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
@@ -432,7 +448,7 @@ function stepRow(st,sp,state){
     ? `<div class="step-sub" style="color:#cc5f5f;font-weight:800">⚠️ الكود ${codeFor(st)} لسه محدش غيّره على الباب — اتأكد مع عماد قبل ما تبعته</div>` : '';
   return `<div class="step ${sp.done?'done':''}">
     <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
-    ${state==='wait'?'<span class="badge b-soon">بعد المستندات</span>':''}
+    ${state==='wait'?`<span class="badge b-soon">بعد ${gateName(sp.gated)}</span>`:''}
     ${sp.done?`<button class="btn" onclick="untick('${st.id}','${sp.k}','${sp.occ}')">↩</button>`:copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
 }
@@ -770,8 +786,9 @@ function renderQueue(){
   /* one row, drawn the same way everywhere on this screen — tickbox, text, buttons */
   const trow=(tick,tx,btns,done)=>`<div class="trow${done?' is-done':''}">
       <span class="tk">${tick}</span><span class="tx">${tx}</span>${btns||''}</div>`;
+  // every row in the to-do says when it fell due — a gated step included (see dueTxt)
   const stepTx=x=>`<b>${x.sp.label}</b> — <bdi>${x.st.guest}</bdi>
-      <div class="sub">${x.st.flat}${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}</div>`;
+      <div class="sub">${x.st.flat}${x.sp.occ&&x.sp.occ!=='mid'?' · '+x.sp.occ:''}${(t=>t?' · '+t:'')(dueTxt(x.st,x.sp))}</div>`;
   const stepBtns=x=>`${x.st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(x.st.phone).replace(/[^0-9]/g,'')}">💬</a>`:''}
       ${(x.sp.k==='docs'||x.sp.k==='security'||x.sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${x.st.id}','${x.sp.k}','${x.sp.occ}')">📋</button>`}
       <button class="btn btn-ok" onclick="${x.sp.k==='arrivaltime'?`tickArrival('${x.st.id}','${x.sp.occ}')`:`tick('${x.st.id}','${x.sp.k}','${x.sp.occ}')`}">✅</button>`;
