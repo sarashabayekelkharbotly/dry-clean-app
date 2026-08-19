@@ -327,8 +327,27 @@ function ensureLangGender(st){
   }
   return true;
 }
+/* 📍 THE FLAT'S MAP PIN (Sarah 2026-08-19). This step has no message to word — the link is the whole
+   of it, one per apartment, so the copy button puts the pin on the clipboard and nothing else. Kept
+   as data here rather than inside the templates because it is the same in both languages. */
+const FLAT_PIN={
+  '8A':'https://goo.gl/maps/k5P3q853uDZy3STf6',
+  '17A':'https://goo.gl/maps/NgzPXTvYhzMWpAXP8',
+  '28A':'https://maps.app.goo.gl/E9C3dJy4MMPzFA7N8',
+  'Zayed 2000':'https://maps.app.goo.gl/ZoXaN4DijpW2BidP8'
+};
+function pinFor(st){ return (st&&FLAT_PIN[st.flat])||''; }
 function copyTpl(stayId,k,occ){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  // the pin needs no language and no gender, so it never triggers those prompts
+  if(k==='location'){
+    const pin=pinFor(st);
+    if(!pin){ toast('⚠️ مفيش لوكيشن مسجّل لشقة '+st.flat+' — كلّمي سارة'); return; }
+    (navigator.clipboard?navigator.clipboard.writeText(pin):Promise.reject()).then(
+      ()=>toast('📍 اللوكيشن اتنسخ — الصقه في واتساب'),
+      ()=>{ prompt('انسخ اللوكيشن:',pin); });
+    return;
+  }
   if(!ensureLangGender(st)) return;
   const t=tpl(k,st,occ);
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
@@ -656,6 +675,8 @@ function tplAR(k, st, occ){
       return currentUser==='malah'
       ? `أهلاً ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟${docsAR} هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — وأنا موجود دائماً هنا على الجروب. 🙏`
       : `أهلاً ${n}! 🌟 شكراً لحجزك معنا — يسعدنا نستضيفك.${docsAR} هنبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — ونحن دائماً موجودون لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. 🙏`; }
+    // 📍 no wording — copyTpl hands over the pin itself; this keeps tpl() honest if anything asks
+    case 'location': return pinFor(st);
     case 'manual': return `${malahIntroAR(st,G)}أهلاً ${n}! هذا دليل البيت 🏠 ${G('خذ','خذي','خذوا')} دقائق ${G('واطّلع','واطّلعي','واطّلعوا')} عليه من فضلك — هيسهّل الإقامة كثيراً. ${G('ستجد','ستجدين','ستجدون')} فيه: تعليمات الدخول، وأماكن كل شيء في البيت (المكواة، أدوات المطبخ، وغيرها)، وطريقة تشغيل الأجهزة (التكييف، الغسالة، التلفزيون)، وما حولك من محلات البقالة وتطبيقات التوصيل وأماكننا المفضلة القريبة. أي شيء غير واضح ${G('اسألني','اسأليني','اسألوني')} هنا!`;
     case 'arrival': case 'arrivalask': return `أهلاً ${n}! نجهّز البيت لإقامتك — متوقع ${G('تصل','تصلي','تصلوا')} الساعة كم؟ حتى يكون كل شيء جاهزاً قبل الوصول.`;
     case 'code': return `أهلاً ${n}! الوصول بكرة 🎉 الدخول متاح من الساعة ٣ عصراً. كود الباب هو:
@@ -688,6 +709,7 @@ function tpl(k, st, occ){
       return currentUser==='malah'
       ? `Hello ${n}! I'm glad to be here to support you with anything you need during your stay 🌟${docsEN} I'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and I'm always here on this group whenever you need me. 🙏`
       : `Hello ${n}! 🌟 Thank you for booking with us — we're delighted to host you.${docsEN} We'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and we're always here for anything you need. 🙏`; }
+    case 'location': return pinFor(st);
     case 'manual': return `${malahIntroEN(st)}Hi ${n}! Here is our house manual 🏠 Please take a few minutes to go through it — it will make your stay much smoother. Inside you'll find: the check-in instructions, where everything is in the home (ironing board, utensils, extras), how the devices work (A/C, washing machine, TV), and what's around you — groceries, delivery apps, and our favorite places nearby. Anything unclear, just ask me here!`;
     case 'arrival': case 'arrivalask': return `Hi ${n}! We're preparing the home for your stay — what time do you expect to arrive? We'll make sure everything is set before you get there.`;
     case 'code': return `Hi ${n}! Your check-in is tomorrow 🎉 Check-in is anytime from 3:00 PM. Your door code is:
@@ -711,7 +733,7 @@ Safe journey!`;
 
 
 /* ==== 14c continuation (overrides): to-do home · سجل log · week-grid schedule ==== */
-const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
+const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن الشقة',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
 
 async function toggleTask(id,done){
   let r=null; try{ r=await api('emad_task_toggle',{id,done}); }catch(e){}
