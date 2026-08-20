@@ -1344,6 +1344,33 @@ function clogShiftMonth(delta){
 }
 // task text is typed by hand and lands in innerHTML — escape it (the cleans' fields already are)
 function clogEsc(s){ return String(s==null?'':s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]); }
+/* EDIT A TASK FROM THE LOG (Sarah 2026-08-19: "especially those that are in the future there is no
+   other way to edit them"). The to-do home only carries today and overdue, so a task dated next
+   week is invisible there and its ✏️ unreachable. The log lists the whole MONTH — future days
+   included — which makes it the only place a scheduled task can be reworded or moved.
+   Editing the date can push a task into another month, out of the view it was edited in; the toast
+   says where it went rather than letting it appear to vanish. */
+var CLOG_EDIT = null;
+function clogEditUI(id){ CLOG_EDIT = (CLOG_EDIT === id) ? null : id; renderCleanLog(); }
+function clogEditCancel(){ CLOG_EDIT = null; renderCleanLog(); }
+async function clogEditSave(id){
+  const tx = (document.getElementById('cle_tx_' + id) || {}).value || '';
+  const dt = (document.getElementById('cle_dt_' + id) || {}).value || '';
+  const tm = (document.getElementById('cle_tm_' + id) || {}).value || '';
+  if (!tx.trim()) { showToast('❌ اكتب نص المهمة'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) { showToast('❌ اختار التاريخ'); return; }
+  try {
+    const r = await callScript({ action:'emad_task_edit', id, text: tx.trim(), date: dt, time: tm });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    CLOG_EDIT = null; CLOG = null;                 // the month may have changed — refetch, never patch
+    await renderCleanLog(true);
+    if (EMAD && EMAD.tasks) { const t = EMAD.tasks.find(x => x.id === id);
+      if (t) { t.text = r.text; t.date = r.date; t.time = r.time; } }
+    const moved = String(r.date || '').slice(0,7) !== CLOG_MONTH;
+    showToast('✏️ اتعدلت — ' + r.date + (r.time ? ' الساعة ' + r.time : ' من غير وقت') +
+              (moved ? ' · اتنقلت لشهر ' + String(r.date).slice(0,7) : ''));
+  } catch(e) { showToast('❌ لم يتم — حاول مرة أخرى'); }
+}
 /* Reject a task from the log — the to-do drops done tasks at midnight, so this is the only surface
    left once a day has passed. Confirm first: reopening pings whoever it belongs to. */
 async function clogReopen(id){
@@ -1439,10 +1466,21 @@ async function renderCleanLog(force){
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px">
           <span style="font-size:10.5px;color:#8a7a7a">${t.done?(t.doneAt?'اتعملت '+t.doneAt:'اتعملت'):'لسه'}</span>
-          ${t.done
-            ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogReopen('${t.id}')">↩ رجّعها</button>`
-            : `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogMarkDone('${t.id}')">✅ اتعملت</button>`}
+          <span style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogEditUI('${t.id}')">✏️ عدّل</button>
+            ${t.done
+              ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogReopen('${t.id}')">↩ رجّعها</button>`
+              : `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogMarkDone('${t.id}')">✅ اتعملت</button>`}
+          </span>
         </div>
+        ${CLOG_EDIT === t.id ? `<div style="padding:6px 0 2px;border-top:1px dashed #eee;margin-top:6px">
+          <input id="cle_tx_${t.id}" value="${clogEsc(t.text).replace(/"/g,'&quot;')}" style="width:100%;font-family:'Cairo',sans-serif;font-size:13px;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 8px;margin-bottom:5px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <input type="date" id="cle_dt_${t.id}" value="${t.date}" style="font-family:'Cairo',sans-serif;font-size:12px;border:1px solid var(--border,#ddd);border-radius:8px;padding:5px 6px">
+            <input type="time" id="cle_tm_${t.id}" value="${/^\d{2}:\d{2}$/.test(t.time||'')?t.time:''}" style="font-family:'Cairo',sans-serif;font-size:12px;border:1px solid var(--border,#ddd);border-radius:8px;padding:5px 6px">
+            <button class="btn btn-sm" onclick="clogEditSave('${t.id}')">حفظ</button>
+            <button class="btn btn-outline btn-sm" onclick="clogEditCancel()">إلغاء</button>
+          </div></div>` : ''}
       </div>`;
     });
     (days[d] || []).sort((a,b)=>String(a.sched||a.started).localeCompare(String(b.sched||b.started))).forEach(r => {
