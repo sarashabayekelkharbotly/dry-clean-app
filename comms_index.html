@@ -386,12 +386,11 @@ function stepState(st, sp){
      on the manual — fell through to the no-date branch and sat quietly as 'open', never reaching
      the to-do. Reading the gate itself covers the manual, the location, and whatever comes next. */
   if(sp.gated) return st.steps.some(x=>x.k===sp.gated&&x.done)?'due':'wait';
-  if(sp.k==='settled'){
-    const at=st.arrivalTime||'15:00';
-    const t2=('0'+((parseInt(at,10)+2)%24)).slice(-2)+at.slice(2,5);
-    if(st.ci<today) return 'due';
-    return (st.ci===today&&nowHM()>=t2)?'due':(st.ci===today?'soon':'open');
-  }
+  /* ARRIVAL DAY = TODAY'S LIST (Sarah 2026-08-21, Afefy): the +2h gate used to file this under
+     «خلال يومين» until two hours after arrival — today's work under a heading that says it is not
+     today's. It sits in مهام النهارده from the morning; the row's own sub-line carries the timing,
+     and Dani times the message himself. */
+  if(sp.k==='settled') return st.ci<=today ? 'due' : 'open';
   if(!sp.dueD) return 'open';
   if(sp.dueD<=today) return 'due';
   return (sp.dueD<= (function(){const d=new Date(today+'T12:00:00'); d.setDate(d.getDate()+2); return d.toISOString().slice(0,10);})()) ? 'soon':'open';
@@ -430,7 +429,7 @@ function stepRow(st,sp,state){
   const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
   const dt=dueTxt(st,sp);
   const sub=(sp.occ&&sp.occ!=='mid')
-    ? `النظافة يوم ${sp.occ}${dt?` · ${dt}`:''}`
+    ? `النظافة يوم ${sp.occ}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${dt?` · ${dt}`:''}`
     : dt;
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
