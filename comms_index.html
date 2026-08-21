@@ -197,9 +197,33 @@ function showSwitchUser(){
 }
 
 /* ---- api + cache-first paint with an honest age banner (house style) ---- */
-async function api(action, extra={}){
-  const res=await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra))});
-  return res.json();
+/* A call with no timeout is a screen with no answer (Sarah 2026-08-20: "there is no response") —
+   the browser will happily wait minutes on a stalled request. 35s cap; the retry wrapper below
+   decides what happens next, the user is never left staring. */
+async function api(action, extra={}, timeoutMs=35000){
+  const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),timeoutMs);
+  try{
+    const res=await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra)),signal:ctl.signal});
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+/* SAVES RETRY THEMSELVES (2026-08-20). One stalled write holds the server lock for minutes; every
+   save behind it used to wait 20s, fail, and paint ❌ لم يُحفظ for work that only needed a second
+   attempt — Sarah then retried by hand, which is exactly what this does, minus the false alarm.
+   Safe because a tick is idempotent (same row, same end state) and the server now dedupes the
+   telegram, so a retry can never announce twice. Three attempts, backing off, saying what it is
+   doing; the honest ❌ survives for the case where all three really failed. */
+async function apiRetry(action, extra={}){
+  const waits=[0,4000,10000];
+  for(let a=0;a<waits.length;a++){
+    if(waits[a]){ toast('⏳ لسه بيحفظ — محاولة تانية…'); await new Promise(r=>setTimeout(r,waits[a])); }
+    try{
+      const r=await api(action, extra);
+      if(r&&r.ok===true) return r;
+      if(!(r&&r.code==='BUSY')) return r;          // a real answer, even a bad one — no point retrying
+    }catch(e){ /* timeout or network — the save may be mid-flight; retry overwrites to the same state */ }
+  }
+  return null;
 }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
 const CK='owh_comms_cache_v2';   // v2: handover/group/lang/requests/notes on every stay
@@ -489,7 +513,7 @@ function stayExtra(st){
 function tagOf(st){ return `${st.guest} (${st.flat})`; }
 async function pseudoTick(stayId, step, val, msg, snap){
   const st=D.stays.find(s=>s.id===stayId);
-  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',val:val||'',tag:st?tagOf(st):'',snap:snap||''}); }catch(e){}
+  const r=await apiRetry('comms_tick',{stayId,step,occ:'',val:val||'',tag:st?tagOf(st):'',snap:snap||''});
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return false; }
   if(st){
     const now=new Date().toISOString().slice(0,10);
@@ -523,7 +547,7 @@ function tickGroupVal(stayId,val){ pseudoTick(stayId,'group',val,val==='invited'
 async function undoFlag(stayId,step){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   if(!confirm(step==='handover'?'إلغاء علامة التسليم؟ الضيف هيرجع في لستة «لسه ماتسلمش».':'إلغاء علامة الجروب؟')) return;
-  let r=null; try{ r=await api('comms_tick',{stayId,step,occ:'',undo:true,tag:tagOf(st)}); }catch(e){}
+  const r=await apiRetry('comms_tick',{stayId,step,occ:'',undo:true,tag:tagOf(st)});
   if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   if(step==='handover') st.handover={done:false,by:'',at:'',note:''};
   else st.group={done:false,by:'',at:'',invited:false};
@@ -638,7 +662,7 @@ async function addTask(){
 async function tick(stayId,k,occ){
   const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
   const st=D.stays.find(x=>x.id===stayId);
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,tag:st?tagOf(st):''}); }catch(e){}
+  const r=await apiRetry('comms_tick',{stayId,step:k,occ,tag:st?tagOf(st):''});
   if(btn){ btn.disabled=false; btn.textContent='✅'; }
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,true,'');
@@ -649,7 +673,7 @@ async function tickArrival(stayId,occ){
   if(v===null) return;
   const t=String(v).trim();
   if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اكتب الوقت بصيغة HH:MM'); return; }
-  let r=null; try{ r=await api('comms_tick',{stayId,step:'arrivaltime',occ,val:t,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()}); }catch(e){}
+  const r=await apiRetry('comms_tick',{stayId,step:'arrivaltime',occ,val:t,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()});
   if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
   applyTick(stayId,'arrivaltime',occ,true,t);
   toast('✅ الوصول '+t);
@@ -657,7 +681,7 @@ async function tickArrival(stayId,occ){
 async function untick(stayId,k,occ){
   if(!confirm('إلغاء العلامة؟')) return;
   const st=D.stays.find(x=>x.id===stayId);
-  let r=null; try{ r=await api('comms_tick',{stayId,step:k,occ,undo:true,tag:st?tagOf(st):''}); }catch(e){}
+  const r=await apiRetry('comms_tick',{stayId,step:k,occ,undo:true,tag:st?tagOf(st):''});
   if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   applyTick(stayId,k,occ,false,'');
   toast('↩ اتلغت');
@@ -756,7 +780,7 @@ Safe journey!`;
 const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن الشقة',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
 
 async function toggleTask(id,done){
-  let r=null; try{ r=await api('emad_task_toggle',{id,done}); }catch(e){}
+  const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
   if(!r||!r.ok){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
   const t=(D.tasks||[]).find(x=>x.id===id); if(t) t.done=done;
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
