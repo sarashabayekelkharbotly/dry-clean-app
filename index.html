@@ -1228,7 +1228,9 @@ function emadHmAr(t){
 }
 function emadFlatAr(f){ return f === 'Zayed 2000' ? 'زايد 2000' : f; }
 function emadTaskLine(c){
-  if (c.type === 'codechange') return `شقة ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — دخول ضيف غدا`;
+  // no hardcoded «غدا» — since 2026-08-16 the trip can sit ON the arrival day itself, and this line
+  // said "tomorrow" about a guest already walking in; the lock-code task carries the exact timing
+  if (c.type === 'codechange') return `شقة ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — قبل دخول الضيف`;
   let t = `شقة ${emadFlatAr(c.flat)}: ${EMAD_TYPE_AR[c.type] || 'تنظيف'}`;
   if (c.time && /^\d/.test(c.time)) t += ` الساعة ${emadHmAr(c.time)}`;
   if (c.cleaner === 'jinny') t += ' — النظافة: جيني';
@@ -1462,7 +1464,7 @@ async function renderCleanLog(force){
       h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;border-right:3px solid ${t.done?'#2e7d32':'#cc5f5f'}">
         <div style="display:flex;justify-content:space-between;gap:6px">
           <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}</div>
-          <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'ملاح':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
+          <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'داني':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px">
           <span style="font-size:10.5px;color:#8a7a7a">${t.done?(t.doneAt?'اتعملت '+t.doneAt:'اتعملت'):'لسه'}</span>
@@ -1885,7 +1887,9 @@ function renderEmadPanel() {
      vacancy — the card still burns the home's half, so it still deserves a glance) */
   {
     const loggedToday = EMAD.meter && String(EMAD.meter.at || '').slice(0, 10) === todayK;
-    const clean8aToday = (EMAD.schedule || []).some(c => c.flat === '8A' && c.date === todayK);
+    // a CLEANING visit only (Sarah 2026-08-21): a codechange is a ten-second trip to the door — it
+    // does not put Emad in front of the meter, and it was triggering the reading task on its own
+    const clean8aToday = (EMAD.schedule || []).some(c => c.flat === '8A' && c.date === todayK && ['checkout','midstay','weekly','revision','custom'].includes(c.type));
     const readingAge = EMAD.meter ? Math.floor((new Date(todayK+'T12:00:00') - new Date(String(EMAD.meter.at).slice(0,10)+'T12:00:00')) / 86400000) : null;
     if (loggedToday)
       todo += row('✅', `تم تسجيل رصيد كارت 8A اليوم: <b>${EMAD.meter.balance}</b> جنيه`, {});
