@@ -1924,6 +1924,18 @@ function renderEmadPanel() {
         todo += row('📶', `<b>تسجيل جيجا الإنترنت — شقة ${emadFlatAr(c.flat)}</b> (يوم نظافة — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
           { click: `emadInetPrompt('${c.flat}')` });
     });
+    /* §9 corrected (Sarah 2026-08-22): the boundary is the GUEST's, not the cleaner's — a check-in
+       whose clean happened the day before is still a reading day. The portal needs no visit. */
+    Object.keys(inet.bounds || {}).forEach(bk => {
+      const [bf, bd] = bk.split('|');
+      if (bd !== todayK || seenNet.has(bf) || !inet.flats[bf]) return;
+      seenNet.add(bf);
+      if (inet.last[bf] === todayK)
+        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — شقة ${emadFlatAr(bf)}`, {});
+      else
+        todo += row('📶', `<b>تسجيل جيجا الإنترنت — شقة ${emadFlatAr(bf)}</b> (يوم دخول/خروج ضيف — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
+          { click: `emadInetPrompt('${bf}')` });
+    });
   }
   (EMAD.receipts || []).forEach(o => {
     todo += row('📦', `<b>استلم طلبية:</b> ${o.name} ×${o.qty} <span style="color:var(--text3);font-size:11px">(طلب ${o.orderedBy})</span>`);
