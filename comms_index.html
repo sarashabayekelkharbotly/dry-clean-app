@@ -97,6 +97,7 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
+  <button class="btn" id="syncAllBtn" onclick="syncAll()" title="مزامنة شاملة — سموبو ← الهب ← كل الشاشات">🔄</button>
   <button class="btn" onclick="loadData(true)">↻</button>
   <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
 </div>
@@ -226,6 +227,31 @@ async function apiRetry(action, extra={}){
   return null;
 }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+/* 🔄 مزامنة شاملة (Sarah 2026-08-22) — the same hub_sync_all الكنترول uses: Smoobu → the Hub →
+   every cache dropped, so bookings, cleans and repairs land here AND on Emad's screen in one press.
+   The run takes ~1 minute, well past the normal 35s guard, so this call gets 5 minutes of its own;
+   if the network drops mid-run the server keeps going, and we poll hub_sync_status until it answers
+   — the same wait-don't-relaunch rule as الكنترول (relaunching would just hit the BUSY lock). */
+async function syncAll(){
+  const b=document.getElementById('syncAllBtn'); const since=Date.now();
+  b.disabled=true;
+  const tick=setInterval(()=>{ b.textContent='⏳'+Math.round((Date.now()-since)/1000)+'ث'; },1000);
+  let r=null;
+  try{ r=await api('hub_sync_all',{},300000); }
+  catch(e){ r=await syncWatch(); }
+  clearInterval(tick); b.disabled=false; b.textContent='🔄';
+  if(r&&r.code==='BUSY'){ toast('⏳ '+(r.error||'المزامنة شغالة دلوقتي — استنى شوية')); return; }
+  if(!r||r.ok!==true){ toast('❌ فشلت المزامنة — '+((r&&r.error)||'حاول مرة أخرى')); return; }
+  toast('✅ تمت المزامنة — بيحدّث الشاشة…');
+  loadData(true); refreshRepairs();
+}
+async function syncWatch(){
+  for(let i=0;i<24;i++){                                   // up to 6 minutes, checking every 15s
+    await new Promise(res=>setTimeout(res,15000));
+    try{ const s=await api('hub_sync_status'); if(s&&!s.running) return s.result||{ok:true}; }catch(e){}
+  }
+  return null;
+}
 const CK='owh_comms_cache_v2';   // v2: handover/group/lang/requests/notes on every stay
 function hydrate(){
   try{ const c=JSON.parse(localStorage.getItem(CK)||'null');
@@ -372,6 +398,19 @@ async function editTask(id){
   t.text=r.text; t.date=r.date; t.time=r.time;
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   renderMain(); toast('✏️ اتعدلت — التلجرام اتبعت');
+}
+
+/* deleting ≠ ticking (Sarah 2026-08-22): a done task stays struck-through as the day's record;
+   delete is for a task that should never have existed — it leaves Emad's panel too, and the
+   assignee gets the same telegram they got when it was added */
+async function delTask(id){
+  const t=(D.tasks||[]).find(x=>x.id===id); if(!t) return;
+  if(!confirm('حذف المهمة دي نهائيًا؟\n'+t.text)) return;
+  let r=null; try{ r=await api('emad_task_delete',{id}); }catch(e){}
+  if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
+  D.tasks=(D.tasks||[]).filter(x=>x.id!==id);
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderMain(); toast('🗑️ اتشالت المهمة — اتشالت من عند عماد كمان');
 }
 
 /* ---- due logic (mirror of the server's watcher) ---- */
@@ -839,6 +878,7 @@ function renderQueue(){
       `${t.time?`<span class="tm">${t.time}</span> · `:''}${t.text}${t.overdue&&!t.done?` <span class="late">(متأخرة)</span>`:''}
        <div class="sub">${age>0?`⏳ من ${age} يوم`:'مضافة النهارده'}${t.by?` — <span class="nm">${t.by}</span>`:''}</div>`,
       `<button class="btn" onclick="editTask('${t.id}')">✏️</button>
+       <button class="btn" onclick="delTask('${t.id}')">🗑️</button>
        ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}`,
       t.done);
   });
@@ -1050,6 +1090,8 @@ function renderRep(){
         <b style="font-size:13px">${r.flat}</b>
         <span class="badge b-soon">${r.trade||'—'}</span>
         <span class="step-sub" style="flex:1;text-align:left">${r.date||''}${r.time&&/^\d/.test(String(r.time))?' · '+r.time:''}</span>
+        <button class="btn" onclick="editRepair('${r.id}')">✏️</button>
+        <button class="btn" onclick="delRepair('${r.id}')">🗑️</button>
       </div>
       <div style="font-size:12px;margin-top:4px">${r.what||'—'}</div>
     </div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
@@ -1075,6 +1117,25 @@ async function openRepair(){
   b.disabled=false; b.textContent='🔧 فتح البلاغ';
   if(r&&(r.ok||r.success)){ toast('✅ اتفتح البلاغ — عماد هيتبلغ'); document.getElementById('rp-what').value=''; refreshRepairs(); }
   else toast('❌ لم يُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
+}
+/* ✏️/🗑️ on a repair REQUEST (Sarah 2026-08-22) — the server writes the Hub's Repairs sheet and
+   busts every cache, so the change reaches the Hub and Emad's panel on their own; nothing to redo.
+   Flat/trade stay fixed here: wrong flat means it's a different request — شيليه وافتحي واحد جديد. */
+async function editRepair(id){
+  const r=((D.rep&&D.rep.open)||[]).find(x=>String(x.id)===String(id)); if(!r) return;
+  const what=prompt('المشكلة:',r.what||''); if(what===null) return;
+  const dt=prompt('التاريخ (YYYY-MM-DD):',r.date||''); if(dt===null) return;
+  const tm=prompt('الساعة (HH:MM أو فاضي):',r.time||''); if(tm===null) return;
+  let res=null; try{ res=await api('repair_edit',{id,what:what.trim(),date:dt.trim(),time:tm.trim()}); }catch(e){}
+  if(!res||!res.ok){ toast('❌ لم يتم — '+((res&&res.error)||'حاول مرة أخرى')); return; }
+  toast('✏️ اتعدل البلاغ — وصل للهب وعماد'); refreshRepairs();
+}
+async function delRepair(id){
+  const r=((D.rep&&D.rep.open)||[]).find(x=>String(x.id)===String(id));
+  if(!confirm('حذف البلاغ ده نهائيًا؟'+(r?'\n'+r.flat+': '+(r.what||''):''))) return;
+  let res=null; try{ res=await api('repair_delete',{id}); }catch(e){}
+  if(!res||!res.ok){ toast('❌ لم يتم — '+((res&&res.error)||'حاول مرة أخرى')); return; }
+  toast('🗑️ اتشال البلاغ — وصل للهب وعماد'); refreshRepairs();
 }
 async function refreshRepairs(){
   try{ const r=await api('repairs_data'); if(r&&r.ok){ D.rep={open:r.open||[],trades:r.trades||[],flats:r.flats||[]};
