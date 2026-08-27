@@ -953,6 +953,24 @@ async function flagEmad(orderId, on) {
   } catch(e) { toast('❌ لم يتم — حاول مرة أخرى'); }
 }
 
+/* ↩ a receive that never physically happened (2026-08-27, the twin معطر جو orders): the server
+   reverses the whole chain — order back to «مطلوب», stock corrected with a logged event, the
+   pending WeShare card removed (a confirmed one is only flagged for Khaled, never deleted). */
+async function unreceiveOrderUi(orderId) {
+  const o = orders.find(x => x.id === orderId); if (!o) return;
+  if (!confirm('إلغاء استلام «' + o.itemName + ' ×' + (o.qtyReceived||0) + '»؟\n\nالطلب هيرجع «مطلوب»، والمخزون هيتصحح، وكارت وي شير بتاعه (لو لسه pending) هيتشال.')) return;
+  toast('⏳ جاري الإلغاء...');
+  try {
+    const r = await api('inv_unreceive', { orderId });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    o.status = 'ordered'; o.qtyReceived = ''; o.receivedAt = ''; o.receivedBy = '';
+    const it = items.find(i => String(i.id) === String(o.itemId));
+    if (it && r.curAfter != null) it.cur = r.curAfter;
+    saveCache(); renderAll();
+    toast('↩️ اتلغى الاستلام — الطلب رجع «مطلوب» والمخزون اتصحح');
+  } catch(e) { toast('❌ لم يتم — حاول مرة أخرى'); }
+}
+
 async function cancelOrder(orderId, itemId) {
   if (!confirm('إلغاء هذا الطلب؟')) return;
   toast('⏳ جاري الإلغاء...');
@@ -1376,6 +1394,8 @@ function renderOrders() {
           <div class="nawaqes-meta">استلم ${ord.qtyReceived} — ${ord.receivedBy||'—'} — ${fmtDateShort(ord.receivedAt)}</div>
         </div>
         <span class="badge badge-ok">✅</span>
+        <button onclick="unreceiveOrderUi('${ord.id}')" title="إلغاء الاستلام — الطلبية ماوصلتش"
+          style="background:none;border:1px solid var(--border);border-radius:8px;padding:2px 8px;cursor:pointer;margin-inline-start:6px">↩</button>
       </div>`;
     });
     html += `</div>`;
@@ -2376,6 +2396,14 @@ async function confirmOrder() {
      saw the local copy. A large order lost 4 items exactly that way.
      Now: each item is written on its own, a failure on one does not stop the rest, only what the
      sheet actually accepted enters the local list, and the message says what really happened. */
+  /* twin-order guard (2026-08-27, the double معطر جو: ordered 22/8 AND 23/8, both later "received"
+     while one delivery came): an item that already has an open order is named before saving — a
+     second order becomes a deliberate choice, not a forgotten first one */
+  const twins = newOrders.filter(o => orders.some(x =>
+    String(x.itemId) === String(o.itemId) && x.status !== 'received' && x.status !== 'cancelled'));
+  if (twins.length && !confirm('⚠️ في طلبات مفتوحة بالفعل لنفس الصنف:\n' +
+      twins.map(o => '• ' + o.itemName).join('\n') + '\n\nتطلب كمان مرة برضه؟')) return;
+
   const btn = document.getElementById('order-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ الحفظ…'; }
 
@@ -2488,6 +2516,12 @@ async function confirmReceive() {
   events.unshift({ id:genId(), itemId:ord.itemId, itemName:ord.itemName, type:'purchase', qty, user:currentUserName, timestamp:now, note:`طلب ${ord.id}`, curAfter:it?.cur||0 });
   closeModal('receive-modal');
   saveCache(); renderAll();
+  /* the twin-order trap (2026-08-27): after receiving one of two identical open orders, the twin
+     still on the list reads as "my tap didn't stick" — name it NOW so a second receive is a
+     decision, never a reflex */
+  if (r.alsoOpen && r.alsoOpen.length)
+    alert('✅ اتسجل الاستلام.\n\n⚠️ خد بالك: فيه طلب تاني مفتوح لنفس الصنف (اتطلب يوم ' + (r.alsoOpen[0].date||'—') +
+          ' ×' + (r.alsoOpen[0].qty||'') + ').\nمتستلمهوش غير لو فعلاً وصلت كمية تانية.');
   if (qty < (ord.qtyRequested || 0))
     toast(`✅ استلمت ${qty} من ${ord.qtyRequested} ${ord.itemName} — لو الباقي هييجي بعدين، يتسجل كطلب جديد`);
   else
