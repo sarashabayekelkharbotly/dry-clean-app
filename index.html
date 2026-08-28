@@ -1542,6 +1542,26 @@ async function emadMeterPrompt(){
   } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
 }
 
+/* 💳 card recharge → WeShare, born confirmed (Sarah 2026-08-29: the flow goes الكنترول → وي شير,
+   like dry clean and inventory — no manual WeShare entry any more). retries:0 — the server dedupes
+   same day+amount, and a deliberate second purchase goes through the confirm re-ask with force. */
+async function cardRechargeSave(force) {
+  const a = parseInt(document.getElementById('cardAmt')?.value) || 0;
+  const p = document.getElementById('cardPayer')?.value || 'Khaled';
+  if (!a) { showToast('اكتب مبلغ الشحنة'); return; }
+  let r = null;
+  try { r = await callScript({ action: 'card_recharge', amount: a, payer: p, force: force ? 1 : '' }, { retries: 0, timeout: 30000 }); } catch(e) {}
+  if (r && r.already) {
+    if (confirm('في شحنة بنفس المبلغ متسجلة بنفس التاريخ خلاص.\n\nدي شحنة تانية جديدة فعلاً؟')) return cardRechargeSave(true);
+    return;
+  }
+  if (!r || r.ok !== true) { showToast('❌ لم يتم — ' + ((r && r.error) || 'تحقق من الإنترنت وحاول مرة أخرى')); return; }
+  showToast('💳 اتسجل الشحن واتقيد في وي شير ✓');
+  const el = document.getElementById('cardAmt'); if (el) el.value = '';
+  ELEC = null;
+  if (document.getElementById('page-elec')?.classList.contains('active')) renderElecScreen(true);
+}
+
 /* 📶 §9 — router GB entry, same shape as the meter prompt. Written into the Hub's readings tab. */
 async function emadInetPrompt(flat){
   const v = prompt('الجيجا المتبقية في راوتر شقة ' + emadFlatAr(flat) + ' (زي ما ظاهرة في صفحة الراوتر):');
@@ -1758,7 +1778,16 @@ function renderElecBody(){
         ? '<span style="color:#cc5f5f">فاضي — خالد لازم يشحنه</span>'
         : 'فيه ' + Math.round(E.cardLoaded) + ' ج · جاهز للعداد'}</div>
       <div style="font-size:10.5px;color:var(--text3);margin-top:3px">${E.lastInsertion
-        ? 'آخر مرة اتحط في العداد: ' + E.lastInsertion : 'لسه ماتحطش في العداد'} — الشحن بيتسجل في WeShare تحت Studio Electricity</div>
+        ? 'آخر مرة اتحط في العداد: ' + E.lastInsertion : 'لسه ماتحطش في العداد'}</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input id="cardAmt" type="number" inputmode="numeric" placeholder="مبلغ شحنة جديدة بالجنيه"
+          style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:13px">
+        <select id="cardPayer" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 6px;font-family:'Cairo',sans-serif;font-size:12px">
+          <option value="Khaled">خالد دفع</option><option value="Sarah">سارة دفعت</option>
+        </select>
+        <button onclick="cardRechargeSave()" style="flex-shrink:0;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 12px;cursor:pointer">💳 سجّل الشحن</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px">الشحنة بتتقيد في وي شير تلقائيًا (Studio Electricity، مقسومة بينكم) — <b>متسجلوهاش في وي شير تاني</b></div>
     </div>` : ''}
     <div class="card" style="padding:10px 12px;margin-bottom:14px">
       <div style="font-weight:800;font-size:12.5px;margin-bottom:6px" id="elecFormTitle">${ELEC_EDIT ? '✏️ تعديل قراءة' : '⚡ قراءة جديدة'}</div>
