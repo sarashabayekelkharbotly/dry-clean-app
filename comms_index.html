@@ -544,11 +544,15 @@ function stayExtra(st){
   h+=`<div class="step-lb">💬 جروب الواتساب (بداني جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
   h+=gr.done?`<span class="badge b-ok">✓</span><button class="btn" onclick="undoFlag('${st.id}','group')">↩</button>`
     :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
-  h+='</div><div class="step">';
+  /* the text gets the FULL row and the buttons live underneath — five buttons beside the text was
+     squishing طلبات into a one-word column (Sarah 2026-08-30) */
+  h+='</div><div class="step" style="flex-direction:column;align-items:stretch">';
   h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
-      <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>
-      <button class="btn" onclick="editNames('${st.id}')" title="اسم الضيف (إنجليزي + عربي)">✏️👤</button>
-      <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>`;
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">
+        <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>
+        <button class="btn" onclick="editNames('${st.id}')" title="اسم الضيف (إنجليزي + عربي)">✏️👤</button>
+        <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>
+      </div>`;
   h+='</div>';
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
@@ -1058,15 +1062,19 @@ function renderLog(){
   /* the FULL task book, future included (Sarah 2026-08-30): every task — Emad's and Dani's, done
      and coming — viewable, editable, deletable from here; the flat badge shows the assignment */
   let th='<div class="sec-h">📝 كل المهام <span class="n">(شامل المستقبل — اضغط ✏️ للتعديل)</span></div>';
-  th+=(D.tasksAll&&D.tasksAll.length)?D.tasksAll.map(t=>`<div class="line" style="${t.done?'opacity:.55':''}${t.date>(D.today||'')?';background:#f6f3ee':''}">
-      <span>${t.done?'✅':(t.date>(D.today||'')?'📅':'⬜')}</span>
-      <b style="white-space:nowrap">${t.date}${t.time?' '+t.time:''}</b>
-      <span style="flex:1;${t.done?'text-decoration:line-through':''}">${t.text}</span>
-      ${t.apt?`<span class="badge b-soon">${t.apt}</span>`:''}
-      <span class="badge">${t.assignee==='malah'?'داني':'عماد'}</span>
-      <button class="btn" onclick="editTask('${t.id}')">✏️</button>
-      <button class="btn" onclick="delTask('${t.id}')">🗑️</button>
-      ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}
+  /* two lines per task, not one crammed row (Sarah 2026-08-30): the text owns its full line;
+     date, badges and buttons share the second — same cure as the requests row */
+  th+=(D.tasksAll&&D.tasksAll.length)?D.tasksAll.map(t=>`<div class="line" style="flex-direction:column;align-items:stretch;gap:4px;${t.done?'opacity:.55;':''}${t.date>(D.today||'')?'background:#f6f3ee;':''}">
+      <div style="font-size:13px;${t.done?'text-decoration:line-through;':''}">${t.done?'✅':(t.date>(D.today||'')?'📅':'⬜')} ${t.text}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <b style="white-space:nowrap;font-size:11.5px;color:var(--text3)">${t.date}${t.time?' '+t.time:''}</b>
+        ${t.apt?`<span class="badge b-soon">${t.apt}</span>`:''}
+        <span class="badge">${t.assignee==='malah'?'داني':'عماد'}</span>
+        <span style="flex:1"></span>
+        <button class="btn" onclick="editTask('${t.id}')">✏️</button>
+        <button class="btn" onclick="delTask('${t.id}')">🗑️</button>
+        ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}
+      </div>
     </div>`).join(''):'<div class="card">لا مهام مسجلة</div>';
   th+='<div class="sec-h" style="margin-top:14px">📜 سجل التواصل</div>';
   const byDay={};
