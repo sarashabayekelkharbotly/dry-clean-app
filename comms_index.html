@@ -243,7 +243,9 @@ async function syncAll(){
   if(r&&r.code==='BUSY'){ toast('⏳ '+(r.error||'المزامنة شغالة دلوقتي — استنى شوية')); return; }
   if(!r||r.ok!==true){ toast('❌ فشلت المزامنة — '+((r&&r.error)||'حاول مرة أخرى')); return; }
   toast('✅ تمت المزامنة — بيحدّث الشاشة…');
-  loadData(true); refreshRepairs();
+  /* no force + parallel (2026-08-31): the sync just rebuilt the comms payload server-side, so this
+     load is a cache hit — forcing here re-paid the whole rebuild as a second spinner */
+  Promise.all([loadData(), refreshRepairs()]).catch(function(){});
 }
 async function syncWatch(){
   for(let i=0;i<24;i++){                                   // up to 6 minutes, checking every 15s
