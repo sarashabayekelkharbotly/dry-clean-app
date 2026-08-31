@@ -1247,7 +1247,8 @@ async function emadTaskAdd(){
   const tl = document.getElementById('emadTaskTime');
   const text = (el && el.value || '').trim(); if (!text) return;
   try {
-    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '', time: (tl && tl.value) || '' });
+    const apEl = document.getElementById('emadTaskApt');
+    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '', time: (tl && tl.value) || '', apt: (apEl && apEl.value) || '' });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     if (el) el.value = ''; if (tl) tl.value = '';
     loadEmadHome();
@@ -1287,12 +1288,15 @@ async function emadTaskEditSave(id) {
   } catch (e) { showToast('❌ لم يتم — تحقق من الإنترنت'); }
 }
 async function emadTaskDelete(id){
-  if (!confirm('حذف هذه المهمة؟')) return;
+  if (!confirm('حذف هذه المهمة نهائيًا؟')) return;
   try {
     const r = await callScript({ action: 'emad_task_delete', id });
     if (!r || r.ok !== true) throw new Error('failed');
     if (EMAD && EMAD.tasks) EMAD.tasks = EMAD.tasks.filter(x => x.id !== id);
     renderHome();
+    // the delete now lives in the سجل (2026-08-30) — refresh it so the card leaves at once
+    if (CLOG && CLOG.tasks) { CLOG.tasks = CLOG.tasks.filter(x => x.id !== id); try { renderCleanLog(); } catch(e2) {} }
+    showToast('🗑 اتشالت المهمة');
   } catch(e) { showToast('❌ لم تُحذف — حاول مرة أخرى'); }
 }
 
@@ -1463,13 +1467,14 @@ async function renderCleanLog(force){
     (tDays[d] || []).sort((a,b)=>String(a.time||'98:99').localeCompare(String(b.time||'98:99'))).forEach(t => {
       h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;border-right:3px solid ${t.done?'#2e7d32':'#cc5f5f'}">
         <div style="display:flex;justify-content:space-between;gap:6px">
-          <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}</div>
+          <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}${t.apt?` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home'?'البيت':t.apt}</span>`:''}</div>
           <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'داني':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px">
           <span style="font-size:10.5px;color:#8a7a7a">${t.done?(t.doneAt?'اتعملت '+t.doneAt:'اتعملت'):'لسه'}</span>
           <span style="display:flex;gap:6px">
             <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogEditUI('${t.id}')">✏️ عدّل</button>
+            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px;color:#cc5f5f" onclick="emadTaskDelete('${t.id}')">🗑 حذف</button>
             ${t.done
               ? `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogReopen('${t.id}')">↩ رجّعها</button>`
               : `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 9px" onclick="clogMarkDone('${t.id}')">✅ اتعملت</button>`}
@@ -1878,10 +1883,12 @@ function renderEmadPanel() {
     const tm = (t.time && /^\d{2}:\d{2}$/.test(t.time)) ? t.time : '';
     const ageDays = t.addedAt ? Math.max(0, Math.floor((new Date(todayK + 'T12:00:00') - new Date(String(t.addedAt).slice(0,10) + 'T12:00:00')) / 86400000)) : 0;
     const ageTxt = ageDays > 0 ? ` <span style="color:${ageDays >= 3 ? '#cc5f5f' : 'var(--text3)'};font-size:11px;font-weight:700">⏳ من ${ageDays} يوم</span>` : '';
-    const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}${ageTxt}` +
+    /* NO delete on the home list (Sarah 2026-08-30: Emad taps the ✕ by mistake and tasks vanish) —
+       deleting is a deliberate act and lives in the سجل only */
+    const aptB = t.apt ? ` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home'?'البيت':t.apt}</span>` : '';
+    const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${aptB}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}${ageTxt}` +
       `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
-      ` <span onclick="event.stopPropagation();emadTaskEditUI('${t.id}')" style="cursor:pointer;font-size:11px;padding:0 4px">✏️</span>` +
-      ` <span onclick="event.stopPropagation();emadTaskDelete('${t.id}')" style="color:#cc5f5f;cursor:pointer;font-size:11px;padding:0 4px">✕</span>`;
+      ` <span onclick="event.stopPropagation();emadTaskEditUI('${t.id}')" style="cursor:pointer;font-size:11px;padding:0 4px">✏️</span>`;
     /* ✏️ opens the row IN PLACE (Sarah 2026-08-18). It used to fire three prompt() boxes one after
        another, and typing "2026-08-21" into a prompt on a phone is a punishment — so rescheduling a
        task never actually happened. Real date and time pickers, the text alongside them, and the
@@ -2006,6 +2013,9 @@ function renderEmadPanel() {
     <input id="emadTaskText" placeholder="＋ أضف مهمة..." onkeydown="if(event.key==='Enter')emadTaskAdd()" style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px 10px;font-family:'Cairo',sans-serif;font-size:13px">
     <input id="emadTaskDate" type="date" value="${todayK}" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:112px">
     <input id="emadTaskTime" type="time" title="اختياري — يرتّب المهمة في مكانها الصحيح في اليوم" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:86px">
+    <select id="emadTaskApt" title="الشقة — أو البيت للمهام الشخصية" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:96px">
+      <option value="">— شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option value="Home">البيت</option>
+    </select>
     <button onclick="emadTaskAdd()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px 16px;cursor:pointer">أضف</button></div>`;
   if (todo) {
     h += `<div class="section-title">✅ مهام اليوم</div><div class="card" style="margin-bottom:12px;padding:6px 12px">${todo}${addBox}</div>`;
