@@ -392,29 +392,66 @@ async function sendBriefNow(){
   toast(which==='morning'?'☀️ اتبعتت خطة اليوم':'🌙 اتبعت ملخص المساء');
 }
 function daysSince(ymd){ try{ return Math.max(0,Math.floor((new Date(D.today+'T12:00:00')-new Date(ymd+'T12:00:00'))/86400000)); }catch(e){ return 0; } }
+function taskById(id){ return (D.tasks||[]).find(x=>x.id===id)||(D.tasksAll||[]).find(x=>x.id===id); }
 async function editTask(id){
-  const t=(D.tasks||[]).find(x=>x.id===id); if(!t) return;
+  const t=taskById(id); if(!t) return;
   const tx=prompt('نص المهمة:',t.text); if(tx===null) return;
   const dt=prompt('التاريخ (YYYY-MM-DD):',t.date); if(dt===null) return;
   const tm=prompt('الساعة (HH:MM أو فاضي):',t.time||''); if(tm===null) return;
-  let r=null; try{ r=await api('emad_task_edit',{id,text:tx.trim(),date:dt.trim(),time:tm.trim()}); }catch(e){}
+  const ap=prompt('الشقة (8A / 17A / 17B / 28A / Zayed 2000 — أو فاضي):',t.apt||''); if(ap===null) return;
+  let r=null; try{ r=await api('emad_task_edit',{id,text:tx.trim(),date:dt.trim(),time:tm.trim(),apt:ap.trim()}); }catch(e){}
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
-  t.text=r.text; t.date=r.date; t.time=r.time;
+  [(D.tasks||[]).find(x=>x.id===id),(D.tasksAll||[]).find(x=>x.id===id)].forEach(x=>{ if(x){ x.text=r.text; x.date=r.date; x.time=r.time; x.apt=ap.trim(); } });
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderMain(); toast('✏️ اتعدلت — التلجرام اتبعت');
+  renderMain(); try{ renderLog(); }catch(e){}
+  toast('✏️ اتعدلت — التلجرام اتبعت');
 }
 
 /* deleting ≠ ticking (Sarah 2026-08-22): a done task stays struck-through as the day's record;
    delete is for a task that should never have existed — it leaves Emad's panel too, and the
    assignee gets the same telegram they got when it was added */
 async function delTask(id){
-  const t=(D.tasks||[]).find(x=>x.id===id); if(!t) return;
+  const t=taskById(id); if(!t) return;
   if(!confirm('حذف المهمة دي نهائيًا؟\n'+t.text)) return;
   let r=null; try{ r=await api('emad_task_delete',{id}); }catch(e){}
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
-  D.tasks=(D.tasks||[]).filter(x=>x.id!==id);
+  D.tasks=(D.tasks||[]).filter(x=>x.id!==id); D.tasksAll=(D.tasksAll||[]).filter(x=>x.id!==id);
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderMain(); toast('🗑️ اتشالت المهمة — اتشالت من عند عماد كمان');
+  renderMain(); try{ renderLog(); }catch(e){}
+  toast('🗑️ اتشالت المهمة — اتشالت من عند عماد كمان');
+}
+
+/* ➕ ad-hoc ladder step (Sarah 2026-08-30) — label + due date; ticked like any step (key 'cx:'+label) */
+async function addCustomStep(stayId){
+  let lb=prompt('اسم الخطوة (مثال: إرسال تعليمات الباركينج):',''); if(lb===null) return;
+  lb=lb.trim().replace(/["'<>\\|]/g,''); if(!lb){ toast('اكتب اسم الخطوة'); return; }
+  const dd=prompt('تاريخ الاستحقاق (YYYY-MM-DD):',D.today||''); if(dd===null) return;
+  const tm=prompt('الساعة (HH:MM أو فاضي):','12:00'); if(tm===null) return;
+  let r=null; try{ r=await api('comms_step_add',{stayId,label:lb,dueD:dd.trim(),dueT:(tm||'').trim()}); }catch(e){}
+  if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
+  toast(r.already?'ℹ️ الخطوة موجودة بالفعل':'➕ اتضافت الخطوة'); loadData(true);
+}
+async function delCustomStep(stayId,lbEnc){
+  const lb=decodeURIComponent(lbEnc);
+  if(!confirm('حذف خطوة «'+lb+'» من سلم الضيف ده؟')) return;
+  let r=null; try{ r=await api('comms_step_del',{stayId,label:lb}); }catch(e){}
+  if(!r||!r.ok){ toast('❌ لم يتم'); return; }
+  toast('🗑️ اتشالت الخطوة'); loadData(true);
+}
+/* ✏️👤 guest names (Sarah 2026-08-30): the booking name is not always who we talk to — one guest
+   books and another arrives, or they are two. The override (EN + AR) feeds every card, template,
+   brief and log line; the Arabic name replaces transliteration in the Arabic messages. */
+async function editNames(stayId){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const en=prompt('اسم الضيف بالإنجليزي — ممكن اسمين (مثال: Amina - Omar)'+(st.bookingName?'\nالحجز الأصلي باسم: '+st.bookingName:''),st.guest||''); if(en===null) return;
+  const ar=prompt('الاسم بالعربي (اللي بيظهر في الرسائل العربية):',st.nameAr||''); if(ar===null) return;
+  const r=await apiRetry('comms_tick',{stayId,step:'names',occ:'',val:(en.trim()+'|'+ar.trim()),tag:tagOf(st)});
+  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  if(en.trim()&&en.trim()!==st.guest&&!st.bookingName) st.bookingName=st.guest;   // keep the booking owner visible locally too
+  if(en.trim()) st.guest=en.trim();
+  st.nameAr=ar.trim();
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderMain(); toast('✏️ الاسم اتحدث — هيظهر في كل الرسائل');
 }
 
 /* ---- due logic (mirror of the server's watcher) ---- */
@@ -474,8 +511,10 @@ function stepRow(st,sp,state){
   const sub=(sp.occ&&sp.occ!=='mid')
     ? `النظافة يوم ${sp.occ}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${dt?` · ${dt}`:''}`
     : dt;
-  const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${sp.k}','${sp.occ}')`;
-  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime')?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
+  // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
+  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  const delBtn=sp.custom?`<button class="btn" onclick="delCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">🗑️</button>`:'';
   /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
      message carries the code the guest is ENTITLED to; if no visit has been asked to set it, that
      code is not on the door yet and sending it strands the guest outside. */
@@ -484,7 +523,7 @@ function stepRow(st,sp,state){
   return `<div class="step ${sp.done?'done':''}">
     <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
     ${state==='wait'?`<span class="badge b-soon">بعد ${gateName(sp.gated)}</span>`:''}
-    ${sp.done?`<button class="btn" onclick="untick('${st.id}','${sp.k}','${sp.occ}')">↩</button>`:copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
+    ${sp.done?`<button class="btn" onclick="untick('${st.id}','${encStep(sp.k)}','${sp.occ}')">↩</button>`:delBtn+copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
 }
 
@@ -507,7 +546,9 @@ function stayExtra(st){
     :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
   h+='</div><div class="step">';
   h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
-      <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>`;
+      <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>
+      <button class="btn" onclick="editNames('${st.id}')" title="اسم الضيف (إنجليزي + عربي)">✏️👤</button>
+      <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>`;
   h+='</div>';
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
@@ -598,7 +639,8 @@ function renderStays(){
     const cardBg=(st.ci<=today&&st.co>today)?'#e4efe1':(st.ci>today&&st.ci<=wk)?'#eef6ec':(st.ci>wk)?'#f4f2f2':'#fff';
     return `<div class="card" style="background:${cardBg}">
       <div class="stay-hd" onclick="window._open=window._open==='${st.id}'?null:'${st.id}';renderStays()">
-        <div style="flex:1"><div class="stay-nm"><bdi>${st.guest}</bdi></div>
+        <div style="flex:1"><div class="stay-nm"><bdi>${st.guest}</bdi>${st.nameAr?` · <bdi style="font-weight:600;font-size:12.5px">${st.nameAr}</bdi>`:``}</div>
+          ${st.bookingName?`<div class="stay-meta">🎫 الحجز باسم: <bdi>${st.bookingName}</bdi></div>`:''}
           <div class="stay-meta">${st.flat} · ${st.ci} ← ${st.co} · ${st.nights} ليلة · ${st.portal}${st.arrivalTime?' · وصول '+st.arrivalTime:''}</div>
           <div class="stay-meta">${metaChips(st)}</div></div>
         ${st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(st.phone).replace(/[^0-9]/g,'')}" onclick="event.stopPropagation()">💬</a>`:''}
@@ -652,6 +694,7 @@ function renderTask(){
     <input class="inp" id="tk-date" type="date">
     <input class="inp" id="tk-time" type="time">
     <select class="inp" id="tk-asg"><option value="">لعماد</option><option value="malah">ليّا (داني)</option></select>
+    <select class="inp" id="tk-apt"><option value="">— من غير شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option></select>
     <button class="btn btn-ok" id="tk-btn" onclick="addTask()">➕ إضافة</button>`;
   const d=document.getElementById('tk-date'); if(d&&!d.value) d.value=D.today||'';
 }
@@ -659,7 +702,7 @@ async function addTask(){
   const text=document.getElementById('tk-text').value.trim();
   if(!text){ toast('اكتب المهمة'); return; }
   const b=document.getElementById('tk-btn'); b.disabled=true; b.textContent='⏳';
-  let r=null; try{ r=await api('emad_task_add',{text,date:document.getElementById('tk-date').value,assignee:document.getElementById("tk-asg").value,time:document.getElementById("tk-time").value}); }catch(e){}
+  let r=null; try{ r=await api('emad_task_add',{text,date:document.getElementById('tk-date').value,assignee:document.getElementById("tk-asg").value,time:document.getElementById("tk-time").value,apt:document.getElementById("tk-apt").value}); }catch(e){}
   b.disabled=false; b.textContent='➕ إضافة';
   if(r&&r.ok){ toast('✅ اتسجلت — التلجرام اتبعت'); document.getElementById('tk-text').value=''; loadData(true); }
   else toast('❌ لم تُحفظ — '+((r&&r.error)||'حاول مرة أخرى'));
@@ -670,7 +713,11 @@ async function addTask(){
    2026-08-12: optimistic ticks "showed errors in previous versions"). So the speed has to come
    from the server, not from pretending — see commsTick and the session cache. The button shows
    ⏳ while it waits so the screen never looks frozen. */
+/* custom-step keys ('cx:'+label) ride onclick attributes URI-encoded so free-text labels can't
+   break the markup; standard keys pass through both functions unchanged */
+function encStep(k){ return String(k).indexOf('cx:')===0?encodeURIComponent(k):k; }
 async function tick(stayId,k,occ){
+  k=decodeURIComponent(k);
   const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
   const st=D.stays.find(x=>x.id===stayId);
   const r=await apiRetry('comms_tick',{stayId,step:k,occ,tag:st?tagOf(st):''});
@@ -690,6 +737,7 @@ async function tickArrival(stayId,occ){
   toast('✅ الوصول '+t);
 }
 async function untick(stayId,k,occ){
+  k=decodeURIComponent(k);
   if(!confirm('إلغاء العلامة؟')) return;
   const st=D.stays.find(x=>x.id===stayId);
   const r=await apiRetry('comms_tick',{stayId,step:k,occ,undo:true,tag:st?tagOf(st):''});
@@ -766,7 +814,7 @@ function welcomeByOther(st){
 function malahIntroEN(st){ return welcomeByOther(st)?`This is Dani from the support team — I'll be with you throughout your stay for anything you need. `:''; }
 function malahIntroAR(st,G){ return welcomeByOther(st)?`معك داني من فريق الدعم — سأكون ${G('معك','معك','معكم')} طوال الإقامة لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. `:''; }
 function tplAR(k, st, occ){
-  const n=arFirst(st.guest), gd=String(st.gender||'m');   // Arabic message → Arabic name (Sarah 2026-08-20)
+  const n=(st.nameAr||arFirst(st.guest)), gd=String(st.gender||'m');   // hand-set Arabic name wins over transliteration (Sarah 2026-08-30)
   const G=(m,f,p)=>gd==='f'?f:(gd==='g'?p:m);
   switch(k){
     case 'groupintro': return `${greetAR()} ${n}! معك سارة 🌟 وخالد معنا في الجروب، ونحب ${G('نعرّفك','نعرّفك','نعرّفكم')} على داني من فريق الدعم — هيكون ${G('معك','معك','معكم')} طوال الإقامة ليهتم بكل ما ${G('تحتاجه','تحتاجينه','تحتاجونه')}، وكلنا هنا ${G('معك','معك','معكم')} على الجروب. ${G('نوّرتنا','نوّرتينا','نوّرتونا')}!`;
@@ -840,9 +888,10 @@ const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دلي
 async function toggleTask(id,done){
   const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
   if(!r||!r.ok){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
-  const t=(D.tasks||[]).find(x=>x.id===id); if(t) t.done=done;
+  [(D.tasks||[]).find(x=>x.id===id),(D.tasksAll||[]).find(x=>x.id===id)].forEach(x=>{ if(x) x.done=done; });
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  renderMain(); toast(done?'✅ تمت':'↩ رجعت');
+  renderMain(); try{ renderLog(); }catch(e){}
+  toast(done?'✅ تمت':'↩ رجعت');
 }
 
 /* الرئيسية — مهام النهارده أولاً (زي شاشة عماد): تعلّم ✅ لما تخلص */
@@ -1006,13 +1055,27 @@ function renderSched(){
 /* السجل — كل اللي اتعلّم، لكل ضيف بالتاريخ والساعة */
 function renderLog(){
   const el=document.getElementById('p-log'); if(!el) return;
+  /* the FULL task book, future included (Sarah 2026-08-30): every task — Emad's and Dani's, done
+     and coming — viewable, editable, deletable from here; the flat badge shows the assignment */
+  let th='<div class="sec-h">📝 كل المهام <span class="n">(شامل المستقبل — اضغط ✏️ للتعديل)</span></div>';
+  th+=(D.tasksAll&&D.tasksAll.length)?D.tasksAll.map(t=>`<div class="line" style="${t.done?'opacity:.55':''}${t.date>(D.today||'')?';background:#f6f3ee':''}">
+      <span>${t.done?'✅':(t.date>(D.today||'')?'📅':'⬜')}</span>
+      <b style="white-space:nowrap">${t.date}${t.time?' '+t.time:''}</b>
+      <span style="flex:1;${t.done?'text-decoration:line-through':''}">${t.text}</span>
+      ${t.apt?`<span class="badge b-soon">${t.apt}</span>`:''}
+      <span class="badge">${t.assignee==='malah'?'داني':'عماد'}</span>
+      <button class="btn" onclick="editTask('${t.id}')">✏️</button>
+      <button class="btn" onclick="delTask('${t.id}')">🗑️</button>
+      ${t.done?`<button class="btn" onclick="toggleTask('${t.id}',false)">↩</button>`:`<button class="btn btn-ok" onclick="toggleTask('${t.id}',true)">✅</button>`}
+    </div>`).join(''):'<div class="card">لا مهام مسجلة</div>';
+  th+='<div class="sec-h" style="margin-top:14px">📜 سجل التواصل</div>';
   const byDay={};
   (D.log||[]).forEach(e=>{ const d=String(e.at).slice(0,10); (byDay[d]=byDay[d]||[]).push(e); });
   const days=Object.keys(byDay).sort().reverse();
-  el.innerHTML=days.length?days.map(d=>`<div class="day-h">${d}${d===D.today?' — النهارده':''}</div>`+byDay[d].map(e=>{
-    const lbl=e.step==='note'?('📝 '+e.val):e.step==='handover'?'🤝 تسليم لداني':e.step==='group'?(e.val==='invited'?'📩 دعوة الجروب':'💬 الجروب جاهز'):e.step==='lang'?('🌐 '+e.val):e.step==='requests'?('📌 '+e.val):e.step==='gender'?'⚥ نوع الضيف':((STEP_AR[e.step]||e.step)+(e.done?' ✅':' ↩'));
+  el.innerHTML=th+(days.length?days.map(d=>`<div class="day-h">${d}${d===D.today?' — النهارده':''}</div>`+byDay[d].map(e=>{
+    const lbl=e.step==='note'?('📝 '+e.val):e.step==='handover'?'🤝 تسليم لداني':e.step==='group'?(e.val==='invited'?'📩 دعوة الجروب':'💬 الجروب جاهز'):e.step==='lang'?('🌐 '+e.val):e.step==='requests'?('📌 '+e.val):e.step==='gender'?'⚥ نوع الضيف':((STEP_AR[e.step]||String(e.step).replace(/^cx:/,''))+(e.done?' ✅':' ↩'));
     return `<div class="line"><span style="flex:1">${lbl} — <bdi>${e.stay}</bdi></span><span class="step-sub" style="white-space:nowrap">${e.by||''} · ${(function(){try{return new Date(e.at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}catch(_){return ''}})()}</span></div>`;
-  }).join('')).join(''):'<div class="card">لا نشاط مسجّل بعد</div>';
+  }).join('')).join(''):'<div class="card">لا نشاط مسجّل بعد</div>');
 }
 
 
