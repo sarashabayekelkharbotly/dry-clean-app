@@ -430,6 +430,7 @@ window.addEventListener('load',function(){
         <option value="17A">17A</option>
         <option value="28A">28A</option>
         <option value="Zayed 2000">Zayed 2000</option>
+        <option value="VW1">VW1</option>
       </select>
     </div>
     <div class="form-group">
@@ -490,6 +491,7 @@ window.addEventListener('load',function(){
     <button class="apt-pill" onclick="filterReview('17A', this)">17A</button>
     <button class="apt-pill" onclick="filterReview('28A', this)">28A</button>
     <button class="apt-pill" onclick="filterReview('Zayed 2000', this)">Zayed 2000</button>
+    <button class="apt-pill" onclick="filterReview('VW1', this)">VW1</button>
   </div>
   <div class="apt-pills" id="reviewStatusFilter">
     <button class="apt-pill active" onclick="filterReviewStatus('all', this)">كل الحالات</button>
@@ -2018,7 +2020,7 @@ function renderEmadPanel() {
       <input id="emadTaskDate" type="date" value="${todayK}" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:112px">
       <input id="emadTaskTime" type="time" title="اختياري — يرتّب المهمة في مكانها الصحيح في اليوم" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:86px">
       <select id="emadTaskApt" title="الشقة — أو البيت للمهام الشخصية" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:96px">
-        <option value="">— شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option value="Home">البيت</option>
+        <option value="">— شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option><option value="Home">البيت</option>
       </select>
       <span style="flex:1"></span>
       <button onclick="emadTaskAdd()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px 18px;cursor:pointer">أضف</button>
@@ -2072,7 +2074,7 @@ function renderEmadPanel() {
    code-change #ecdcf0). Sarah: "i wanted the week to appear in the same format with the table and
    the color codes ... i need the visual not the text." Read-only, this week + next. */
 const EMAD_CELL_BG = { checkout:'#f5dede', midstay:'#d6e2f2', weekly:'#d6e2f2', revision:'#ecdcf0', codechange:'#ecdcf0', custom:'#f5dede' };
-const EMAD_FLAT_ORDER = ['8A','17A','17B','28A','Zayed 2000'];
+const EMAD_FLAT_ORDER = ['8A','17A','17B','28A','Zayed 2000','VW1'];
 /* ONE week at a time with prev/next arrows, like the Hub's Week screen — Sarah: "I don't want the
    two weeks below each other". Range is bounded by what the backend serves (last week → next). */
 let EMAD_WEEK = 0;
@@ -2253,7 +2255,7 @@ function openEditModal(subId) {
     if (d && !isNaN(d)) dateStr = emadYmdOf(d);
   } catch(e) { /* use today */ }
 
-  const aptOptions = ['8A','17A','28A','Zayed 2000'].map(a =>
+  const aptOptions = ['8A','17A','28A','Zayed 2000','VW1'].map(a =>
     `<option value="${a}" ${sub.apt===a?'selected':''}>${a}</option>`).join('');
   const submitterOptions = ['Emad','Sarah','Khaled','Amal'].map(p =>
     `<option value="${p}" ${sub.submittedBy===p?'selected':''}>${p}</option>`).join('');
@@ -2899,7 +2901,7 @@ function updateStatsForMonth(month) {
     <div class="stat-card"><div class="stat-value">${totalItems}</div><div class="stat-label">إجمالي القطع</div></div>
     <div class="stat-card"><div class="stat-value">$${avgOrder.toFixed(0)}</div><div class="stat-label">متوسط الطلب</div></div>`;
 
-  const apts = ['8A','17A','28A','Zayed 2000'];
+  const apts = ['8A','17A','28A','Zayed 2000','VW1'];
   const aptCosts = apts.map(apt => ({ apt, cost: subs.filter(s=>s.apt===apt).reduce((sum,s)=>sum+getSubmissionTotal(s.id),0) }));
   const maxCost = Math.max(...aptCosts.map(a=>a.cost), 1);
   document.getElementById('aptBreakdown').innerHTML = aptCosts.map(a => `
