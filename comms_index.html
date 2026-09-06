@@ -700,7 +700,7 @@ function renderTask(){
     <input class="inp" id="tk-date" type="date">
     <input class="inp" id="tk-time" type="time">
     <select class="inp" id="tk-asg"><option value="">لعماد</option><option value="malah">ليّا (داني)</option></select>
-    <select class="inp" id="tk-apt"><option value="">— من غير شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option></select>
+    <select class="inp" id="tk-apt"><option value="">— من غير شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option></select>
     <button class="btn btn-ok" id="tk-btn" onclick="addTask()">➕ إضافة</button>`;
   const d=document.getElementById('tk-date'); if(d&&!d.value) d.value=D.today||'';
 }
@@ -1176,7 +1176,7 @@ function renderRep(){
       </div>
       <div style="font-size:12px;margin-top:4px">${r.what||'—'}</div>
     </div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
-  const fl=(R.flats&&R.flats.length)?R.flats:['8A','17A','28A','Zayed 2000','17B'];
+  const fl=(R.flats&&R.flats.length)?R.flats:['8A','17A','28A','Zayed 2000','17B','VW1'];
   h+=`<div class="sec-h">فتح بلاغ صيانة</div>
     <select class="inp" id="rp-flat">${fl.map(f=>`<option>${f}</option>`).join('')}</select>
     <select class="inp" id="rp-trade">${(R.trades||[]).map(t=>`<option>${t}</option>`).join('')}<option value="__new">➕ نوع جديد…</option></select>
