@@ -97,6 +97,7 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
   <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
   <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
   <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
+  <button class="btn" onclick="openTplEditor()" title="رسائل الضيوف — عرض وتعديل">📄</button>
   <button class="btn" id="syncAllBtn" onclick="syncAll()" title="مزامنة شاملة — سموبو ← الهب ← كل الشاشات">🔄</button>
   <button class="btn" onclick="loadData(true)">↻</button>
   <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
@@ -549,12 +550,34 @@ function stayExtra(st){
   /* the text gets the FULL row and the buttons live underneath — five buttons beside the text was
      squishing طلبات into a one-word column (Sarah 2026-08-30) */
   h+='</div><div class="step" style="flex-direction:column;align-items:stretch">';
-  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
+  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · ⚥ <b>${st.gender||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">
-        <button class="btn" onclick="setGender('${st.id}')">⚥</button><button class="btn" onclick="setField('${st.id}','lang')">🌐</button><button class="btn" onclick="setField('${st.id}','requests')">📌</button>
-        <button class="btn" onclick="editNames('${st.id}')" title="اسم الضيف (إنجليزي + عربي)">✏️👤</button>
+        <button class="btn" onclick="setupUI('${st.id}')">⚙️ بيانات الضيف</button>
         <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>
       </div>`;
+  if(SETUP_OPEN===st.id){
+    const ea=v=>String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    h+=`<div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--surface2,#faf5f5);border-radius:10px;padding:9px" id="su_${st.id}">
+      <label style="font-size:10.5px;grid-column:1/3">الاسم بالإنجليزي${st.bookingName?` — <span style="color:var(--text3)">🎫 الحجز باسم ${ea(st.bookingName)}</span>`:''}
+        <input id="su_en_${st.id}" value="${ea(st.guest)}" style="width:100%"></label>
+      <label style="font-size:10.5px;grid-column:1/3">الاسم بالعربي (للرسائل العربية)
+        <input id="su_ar_${st.id}" value="${ea(st.nameAr)}" style="width:100%"></label>
+      <label style="font-size:10.5px">🌐 اللغة (EN / AR / FR)
+        <input id="su_lang_${st.id}" value="${ea(st.lang)}" style="width:100%"></label>
+      <label style="font-size:10.5px">⚥ الضيف
+        <select id="su_g_${st.id}" style="width:100%">
+          <option value="" ${!st.gender?'selected':''}>؟</option>
+          <option value="m" ${st.gender==='m'?'selected':''}>m — رجل</option>
+          <option value="f" ${st.gender==='f'?'selected':''}>f — سيدة</option>
+          <option value="g" ${st.gender==='g'?'selected':''}>g — مجموعة/عائلة</option>
+        </select></label>
+      <label style="font-size:10.5px;grid-column:1/3">📌 طلبات خاصة
+        <input id="su_req_${st.id}" value="${ea(st.requests)}" style="width:100%"></label>
+      <div style="grid-column:1/3;display:flex;gap:6px;justify-content:flex-end">
+        <button class="btn" onclick="setupUI('${st.id}')">إلغاء</button>
+        <button class="btn btn-ok" id="su_save_${st.id}" onclick="setupSave('${st.id}')">💾 حفظ الكل</button>
+      </div></div>`;
+  }
   h+='</div>';
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
@@ -617,6 +640,42 @@ function setField(stayId,k){
   const v=prompt(k==='lang'?'لغة التواصل مع الضيف (مثال: EN / AR / FR):':'الطلبات الخاصة (مثال: early check-in · سرير أطفال):', k==='lang'?(st.lang||''):(st.requests||''));
   if(v===null) return;
   pseudoTick(stayId,k,String(v).trim());
+}
+/* ⚙️ THE CARD'S SETUP, SAVED AS ONE (Sarah 2026-09-09: "selecting language, gender, changing
+   names — i want to be able to do them all one thing after the other", and each prompt() used to
+   pay its own ~2.5s round trip). One inline form, one comms_tick_batch call carrying only the
+   CHANGED fields, one server confirmation naming what saved — nothing is claimed unwritten. */
+let SETUP_OPEN=null;
+function setupUI(stayId){ SETUP_OPEN=(SETUP_OPEN===stayId)?null:stayId; renderMain(); }
+async function setupSave(stayId){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const gv=id=>{const el=document.getElementById(id);return el?String(el.value).trim():null;};
+  const en=gv(`su_en_${stayId}`), ar=gv(`su_ar_${stayId}`), lang=gv(`su_lang_${stayId}`),
+        g=gv(`su_g_${stayId}`), req=gv(`su_req_${stayId}`);
+  const items=[];
+  if(en!==null&&ar!==null&&(en!==(st.guest||'')||ar!==(st.nameAr||''))) items.push({step:'names',val:en+'|'+ar});
+  if(lang!==null&&lang!==(st.lang||'')) items.push({step:'lang',val:lang});
+  if(g!==null&&g!==(st.gender||'')) items.push({step:'gender',val:g});
+  if(req!==null&&req!==(st.requests||'')) items.push({step:'requests',val:req});
+  if(!items.length){ SETUP_OPEN=null; renderMain(); toast('لا تغيير'); return; }
+  const btn=document.getElementById(`su_save_${stayId}`); if(btn){ btn.disabled=true; btn.textContent='⏳ بيحفظ…'; }
+  const r=await apiRetry('comms_tick_batch',{stayId,items,tag:tagOf(st)});
+  if(btn){ btn.disabled=false; btn.textContent='💾 حفظ الكل'; }
+  if(!r||r.ok!==true){
+    const bad=(r&&r.results||[]).filter(x=>!x.ok).map(x=>x.step).join('، ');
+    toast('❌ '+(bad?('لم يُحفظ: '+bad+' — حاول تاني'):'لم يُحفظ — حاول تاني')); return;
+  }
+  items.forEach(it=>{
+    if(it.step==='names'){ const nen=it.val.split('|')[0], nar=it.val.split('|')[1]||'';
+      if(nen&&nen!==st.guest&&!st.bookingName) st.bookingName=st.guest;
+      if(nen) st.guest=nen; st.nameAr=nar; }
+    else if(it.step==='lang') st.lang=it.val;
+    else if(it.step==='gender') st.gender=it.val;
+    else if(it.step==='requests') st.requests=it.val;
+  });
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  SETUP_OPEN=null; renderMain();
+  toast('✅ اتسجل كله ('+items.length+')');
 }
 function setGender(stayId){
   const v=prompt("⚥ الضيف: اكتب m لرجل، f لسيدة، g لمجموعة/عائلة","m");
@@ -853,7 +912,97 @@ ${codeFor(st)}
     default: return '';
   }
 }
+/* ---- 📄 TEMPLATE EDITOR (Sarah 2026-09-09: "change through the app rather than through code").
+   An overlay over everything: the template list → one template's raw text with the token legend →
+   a live preview rendered exactly as a guest would receive it (gender + language flips). Save is
+   Sarah/Khaled only and server-confirmed; داني can read. */
+let TPL_ED={key:null,lang:'ar',g:'m'};
+function openTplEditor(){ TPL_ED={key:null,lang:'ar',g:'m'}; renderTplEditor(); }
+function closeTplEditor(){ const el=document.getElementById('tplOverlay'); if(el) el.remove(); }
+function tplEdPick(key,lang){ TPL_ED.key=key; TPL_ED.lang=lang; renderTplEditor(); }
+function tplEdG(g){ TPL_ED.g=g; tplEdPreview(); }
+function tplEdPreview(){
+  const ta=document.getElementById('tplText'), pv=document.getElementById('tplPrev');
+  if(!ta||!pv) return;
+  const sample={guest:'Ahmed Hassan',nameAr:'أحمد',gender:TPL_ED.g,flat:'17A',ci:D.today||'2026-09-15',steps:[]};
+  pv.textContent=renderTpl(ta.value,sample);
+}
+async function tplEdSave(){
+  const ta=document.getElementById('tplText'); if(!ta||!TPL_ED.key) return;
+  const btn=document.getElementById('tplSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
+  let r=null; try{ r=await api('comms_tpl_save',{key:TPL_ED.key,lang:TPL_ED.lang,text:ta.value}); }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='💾 حفظ'; }
+  if(!r||r.ok!==true){ toast('❌ '+((r&&r.error)||'لم يُحفظ — حاول تاني')); return; }
+  const row=(D.templates||[]).find(x=>x.key===TPL_ED.key&&x.lang===TPL_ED.lang);
+  if(row) row.text=ta.value;
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  toast('💾 اتحفظت — كل النسخ الجاية هتستخدم النص الجديد');
+}
+function renderTplEditor(){
+  closeTplEditor();
+  const canWrite=(currentUser==='sarah'||currentUser==='khaled');
+  const tpls=D.templates||[];
+  const div=document.createElement('div'); div.id='tplOverlay';
+  div.style.cssText='position:fixed;inset:0;background:rgba(40,25,25,.45);z-index:900;overflow:auto;padding:18px 10px';
+  let inner='<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:14px" dir="rtl">';
+  inner+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:15px">📄 رسائل الضيوف</b><button class="btn" onclick="closeTplEditor()">✕</button></div>';
+  if(!tpls.length){ inner+='<div style="color:#8a7d7d;font-size:12.5px">القوالب لسه بتتحمّل — اعمل↻ تحديث وافتح تاني.</div></div>'; div.innerHTML=inner; document.body.appendChild(div); return; }
+  if(!TPL_ED.key){
+    const byKey={}; tpls.forEach(t=>{ (byKey[t.key]=byKey[t.key]||{label:t.label,langs:{}}).langs[t.lang]=t; if(t.label)byKey[t.key].label=t.label; });
+    Object.keys(byKey).forEach(k=>{
+      const b=byKey[k];
+      inner+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f0e6e6">
+        <span style="font-size:13px">${b.label||k}</span>
+        <span>${b.langs.ar?`<button class="btn" onclick="tplEdPick('${k}','ar')">عربي</button>`:''}
+        ${b.langs.en?`<button class="btn" onclick="tplEdPick('${k}','en')">EN</button>`:''}</span></div>`;
+    });
+    inner+='<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">التعديل لسارة وخالد — الحفظ بيتأكد من السيرفر قبل ما يتقال «اتحفظت».</div>';
+  } else {
+    const row=tpls.find(x=>x.key===TPL_ED.key&&x.lang===TPL_ED.lang)||{label:TPL_ED.key,text:''};
+    const ea=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    inner+=`<div style="margin-bottom:6px"><button class="btn" onclick="TPL_ED.key=null;renderTplEditor()">→ الرجوع للقائمة</button>
+      <b style="margin-inline-start:8px">${row.label} · ${TPL_ED.lang==='ar'?'عربي':'EN'}</b></div>
+      <textarea id="tplText" oninput="tplEdPreview()" style="width:100%;min-height:170px;font-family:inherit;font-size:12.5px;border:1px solid #e6d8d8;border-radius:10px;padding:8px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}">${ea(row.text)}</textarea>
+      <div style="font-size:10px;color:#8a7d7d;line-height:1.7;margin:6px 0">
+        <b>الرموز:</b> {تحية}/{greeting} صباح أو مساء الخير حسب الساعة وقت النسخ · {اسم}/{name} اسم الضيف · {كود}/{code} كود الباب ·
+        [للراجل|للست|للجروب] صيغة حسب ⚥ · سطر يبدأ {لو مش زايد} بيتشال لزايد 2000 · {لو الأوراق لسه} يظهر فقط لو الجوازات ما اتطلبتش
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:11px">معاينة كأنها لضيف:</span>
+        <button class="btn" onclick="tplEdG('m')">راجل</button><button class="btn" onclick="tplEdG('f')">ست</button><button class="btn" onclick="tplEdG('g')">جروب</button></div>
+      <div id="tplPrev" style="white-space:pre-wrap;background:#faf5f5;border-radius:10px;padding:10px;font-size:12.5px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}"></div>
+      ${canWrite?`<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ok" id="tplSaveBtn" onclick="tplEdSave()">💾 حفظ</button></div>`
+                :'<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">للعرض فقط — التعديل لسارة وخالد.</div>'}`;
+  }
+  inner+='</div>';
+  div.innerHTML=inner; document.body.appendChild(div);
+  if(TPL_ED.key) tplEdPreview();
+}
+/* ---- sheet-first templates (Sarah 2026-09-09): the CommsTemplates tab (edited in the 📄 screen)
+   wins; the built-in wording below stays as the fallback so a blanked row can never break a
+   guest message. renderTpl applies the rules as tokens — see the legend in the editor. */
+function renderTpl(text, st){
+  const gi={m:0,f:1,g:2}[st.gender||'m']??0;
+  let t=String(text);
+  t=t.replace(/\{تحية\}/g,greetAR()).replace(/\{greeting\}/g,greetEN());
+  t=t.replace(/\{اسم\}/g,(st.nameAr||firstName(st.guest))).replace(/\{name\}/g,firstName(st.guest));
+  t=t.replace(/\{كود\}|\{code\}/g,codeFor(st));
+  const asked=(st.steps||[]).some(x=>x.k==='docsask'&&x.done);
+  t=t.split('\n').filter(line=>{
+    if(line.indexOf('{لو مش زايد}')>-1) return st.flat!=='Zayed 2000';
+    if(line.indexOf('{لو الأوراق لسه}')>-1) return !asked;
+    return true;
+  }).map(line=>line.replace('{لو مش زايد}','').replace('{لو الأوراق لسه}','')).join('\n');
+  t=t.replace(/\[([^\[\]|\n]*)\|([^\[\]|\n]*)\|([^\[\]|\n]*)\]/g,(m,a,b,c)=>[a,b,c][gi]);
+  return t;
+}
+function sheetTpl(k, st, occ){
+  const lang=tplLang(st);
+  const key = k==='midstay' ? (occ==='mid'?'midstay':'midclean') : (k==='arrival'?'arrivalask':k);
+  const row=(D.templates||[]).find(x=>x.key===key&&x.lang===lang);
+  return (row&&row.text&&row.text.trim()) ? renderTpl(row.text, st) : null;
+}
 function tpl(k, st, occ){
+  const sheet=sheetTpl(k, st, occ); if(sheet!==null) return sheet;
   if(tplLang(st)==='ar') return tplAR(k, st, occ);
   const n=firstName(st.guest);
   switch(k){
