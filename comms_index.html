@@ -943,16 +943,17 @@ function renderTplEditor(){
   const canWrite=(currentUser==='sarah'||currentUser==='khaled');
   const tpls=D.templates||[];
   const div=document.createElement('div'); div.id='tplOverlay';
-  div.style.cssText='position:fixed;inset:0;background:rgba(40,25,25,.45);z-index:900;overflow:auto;padding:18px 10px';
-  let inner='<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:14px" dir="rtl">';
-  inner+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:15px">📄 رسائل الضيوف</b><button class="btn" onclick="closeTplEditor()">✕</button></div>';
+  /* full screen — the 520px card was unreadable on the phone (Sarah 2026-09-09) */
+  div.style.cssText='position:fixed;inset:0;background:#fff;z-index:900;overflow:auto';
+  let inner='<div style="max-width:720px;margin:0 auto;min-height:100vh;background:#fff;padding:16px 14px 48px" dir="rtl">';
+  inner+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:18px">📄 رسائل الضيوف</b><button class="btn" onclick="closeTplEditor()">✕</button></div>';
   if(!tpls.length){ inner+='<div style="color:#8a7d7d;font-size:12.5px">القوالب لسه بتتحمّل — اعمل↻ تحديث وافتح تاني.</div></div>'; div.innerHTML=inner; document.body.appendChild(div); return; }
   if(!TPL_ED.key){
     const byKey={}; tpls.forEach(t=>{ (byKey[t.key]=byKey[t.key]||{label:t.label,langs:{}}).langs[t.lang]=t; if(t.label)byKey[t.key].label=t.label; });
     Object.keys(byKey).forEach(k=>{
       const b=byKey[k];
       inner+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f0e6e6">
-        <span style="font-size:13px">${b.label||k}</span>
+        <span style="font-size:15px">${b.label||k}</span>
         <span>${b.langs.ar?`<button class="btn" onclick="tplEdPick('${k}','ar')">عربي</button>`:''}
         ${b.langs.en?`<button class="btn" onclick="tplEdPick('${k}','en')">EN</button>`:''}</span></div>`;
     });
@@ -962,14 +963,14 @@ function renderTplEditor(){
     const ea=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
     inner+=`<div style="margin-bottom:6px"><button class="btn" onclick="TPL_ED.key=null;renderTplEditor()">→ الرجوع للقائمة</button>
       <b style="margin-inline-start:8px">${row.label} · ${TPL_ED.lang==='ar'?'عربي':'EN'}</b></div>
-      <textarea id="tplText" oninput="tplEdPreview()" style="width:100%;min-height:170px;font-family:inherit;font-size:12.5px;border:1px solid #e6d8d8;border-radius:10px;padding:8px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}">${ea(row.text)}</textarea>
-      <div style="font-size:10px;color:#8a7d7d;line-height:1.7;margin:6px 0">
+      <textarea id="tplText" oninput="tplEdPreview()" style="width:100%;min-height:42vh;font-family:inherit;font-size:15px;line-height:1.8;border:1px solid #e6d8d8;border-radius:10px;padding:10px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}">${ea(row.text)}</textarea>
+      <div style="font-size:12px;color:#8a7d7d;line-height:1.8;margin:8px 0">
         <b>الرموز:</b> {تحية}/{greeting} صباح أو مساء الخير حسب الساعة وقت النسخ · {اسم}/{name} اسم الضيف · {كود}/{code} كود الباب ·
         [للراجل|للست|للجروب] صيغة حسب ⚥ · سطر يبدأ {لو مش زايد} بيتشال لزايد 2000 · {لو الأوراق لسه} يظهر فقط لو الجوازات ما اتطلبتش
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:11px">معاينة كأنها لضيف:</span>
         <button class="btn" onclick="tplEdG('m')">راجل</button><button class="btn" onclick="tplEdG('f')">ست</button><button class="btn" onclick="tplEdG('g')">جروب</button></div>
-      <div id="tplPrev" style="white-space:pre-wrap;background:#faf5f5;border-radius:10px;padding:10px;font-size:12.5px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}"></div>
+      <div id="tplPrev" style="white-space:pre-wrap;background:#faf5f5;border-radius:10px;padding:12px;font-size:15px;line-height:1.8;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}"></div>
       ${canWrite?`<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ok" id="tplSaveBtn" onclick="tplEdSave()">💾 حفظ</button></div>`
                 :'<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">للعرض فقط — التعديل لسارة وخالد.</div>'}`;
   }
