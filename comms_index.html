@@ -19,8 +19,14 @@
   --primary:#cc5f5f; --ok:#5caa7f; --warn:#c9a24b; --danger:#a84545; --blue:#4285f4; }
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Cairo',sans-serif; }
 body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* white ground, like الكنترول (Sarah 2026-08-18) */
-.hdr { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:10px; }
-.hdr h1 { font-size:17px; font-weight:900; flex:1; }
+/* Two clean rows on the phone (Sarah 2026-09-09: the title wrapped word-per-line between the
+   icons): the title + version keep the first row to themselves and never wrap; the buttons live
+   in their own row underneath, one line, scrollable sideways if they ever outgrow it. */
+.hdr { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--border); padding:9px 12px 7px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
+.hdr h1 { font-size:16px; font-weight:900; white-space:nowrap; margin-inline-end:auto; }
+.hdr .hbtns { flex-basis:100%; display:flex; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; }
+.hdr .hbtns::-webkit-scrollbar { display:none; }
+.hdr .hbtns .btn { flex-shrink:0; }
 .pill { font-size:10px; color:var(--text3); }
 .wrap { padding:14px 14px 0; max-width:640px; margin:0 auto; }
 .tabs { position:sticky; top:53px; z-index:19; background:var(--card); display:flex; justify-content:center; gap:2px; padding:6px 8px; overflow-x:auto; border-bottom:1px solid var(--border); }
@@ -92,15 +98,17 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v18</span>
+  <span class="pill">v19</span>
   <span class="pill" id="agePill"></span>
-  <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
-  <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
-  <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
-  <button class="btn" onclick="openTplEditor()" title="رسائل الضيوف — عرض وتعديل">📄</button>
-  <button class="btn" id="syncAllBtn" onclick="syncAll()" title="مزامنة شاملة — سموبو ← الهب ← كل الشاشات">🔄</button>
-  <button class="btn" onclick="loadData(true)">↻</button>
-  <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
+  <div class="hbtns">
+    <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
+    <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
+    <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
+    <button class="btn" onclick="openTplEditor()" title="رسائل الضيوف — عرض وتعديل">📄</button>
+    <button class="btn" id="syncAllBtn" onclick="syncAll()" title="مزامنة شاملة — سموبو ← الهب ← كل الشاشات">🔄</button>
+    <button class="btn" onclick="loadData(true)">↻</button>
+    <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>
+  </div>
 </div>
 
 <div class="tabs">
