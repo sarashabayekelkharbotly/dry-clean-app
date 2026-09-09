@@ -1387,14 +1387,19 @@ async function clogReopen(id){
 }
 function clogMarkDone(id){ clogSetDone(id, true); }
 async function clogSetDone(id, done){
+  /* CONFIRM, THEN PATCH THE ONE ROW (Sarah 2026-09-09: "i want to know if things are written or
+     not" — no optimistic ticks; but no month refetch either, a done flag moves no row between
+     months). The tap waits for the server's yes, then only this row updates. The old flow ALSO
+     awaited a full renderCleanLog(true) refetch — that second round trip was most of the pain. */
   try {
     const r = await callScript({ action:'emad_task_toggle', id, done });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
-    CLOG = null;                                    // the month has changed — refetch, never patch
-    await renderCleanLog(true);
-    if (EMAD && EMAD.tasks) { const t = EMAD.tasks.find(x => x.id === id); if (t) t.done = done; }
+    const ct = (CLOG && CLOG.tasks || []).find(x => x.id === id);
+    const et = (EMAD && EMAD.tasks || []).find(x => x.id === id);
+    if (ct) ct.done = done; if (et) et.done = done;
+    try { renderCleanLog(); } catch(e0) {}
     showToast(done ? '✅ اتسجلت' : '↩ رجعت — واتبعت له إشعار');
-  } catch(e){ showToast('❌ لم يتم — حاول مرة أخرى'); }
+  } catch(e){ showToast('❌ لم يتم الحفظ — حاول تاني'); }
 }
 async function renderCleanLog(force){
   const el = document.getElementById('logContent');
