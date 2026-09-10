@@ -451,6 +451,34 @@ async function addCustomStep(stayId){
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
   toast(r.already?'ℹ️ الخطوة موجودة بالفعل':'➕ اتضافت الخطوة'); loadData(true);
 }
+/* ✏️ edit an ad-hoc step — label + due move together; a rename carries the ✅ state with it
+   (the server rewrites the tick rows), so nothing is lost by fixing a typo (Sarah 2026-09-10) */
+async function editCustomStep(stayId,lbEnc){
+  const oldLabel=decodeURIComponent(lbEnc);
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const sp=(st.steps||[]).find(x=>x.k==='cx:'+oldLabel);
+  let lb=prompt('اسم الخطوة:',oldLabel); if(lb===null) return;
+  lb=lb.trim().replace(/["'<>\\|]/g,''); if(!lb){ toast('اكتب اسم الخطوة'); return; }
+  const dd=prompt('تاريخ الاستحقاق (YYYY-MM-DD):',(sp&&sp.dueD)||D.today||''); if(dd===null) return;
+  const tm=prompt('الساعة (HH:MM أو فاضي):',(sp&&sp.dueT)||'12:00'); if(tm===null) return;
+  const r=await apiRetry('comms_step_edit',{stayId,oldLabel,label:lb,dueD:dd.trim(),dueT:(tm||'').trim()});
+  if(!r||r.ok!==true){ unsavedToast(); return; }
+  if(sp){ sp.k='cx:'+r.label; sp.label=r.label; sp.dueD=r.dueD; sp.dueT=r.dueT; }
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderMain(); toast('✏️ اتعدلت الخطوة');
+}
+/* ✏️ fix a note in place (Khaled's typos, 2026-09-10) — empty text removes it */
+async function editNote(stayId,occ){
+  const st=D.stays.find(s=>s.id===stayId); if(!st) return;
+  const n=(st.notes||[]).find(x=>String(x.occ)===String(occ)); if(!n) return;
+  const v=prompt('📝 عدّل الملاحظة (سيبها فاضية علشان تتشال):',n.text); if(v===null) return;
+  const r=await apiRetry('comms_note_edit',{stayId,occ,text:String(v).trim()});
+  if(!r||r.ok!==true){ unsavedToast(); return; }
+  if(r.deleted) st.notes=st.notes.filter(x=>String(x.occ)!==String(occ));
+  else n.text=String(v).trim();
+  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+  renderMain(); toast(r.deleted?'🗑️ اتشالت الملاحظة':'✏️ اتعدلت');
+}
 async function delCustomStep(stayId,lbEnc){
   const lb=decodeURIComponent(lbEnc);
   if(!confirm('حذف خطوة «'+lb+'» من سلم الضيف ده؟')) return;
@@ -534,7 +562,7 @@ function stepRow(st,sp,state){
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
   // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
-  const delBtn=sp.custom?`<button class="btn" onclick="delCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">🗑️</button>`:'';
+  const delBtn=sp.custom?`<button class="btn" onclick="editCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">✏️</button><button class="btn" onclick="delCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">🗑️</button>`:'';
   /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
      message carries the code the guest is ENTITLED to; if no visit has been asked to set it, that
      code is not on the door yet and sending it strands the guest outside. */
@@ -602,7 +630,7 @@ function stayExtra(st){
   /* الملاحظات (اللي اتقال على Airbnb) لازم تبان زي 📌 الطلبات الخاصة — غامق وأسود، مش رمادي
      صغير يعدي من غير ما حد ياخد باله (سارة 2026-08-12) */
   (st.notes||[]).slice().reverse().forEach(n=>{ h+=`<div style="padding:4px 0;border-top:1px dashed var(--border);font-size:12.5px;font-weight:800;color:var(--text1)">${n.text}
-    <span style="font-weight:400;font-size:10.5px;color:var(--text3)">— ${n.by} ${n.at}</span></div>`; });
+    <span style="font-weight:400;font-size:10.5px;color:var(--text3)">— ${n.by} ${n.at}</span>${n.occ?` <button class="btn" style="padding:1px 7px;font-size:10px" onclick="editNote('${st.id}','${n.occ}')">✏️</button>`:''}</div>`; });
   h+='</div>';
   return h;
 }
