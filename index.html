@@ -1248,13 +1248,27 @@ async function emadTaskAdd(){
   const el = document.getElementById('emadTaskText'), dl = document.getElementById('emadTaskDate');
   const tl = document.getElementById('emadTaskTime');
   const text = (el && el.value || '').trim(); if (!text) return;
+  const apEl = document.getElementById('emadTaskApt');
+  const date=(dl && dl.value)||'', time=(tl && tl.value)||'', apt=(apEl && apEl.value)||'';
   try {
-    const apEl = document.getElementById('emadTaskApt');
-    const r = await callScript({ action: 'emad_task_add', text, date: (dl && dl.value) || '', time: (tl && tl.value) || '', apt: (apEl && apEl.value) || '' });
+    /* 45s per attempt (Sarah 2026-09-10: platform spikes measured at 35-38s on a DO-NOTHING call
+       — 25s timeouts died twice while the first attempt's write actually landed, so the toast
+       claimed failure for a task that appeared). Confirmed-then-patch: the server's yes updates
+       just the list — the old full loadEmadHome() refetch was a second ride on the same slow
+       platform. */
+    const r = await callScript({ action: 'emad_task_add', text, date, time, apt }, { timeout: 45000 });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     if (el) el.value = ''; if (tl) tl.value = '';
-    loadEmadHome();
-  } catch(e) { showToast('❌ لم تُضف المهمة — حاول مرة أخرى'); }
+    if (EMAD && EMAD.tasks && !r.already)
+      EMAD.tasks.push({ id: r.id, date: date || emadYmdOf(new Date()), text, by: '', addedAt: '',
+                        done: false, time: /^\d{2}:\d{2}$/.test(time) ? time : '', apt });
+    renderHome();
+    showToast(r.already ? 'ℹ️ المهمة موجودة بالفعل' : '✅ اتضافت');
+  } catch(e) {
+    /* the add is idempotent server-side (same date+text answers ok/already) — so an honest
+       message tells her to simply try again: a landed first attempt can never duplicate */
+    showToast('⚠️ الحفظ اتأخر — جرّب تاني؛ لو كانت اتسجلت مش هتتكرر');
+  }
 }
 async function emadTaskToggle(id, done){
   const t = (EMAD && EMAD.tasks || []).find(x => x.id === id);
@@ -3004,10 +3018,19 @@ async function updateSheetCell(range, value) {
   if (!res.ok) throw new Error('Update failed');
   return res.json();
 }
+/* THE 15-SECOND CONTRACT (Sarah 2026-09-10: "i can wait 10 to 15 seconds but longer is too much").
+   Reads keep the patient 25s (a slow read hurts nobody — the cache shows meanwhile). WRITES get
+   7s per attempt × 2 attempts ≈ 14s worst case: a cold start dies on attempt one and succeeds
+   warm on attempt two; a real platform spike ends inside her limit with an honest "unconfirmed —
+   try again" instead of a long stare. Safe because the write paths are idempotent server-side
+   (task add dedupes, ticks dedupe, repair close is once-per-ticket): a landed-but-unconfirmed
+   first attempt can never duplicate. Explicit opts always win (the sync pipeline passes its own). */
+const READ_ACTIONS = { dc_get_boot:1, dc_get_all:1, emad_home:1, repairs_data:1, meter_screen:1, hub_sync_status:1, dc_version:1 };
 async function callScript(body, opts) {
   opts = opts || {};
+  const isRead = !!(body && READ_ACTIONS[body.action]);
   // a long pipeline needs its own patience AND no retry — a retry there runs the whole thing twice
-  return callScriptWithRetry(body, opts.retries === undefined ? 1 : opts.retries, opts.timeout || 25000);
+  return callScriptWithRetry(body, opts.retries === undefined ? 1 : opts.retries, opts.timeout || (isRead ? 25000 : 7000));
 }
 
 // Apps Script has "cold start" latency — the first call after a period of

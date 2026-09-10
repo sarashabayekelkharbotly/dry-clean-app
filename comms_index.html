@@ -98,7 +98,7 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
 
 <div class="hdr">
   <h1>📨 التواصل مع الضيوف</h1>
-  <span class="pill">v19</span>
+  <span class="pill">v23</span>
   <span class="pill" id="agePill"></span>
   <div class="hbtns">
     <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
@@ -224,11 +224,14 @@ async function api(action, extra={}, timeoutMs=35000){
    telegram, so a retry can never announce twice. Three attempts, backing off, saying what it is
    doing; the honest ❌ survives for the case where all three really failed. */
 async function apiRetry(action, extra={}){
-  const waits=[0,4000,10000];
+  /* the 15-second contract (Sarah 2026-09-10): 6.5s × 2 attempts + one 2.5s breath ≈ 15s worst —
+     the old 35s × 3 left Khaled's handover "stuck" for two minutes inside a platform busy-window
+     while the write had long landed. Safe: every tick dedupes server-side, so retrying is free. */
+  const waits=[0,2500];
   for(let a=0;a<waits.length;a++){
     if(waits[a]){ toast('⏳ لسه بيحفظ — محاولة تانية…'); await new Promise(r=>setTimeout(r,waits[a])); }
     try{
-      const r=await api(action, extra);
+      const r=await api(action, extra, 6500);
       if(r&&r.ok===true) return r;
       if(!(r&&r.code==='BUSY')) return r;          // a real answer, even a bad one — no point retrying
     }catch(e){ /* timeout or network — the save may be mid-flight; retry overwrites to the same state */ }
@@ -236,6 +239,12 @@ async function apiRetry(action, extra={}){
   return null;
 }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+/* THE SCREEN HEALS ITSELF (Khaled's handover, 2026-09-10: his tap LANDED server-side but every
+   response died in a platform busy-window — his screen stayed un-patched with no way to learn the
+   truth). An unconfirmed save now says so honestly AND schedules one background refresh ~25s
+   later: when the platform calms, reality replaces doubt without anyone knowing to pull. */
+function reconcileSoon(){ clearTimeout(window._recT); window._recT=setTimeout(function(){ try{ loadData(true); }catch(e){} }, 25000); }
+function unsavedToast(){ toast('⚠️ مش متأكدين اتسجلت — الشاشة هتتحدث لوحدها بعد شوية، وإعادة المحاولة مش هتكرر حاجة'); reconcileSoon(); }
 /* 🔄 مزامنة شاملة (Sarah 2026-08-22) — the same hub_sync_all الكنترول uses: Smoobu → the Hub →
    every cache dropped, so bookings, cleans and repairs land here AND on Emad's screen in one press.
    The run takes ~1 minute, well past the normal 35s guard, so this call gets 5 minutes of its own;
@@ -457,7 +466,7 @@ async function editNames(stayId){
   const en=prompt('اسم الضيف بالإنجليزي — ممكن اسمين (مثال: Amina - Omar)'+(st.bookingName?'\nالحجز الأصلي باسم: '+st.bookingName:''),st.guest||''); if(en===null) return;
   const ar=prompt('الاسم بالعربي (اللي بيظهر في الرسائل العربية):',st.nameAr||''); if(ar===null) return;
   const r=await apiRetry('comms_tick',{stayId,step:'names',occ:'',val:(en.trim()+'|'+ar.trim()),tag:tagOf(st)});
-  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  if(!r||r.ok!==true){ unsavedToast(); return; }
   if(en.trim()&&en.trim()!==st.guest&&!st.bookingName) st.bookingName=st.guest;   // keep the booking owner visible locally too
   if(en.trim()) st.guest=en.trim();
   st.nameAr=ar.trim();
@@ -603,7 +612,7 @@ function tagOf(st){ return `${st.guest} (${st.flat})`; }
 async function pseudoTick(stayId, step, val, msg, snap){
   const st=D.stays.find(s=>s.id===stayId);
   const r=await apiRetry('comms_tick',{stayId,step,occ:'',val:val||'',tag:st?tagOf(st):'',snap:snap||''});
-  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return false; }
+  if(!r||r.ok!==true){ unsavedToast(); return false; }
   if(st){
     const now=new Date().toISOString().slice(0,10);
     if(step==='handover') st.handover={done:true,by:currentUserName,at:now,note:val||''};
@@ -637,7 +646,7 @@ async function undoFlag(stayId,step){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   if(!confirm(step==='handover'?'إلغاء علامة التسليم؟ الضيف هيرجع في لستة «لسه ماتسلمش».':'إلغاء علامة الجروب؟')) return;
   const r=await apiRetry('comms_tick',{stayId,step,occ:'',undo:true,tag:tagOf(st)});
-  if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  if(!r||r.ok!==true){ unsavedToast(); return; }
   if(step==='handover') st.handover={done:false,by:'',at:'',note:''};
   else st.group={done:false,by:'',at:'',invited:false};
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
@@ -795,7 +804,7 @@ async function tick(stayId,k,occ){
   const st=D.stays.find(x=>x.id===stayId);
   const r=await apiRetry('comms_tick',{stayId,step:k,occ,tag:st?tagOf(st):''});
   if(btn){ btn.disabled=false; btn.textContent='✅'; }
-  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  if(!r||r.ok!==true){ unsavedToast(); return; }
   applyTick(stayId,k,occ,true,'');
   toast('✅ اتسجلت');
 }
@@ -805,7 +814,7 @@ async function tickArrival(stayId,occ){
   const t=String(v).trim();
   if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اكتب الوقت بصيغة HH:MM'); return; }
   const r=await apiRetry('comms_tick',{stayId,step:'arrivaltime',occ,val:t,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()});
-  if(!r||r.ok!==true){ toast('❌ لم يُحفظ — حاول مرة أخرى'); return; }
+  if(!r||r.ok!==true){ unsavedToast(); return; }
   applyTick(stayId,'arrivaltime',occ,true,t);
   toast('✅ الوصول '+t);
 }
@@ -814,7 +823,7 @@ async function untick(stayId,k,occ){
   if(!confirm('إلغاء العلامة؟')) return;
   const st=D.stays.find(x=>x.id===stayId);
   const r=await apiRetry('comms_tick',{stayId,step:k,occ,undo:true,tag:st?tagOf(st):''});
-  if(!r||r.ok!==true){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  if(!r||r.ok!==true){ unsavedToast(); return; }
   applyTick(stayId,k,occ,false,'');
   toast('↩ اتلغت');
 }
@@ -1051,7 +1060,7 @@ const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دلي
 
 async function toggleTask(id,done){
   const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
-  if(!r||!r.ok){ toast('❌ لم يتم — حاول مرة أخرى'); return; }
+  if(!r||!r.ok){ unsavedToast(); return; }
   [(D.tasks||[]).find(x=>x.id===id),(D.tasksAll||[]).find(x=>x.id===id)].forEach(x=>{ if(x) x.done=done; });
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   renderMain(); try{ renderLog(); }catch(e){}
