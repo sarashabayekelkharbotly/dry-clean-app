@@ -729,7 +729,7 @@ function renderStays(){
         ${hoB}
         ${undone?`<span class="badge b-due">${undone}</span>`:'<span class="badge b-ok">✓</span>'}
       </div>
-      ${open?stayExtra(st)+st.steps.map(sp=>stepRow(st,sp,stepState(st,sp))).join(''):''}
+      ${open?stayExtra(st)+st.steps.slice().sort((a,b)=>((a.dueD||'')+' '+(a.dueT||''))<((b.dueD||'')+' '+(b.dueT||''))?-1:1).map(sp=>stepRow(st,sp,stepState(st,sp))).join(''):''}
     </div>`;
   }).join('');
 }
