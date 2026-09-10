@@ -2598,9 +2598,11 @@ async function submitNew() {
     newItems = [];
     renderNewItems();
     document.getElementById('newApt').value = '';
-    await loadAllData();
+    // confirmed by the two appends above — say so NOW; the refetch rides behind, unawaited
+    // (2026-09-10: awaiting it added a third full server ride to every submission Emad files)
     showPage('home');
     showToast('✅ تم إرسال الطلب بنجاح!');
+    loadAllData(true);
   } catch(e) { showToast('❌ خطأ في الحفظ: ' + e.message); }
 }
 
@@ -3026,11 +3028,19 @@ async function updateSheetCell(range, value) {
    (task add dedupes, ticks dedupe, repair close is once-per-ticket): a landed-but-unconfirmed
    first attempt can never duplicate. Explicit opts always win (the sync pipeline passes its own). */
 const READ_ACTIONS = { dc_get_boot:1, dc_get_all:1, emad_home:1, repairs_data:1, meter_screen:1, hub_sync_status:1, dc_version:1 };
+/* RETRY ONLY WHAT CANNOT DUPLICATE (2026-09-10, caught in the same evening it was introduced):
+   the blanket writes-retry was safe for the deduping actions but a raw `append` (submission
+   save) or a meter_log has NO server-side dedupe — a slow first attempt plus a retry would file
+   the row twice, the 27-Aug duplicated-tasks class exactly. So: reads retry (harmless), the
+   actions listed here retry (each dedupes server-side), and every OTHER write gets ONE 12s
+   attempt — on timeout the caller says "unconfirmed", never files twice. */
+const RETRY_SAFE = { emad_task_add:1, emad_task_toggle:1, emad_task_edit:1, emad_task_delete:1, repair_close:1, repair_edit:1, dc_flag_pickup:1 };
 async function callScript(body, opts) {
   opts = opts || {};
-  const isRead = !!(body && READ_ACTIONS[body.action]);
-  // a long pipeline needs its own patience AND no retry — a retry there runs the whole thing twice
-  return callScriptWithRetry(body, opts.retries === undefined ? 1 : opts.retries, opts.timeout || (isRead ? 25000 : 7000));
+  const a = body && body.action, isRead = !!READ_ACTIONS[a];
+  const t = opts.timeout || (isRead ? 25000 : (RETRY_SAFE[a] ? 7000 : 12000));
+  const r = opts.retries !== undefined ? opts.retries : ((isRead || RETRY_SAFE[a]) ? 1 : 0);
+  return callScriptWithRetry(body, r, t);
 }
 
 // Apps Script has "cold start" latency — the first call after a period of
