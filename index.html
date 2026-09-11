@@ -2327,7 +2327,10 @@ function renderEditItems() {
   }
   el.innerHTML = editItems.map((item, idx) => {
     // Include item's existing type even if not in colorOptions (spelling diff or missing from sheet)
-    const typeKeys = Object.keys(colorOptions);
+    // From the catalog (= colorOptions UNION itemPrices), not colorOptions alone — otherwise a
+    // priced item with no colour row (منشفة مطبخ) is missing here even though the add screen
+    // shows it, which is exactly how it went unnoticed.
+    const typeKeys = catalog.map(c => c.name);
     if (item.type && !typeKeys.includes(item.type)) typeKeys.unshift(item.type);
     const typeOptions = typeKeys.map(t =>
       `<option value="${t}" ${item.type===t?'selected':''}>${t}</option>`).join('');
