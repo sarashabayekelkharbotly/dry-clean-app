@@ -866,8 +866,12 @@ function loadCatalog() {
 }
 
 function rebuildCatalogFromColorOptions() {
-  // Build catalog array from live colorOptions + itemPrices
-  catalog = Object.keys(colorOptions).map(name => ({
+  // Build catalog array from the UNION of colorOptions + itemPrices (2026-09-11): منشفة مطبخ sat
+  // in ItemPrices with no ColorOptions row and vanished from the dropdown. A priced item must
+  // appear even with no colors — the form's color is optional anyway («اللون (اختياري)»).
+  const names = Object.keys(colorOptions);
+  Object.keys(itemPrices).forEach(n => { if (!names.includes(n)) names.push(n); });
+  catalog = names.map(name => ({
     name,
     price: itemPrices[name] || 0,
     colors: colorOptions[name] || []
