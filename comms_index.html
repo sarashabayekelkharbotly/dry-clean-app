@@ -223,22 +223,24 @@ async function api(action, extra={}, timeoutMs=35000){
    Safe because a tick is idempotent (same row, same end state) and the server now dedupes the
    telegram, so a retry can never announce twice. Three attempts, backing off, saying what it is
    doing; the honest ❌ survives for the case where all three really failed. */
-async function apiRetry(action, extra={}){
+async function apiRetry(action, extra={}, tmo=6500){
   /* the 15-second contract (Sarah 2026-09-10): 6.5s × 2 attempts + one 2.5s breath ≈ 15s worst —
      the old 35s × 3 left Khaled's handover "stuck" for two minutes inside a platform busy-window
-     while the write had long landed. Safe: every tick dedupes server-side, so retrying is free. */
+     while the write had long landed. Safe: every tick dedupes server-side, so retrying is free.
+     tmo: a MULTI-item save (the card's setup batch = 4 ticks in one request) legitimately needs
+     more than one tick's budget — the caller says so instead of failing on honest work. */
   const waits=[0,2500];
   for(let a=0;a<waits.length;a++){
     if(waits[a]){ toast('⏳ لسه بيحفظ — محاولة تانية…'); await new Promise(r=>setTimeout(r,waits[a])); }
     try{
-      const r=await api(action, extra, 6500);
+      const r=await api(action, extra, tmo);
       if(r&&r.ok===true) return r;
       if(!(r&&r.code==='BUSY')) return r;          // a real answer, even a bad one — no point retrying
     }catch(e){ /* timeout or network — the save may be mid-flight; retry overwrites to the same state */ }
   }
   return null;
 }
-function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),m&&m.length>60?9000:3200); }   // long (error) messages stay readable
 /* THE SCREEN HEALS ITSELF (Khaled's handover, 2026-09-10: his tap LANDED server-side but every
    response died in a platform busy-window — his screen stayed un-patched with no way to learn the
    truth). An unconfirmed save now says so honestly AND schedules one background refresh ~25s
@@ -704,11 +706,13 @@ async function setupSave(stayId){
   if(req!==null&&req!==(st.requests||'')) items.push({step:'requests',val:req});
   if(!items.length){ SETUP_OPEN=null; renderMain(); toast('لا تغيير'); return; }
   const btn=document.getElementById(`su_save_${stayId}`); if(btn){ btn.disabled=true; btn.textContent='⏳ بيحفظ…'; }
-  const r=await apiRetry('comms_tick_batch',{stayId,items,tag:tagOf(st)});
+  const r=await apiRetry('comms_tick_batch',{stayId,items,tag:tagOf(st)},15000);   // 4 ticks in one request — one tick's 6.5s budget starved it
   if(btn){ btn.disabled=false; btn.textContent='💾 حفظ الكل'; }
   if(!r||r.ok!==true){
-    const bad=(r&&r.results||[]).filter(x=>!x.ok).map(x=>x.step).join('، ');
-    toast('❌ '+(bad?('لم يُحفظ: '+bad+' — حاول تاني'):'لم يُحفظ — حاول تاني')); return;
+    /* SAY WHY (2026-09-12: twenty minutes of «لم يُحفظ» while the server was naming the exact
+       error in results[].error and this toast threw it away). The reason IS the diagnosis. */
+    const errs=(r&&r.results||[]).filter(x=>!x.ok).map(x=>x.step+(x.error?(' — '+x.error):'')).join(' · ');
+    toast('❌ '+(errs?('لم يُحفظ: '+errs):('لم يُحفظ — '+((r&&r.error)||'مفيش رد من السيرفر — حاول تاني')))); return;
   }
   items.forEach(it=>{
     if(it.step==='names'){ const nen=it.val.split('|')[0], nar=it.val.split('|')[1]||'';
