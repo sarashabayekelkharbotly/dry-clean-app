@@ -310,13 +310,16 @@ function ciAdd(ci,n){ const d=new Date(ci+'T12:00:00'); d.setDate(d.getDate()+n)
 function codeNeed(st){ const ci=String(st.ci||''); return ci?ci.slice(8,10)+ci.slice(5,7):''; }
 function codeFor(st){
   const need=codeNeed(st); if(!need) return '〈CODE〉';
-  const from=ciAdd(st.ci,-2), today=(D&&D.today)||'';
+  const from=ciAdd(st.ci,-2);
   /* A hand-set code (✎ in the Hub, `edited` in the payload) IS the arrival's code — even when its
      visit already happened (Amina 2026-08-22: Emad set 2108 the day before and the guest message
-     still carried the mechanical 2208). The old still-to-come heuristic stays as a fallback for
-     rows confirmed before the flag existed. */
+     still carried the mechanical 2208). ONLY ✎ may override the derived code: there used to be a
+     second branch here treating any still-to-come row whose code differed as if it were hand-set,
+     and it promoted a stale 0107 — frozen at confirm time, before the booking existed — into
+     Moaz's guest message (2026-09-22). The Hub heals its record now (schedReconcile_), and this
+     screen never mistakes staleness for a decision. */
   let hand=null;
-  (D.schedule||[]).forEach(c=>{ if(c.flat===st.flat&&c.code&&c.date>=from&&c.date<=st.ci&&(c.edited||(c.date>=today&&c.code!==need))&&(!hand||c.date>hand.date)) hand=c; });
+  (D.schedule||[]).forEach(c=>{ if(c.flat===st.flat&&c.code&&c.date>=from&&c.date<=st.ci&&c.edited&&(!hand||c.date>hand.date)) hand=c; });
   return hand?hand.code:need;
 }
 /* Has anyone actually been asked to set it? Same test as the Hub and as الكنترول's watcher: some
