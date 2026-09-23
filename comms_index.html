@@ -288,7 +288,10 @@ async function loadData(force){
     if(r&&r.ok){ D=r; lastTs=Date.now();
       try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
       document.getElementById('bannerBox').innerHTML='';
-      refreshRepairs();
+      /* repairs now ride in comms_home (2026-09-24) — no second request on load; render from the
+         payload. Old backend without r.rep → fall back to the one-off fetch. */
+      if(r.rep){ D.rep={open:r.rep.open||[],trades:r.rep.trades||[],flats:r.rep.flats||[]}; renderRep(); renderSched(); }
+      else refreshRepairs();
       document.getElementById('agePill').textContent='';
       renderAll();
     } else { document.getElementById('bannerBox').innerHTML=`<div class="banner">⚠️ التحديث فشل — السبب: ${(r&&r.error)||'غير معروف'}</div>`; }
