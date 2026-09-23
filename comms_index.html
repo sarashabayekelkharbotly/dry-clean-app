@@ -981,14 +981,24 @@ function tplEdPreview(){
 }
 async function tplEdSave(){
   const ta=document.getElementById('tplText'); if(!ta||!TPL_ED.key) return;
-  const btn=document.getElementById('tplSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
-  let r=null; try{ r=await api('comms_tpl_save',{key:TPL_ED.key,lang:TPL_ED.lang,text:ta.value}); }catch(e){}
+  const btn=document.getElementById('tplSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ بيحفظ…'; }
+  const key=TPL_ED.key, lang=TPL_ED.lang, text=ta.value;
+  /* Used to be ONE 35s api() call with a swallowed catch: in a busy-window Sarah stared at ⏳ for up
+     to 35s, gave up before any toast, and the write never landed — "nothing confirmed, nothing
+     changed" (2026-09-23). NOT optimistic (Sarah's rule: never show a change she can't be sure
+     everyone else sees): the screen updates ONLY after the server confirms the row is written to the
+     sheet — which also drops the shared template cache, so Emad and Dani get it too. Retries through
+     the busy-window with visible progress; on no answer it says so honestly and self-heals. */
+  let r=null; try{ r=await apiRetry('comms_tpl_save',{key,lang,text},9000); }catch(e){}
   if(btn){ btn.disabled=false; btn.textContent='💾 حفظ'; }
-  if(!r||r.ok!==true){ toast('❌ '+((r&&r.error)||'لم يُحفظ — حاول تاني')); return; }
-  const row=(D.templates||[]).find(x=>x.key===TPL_ED.key&&x.lang===TPL_ED.lang);
-  if(row) row.text=ta.value;
-  try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
-  toast('💾 اتحفظت — كل النسخ الجاية هتستخدم النص الجديد');
+  if(r&&r.ok===true){                                     // CONFIRMED on the sheet + shared cache dropped → everyone sees it
+    const row=(D.templates||[]).find(x=>x.key===key&&x.lang===lang);
+    if(row) row.text=text;
+    try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
+    toast('💾 اتحفظت — كل النسخ الجاية هتستخدم النص الجديد'); return;
+  }
+  if(r&&r.ok===false){ toast('❌ '+(r.error||'لم يُحفظ')); return; }   // a real refusal — nothing changed, and the screen shows the old text still
+  unsavedToast();                                         // no answer — NOT confirmed; the screen refreshes itself from the server, retry won't duplicate
 }
 function renderTplEditor(){
   closeTplEditor();
