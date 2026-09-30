@@ -1339,13 +1339,22 @@ async function emadCleanStart(date, flat, type, time){
     loadEmadHome(true);
   } catch(e) { alert('لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
-async function emadCleanEnd(date, flat, type, time){
+async function emadCleanEnd(date, flat, type, time, late){
+  /* 🔴 a clean from a PAST day (Sarah 2026-09-30) asks for the REAL end time first — pressing now
+     would record a 20-hour clean. Arabic digits are accepted (١٥:٣٠ → 15:30). */
+  let endTime = '';
+  if (late) {
+    const et = prompt('النظافة دي من يوم ' + date.slice(5) + ' — خلصت الساعة كام؟ (مثلاً 15:30)');
+    if (et === null) return;
+    endTime = et.trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[.٫،]/g, ':');
+    if (!/^\d{1,2}:\d{2}$/.test(endTime)) { alert('اكتب الساعة كده: 15:30'); return; }
+  }
   // Sarah 2026-08-02: house-status notes are required on EVERY clean — the سجل screen reads them
   const notes = prompt('حالة الشقة؟ (إجباري) — أعطال، نواقص، أو "كله تمام"');
   if (notes === null) return;
   if (!notes.trim()) { alert('لازم تكتب حالة الشقة — لو مفيش حاجة اكتب "كله تمام"'); return; }
   try {
-    const r = await callScript({ action: 'clean_end', date, flat, type, time, notes: notes.trim() });
+    const r = await callScript({ action: 'clean_end', date, flat, type, time, notes: notes.trim(), endTime });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('🏁 خلصت (' + r.mins + ' دقيقة)');
     loadEmadHome(true);
@@ -1901,6 +1910,13 @@ function renderEmadPanel() {
       else
         timed.push({t: tk, h: row('🧹', `${emadTaskLine(c)} <span style="color:var(--text3);font-size:10.5px">— اضغط لما تبدأ</span>`, { click: `emadCleanStart(${args})` })});
     });
+  /* 🔴 a clean started on a past day and never closed STAYS here, at the top, until خلصت (Sarah
+     2026-09-30) — the server sends only those, from 2026-09-30 on */
+  (EMAD.openCleans || []).forEach(c => {
+    const args = `'${c.date}','${c.flat}','${c.type}','${String(c.time || '')}',true`;
+    timed.push({t: '00:00', h: row('🔴', `${emadTaskLine(c)} <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ${c.date.slice(5)})</span>` +
+      `<br><b style="color:#cc5f5f">بدأت ${c.started} ومتقفلتش — اضغط وسجّل خلصت الساعة كام</b>`, { click: `emadCleanEnd(${args})` })});
+  });
   // manual tasks — ticked on the SERVER so Sarah sees what got done; overdue ones carry متأخر.
   // Each shows its AGE since it was added (Sarah 2026-08-11: "so Emad feels how long it's pending")
   // and ✏️ reschedules/rewords it (server emad_task_edit, announced to the assignee).
