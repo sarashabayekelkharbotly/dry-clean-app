@@ -829,7 +829,7 @@ const CACHE_KEY = 'owh_inv_cache_v1';
 
 function saveCache() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, snapshots, categoriesList, countFixDay, ts: lastSyncTs }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, categoriesList, countFixDay, ts: lastSyncTs }));   // snapshots no longer cached (2026-09-30)
   } catch(e) { console.error('saveCache', e); }
 }
 
@@ -1025,11 +1025,10 @@ async function syncData(silent = false) {
 
   let syncOk = false;
   try {
-    // Fetch main data + snapshots IN PARALLEL (was sequential — saves a full round-trip)
-    const [res, snapRes] = await Promise.all([
-      api('inv_get_all'),
-      api('inv_get_snapshots').catch(() => null)
-    ]);
+    /* Snapshots are NOT downloaded on open any more (2026-09-30): no screen reads them, and the tab
+       had grown to 21,500 repeated rows that rode along on every load and filled the phone cache.
+       They stay recorded server-side, once per month, for a future stock-value / consumption view. */
+    const res = await api('inv_get_all'), snapRes = null;
     if (res.items && res.items.length > 0) {
       items = res.items;
     } else {
@@ -2196,10 +2195,7 @@ async function adjCur(id, delta) {
     renderSummary(); renderNawaqes();
     const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'consume', qty, user:currentUserName, timestamp:new Date().toISOString(), note:'', curAfter:it.cur };
     events.unshift(ev);
-    try {
-      await api('inv_update_cur', { itemId: it.id, cur: it.cur });
-      await api('inv_log_event', { event: ev });
-    } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+    await invMoveSave(it, ev, delta);
     toast(`✓ ${it.ar} — ${it.cur}`);
     return;
   }
@@ -2221,11 +2217,19 @@ async function adjCur(id, delta) {
 
   const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'adjust', qty:delta, user:currentUserName, timestamp:new Date().toISOString(), note:'تراجع عن خصم بالغلط', curAfter:it.cur };
   events.unshift(ev);
-  try {
-    await api('inv_update_cur', { itemId: it.id, cur: it.cur });
-    await api('inv_log_event', { event: ev });
-  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  await invMoveSave(it, ev, delta);
   toast(`✓ ${it.ar} — ${it.cur}`);
+}
+
+/* ONE SAVE PER STOCK MOVE (2026-09-30): the server applies the delta to the stock IT holds and writes
+   the event in the same locked step (inv_move) — the old "set stock to N, then log" pair could half-
+   land, and two phones overwrote each other. The screen then takes the server's stock as the truth. */
+async function invMoveSave(it, ev, delta) {
+  try {
+    const r = await api('inv_move', { itemId: it.id, type: ev.type, delta, eventId: ev.id, note: ev.note || '', user: ev.user });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    if (typeof r.cur === 'number' && r.cur !== it.cur) { it.cur = r.cur; ev.curAfter = r.cur; updateCardUI(it); renderSummary(); renderNawaqes(); }
+  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
 }
 
 /* COUNT CORRECTION (📐, 2026-08-09) — the legitimate way to make the app match the shelf.
@@ -2297,10 +2301,7 @@ async function confirmConsume() {
 
   const ev = { id:genId(), itemId:it.id, itemName:it.ar, type:'consume', qty, user:currentUserName, timestamp:new Date().toISOString(), note, curAfter:it.cur };
   events.unshift(ev);
-  try {
-    await api('inv_update_cur', { itemId: it.id, cur: it.cur });
-    await api('inv_log_event', { event: ev });
-  } catch(e) { toast('⚠️ لم يتم الحفظ في الشيت'); }
+  await invMoveSave(it, ev, -qty);
   toast(`📉 ${it.ar} — تبقى ${it.cur}`);
 }
 
