@@ -133,14 +133,21 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+/* THE NEW ENGINE (2026-10-01, the fast plan — WRITE_THROUGH_DESIGN.md). Dani's page talks to Supabase now: ~0.3 s instead of
+   7–9 s. Every save is replayed into the old backend, so the Sheets, telegrams and the Hub carry on exactly as before.
+   ROLLBACK = put the old address back on this line and push (nothing is lost — the Sheets stayed current):
+   https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec */
+const SCRIPT_URL = 'https://geszrsrdqxwtihrqzxiu.supabase.co/functions/v1/elcontrol';
+/* its OWN sign-in key: Sarah and Khaled use this page AND Emad's app on the same site, and the two engines' sessions
+   are different — a shared key would sign them out of one every time they used the other */
+const OWH_SESS_KEY = 'owh_session_engine';
 const SCRIPT_URL_AUTH = SCRIPT_URL;
 let currentUser=null, currentUserName=null, currentUserRole=null;
 let D = { stays:[], schedule:[], repairs:[], tasks:[], today:'' };
 let lastTs = 0;
 
 /* ---- session plumbing (the الكنترول pattern: sid merged into every POST) ---- */
-function owhSid(){ try{ const s=JSON.parse(localStorage.getItem('owh_session')||'null'); return (s&&s.sid)?s.sid:''; }catch(e){ return ''; } }
+function owhSid(){ try{ const s=JSON.parse(localStorage.getItem(OWH_SESS_KEY)||'null'); return (s&&s.sid)?s.sid:''; }catch(e){ return ''; } }
 (function(){
   const _fetch=window.fetch.bind(window);
   window.fetch=function(url,opts){
@@ -161,16 +168,16 @@ function owhSid(){ try{ const s=JSON.parse(localStorage.getItem('owh_session')||
 let owhExpiredShown=false;
 function owhSessionExpired(){
   if(owhExpiredShown) return; owhExpiredShown=true;
-  localStorage.removeItem('owh_session'); currentUser=null;
+  localStorage.removeItem(OWH_SESS_KEY); currentUser=null;
   document.getElementById('loginScreen').style.display='flex';
   const e=document.getElementById('loginError'); e.textContent='انتهت الجلسة — سجّل الدخول مرة أخرى'; e.style.display='block';
 }
 function initAuth(){
-  const saved=localStorage.getItem('owh_session');
+  const saved=localStorage.getItem(OWH_SESS_KEY);
   if(saved){ try{ const s=JSON.parse(saved);
     if(s&&s.username&&s.sid){ currentUser=s.username; currentUserName=s.displayName; currentUserRole=s.role; hideLoginScreen(); return; }
-    localStorage.removeItem('owh_session');
-  }catch(e){ localStorage.removeItem('owh_session'); } }
+    localStorage.removeItem(OWH_SESS_KEY);
+  }catch(e){ localStorage.removeItem(OWH_SESS_KEY); } }
   document.getElementById('loginScreen').style.display='flex';
 }
 async function doLogin(){
@@ -182,7 +189,7 @@ async function doLogin(){
     const res=await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'auth_login',username,password})});
     const data=await res.json();
     if(data.ok){ currentUser=data.username; currentUserName=data.displayName; currentUserRole=data.role;
-      localStorage.setItem('owh_session',JSON.stringify(data)); hideLoginScreen(); }
+      localStorage.setItem(OWH_SESS_KEY,JSON.stringify(data)); hideLoginScreen(); }
     else showLoginError(data.error||'خطأ في تسجيل الدخول');
   }catch(e){ showLoginError('خطأ في الاتصال — تحقق من الإنترنت'); }
   btn.textContent='دخول'; btn.disabled=false;
@@ -201,7 +208,7 @@ function hideLoginScreen(){
 function showSwitchUser(){
   const sid=owhSid();
   if(sid){ try{ window.fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'auth_logout',sid})}).catch(function(){}); }catch(e){} }
-  localStorage.removeItem('owh_session'); currentUser=null;
+  localStorage.removeItem(OWH_SESS_KEY); currentUser=null;
   document.getElementById('switchUserBtn').style.display='none';
   const el=document.getElementById('loginScreen'); el.style.opacity='1'; el.style.display='flex';
 }
