@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#cc5f5f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="الكنترول">
-<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://geszrsrdqxwtihrqzxiu.supabase.co">
 <link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -637,7 +637,9 @@ window.addEventListener('load',function(){
 // ============================================================
 // AUTH
 // ============================================================
-const SCRIPT_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+// switch A (2026-10-01): Emad's app runs on the new engine. ROLLBACK = the old address: https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec
+const SCRIPT_URL_AUTH = 'https://geszrsrdqxwtihrqzxiu.supabase.co/functions/v1/elcontrol';
+const OWH_SESS_KEY = 'owh_session_engine';   // the engine's own sign-ins (shared with Dani's page), never the old backend's
 let currentUser     = null;
 let currentUserName = null;
 let currentUserRole = null;
@@ -651,7 +653,7 @@ let currentUserRole = null;
    the user to the sign-in screen.
    ============================================================ */
 function owhSid() {
-  try { const s = JSON.parse(localStorage.getItem('owh_session') || 'null'); return (s && s.sid) ? s.sid : ''; }
+  try { const s = JSON.parse(localStorage.getItem(OWH_SESS_KEY) || 'null'); return (s && s.sid) ? s.sid : ''; }
   catch (e) { return ''; }
 }
 (function () {
@@ -683,7 +685,7 @@ let owhExpiredShown = false;
 function owhSessionExpired() {
   if (owhExpiredShown) return;
   owhExpiredShown = true;
-  localStorage.removeItem('owh_session');
+  localStorage.removeItem(OWH_SESS_KEY);
   currentUser = null; currentUserName = null; currentUserRole = null;
   const el = document.getElementById('loginScreen');
   if (el) { el.style.opacity = '1'; el.style.display = 'flex'; }
@@ -692,7 +694,7 @@ function owhSessionExpired() {
 }
 
 async function initAuth() {
-  const saved = localStorage.getItem('owh_session');
+  const saved = localStorage.getItem(OWH_SESS_KEY);
   if (saved) {
     try {
       const s = JSON.parse(saved);
@@ -706,7 +708,7 @@ async function initAuth() {
         return;
       }
     } catch(e) {}
-    localStorage.removeItem('owh_session');
+    localStorage.removeItem(OWH_SESS_KEY);
   }
   // No valid session — show login screen
   const ls = document.getElementById('loginScreen');
@@ -736,7 +738,7 @@ async function doLogin() {
       currentUser     = data.username;
       currentUserName = data.displayName;
       currentUserRole = data.role;
-      localStorage.setItem('owh_session', JSON.stringify(data));
+      localStorage.setItem(OWH_SESS_KEY, JSON.stringify(data));
       hideLoginScreen();
     } else {
       showLoginError(data.error || 'خطأ في تسجيل الدخول');
@@ -770,7 +772,7 @@ function showSwitchUser() {
     try { window.fetch(SCRIPT_URL_AUTH, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action: 'auth_logout', sid }) }).catch(function () {}); } catch (e) {}
   }
-  localStorage.removeItem('owh_session');
+  localStorage.removeItem(OWH_SESS_KEY);
   currentUser = null; currentUserName = null; currentUserRole = null;
   document.getElementById('loginUsername').value = '';
   document.getElementById('loginPassword').value = '';
@@ -785,7 +787,7 @@ function showSwitchUser() {
 // CONFIG
 // ============================================================
 const SHEET_ID   = '18053VBWoCoEqkBGJfUP2nB1nX3IGRBQ3qEDiR2sf35U';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+const SCRIPT_URL = SCRIPT_URL_AUTH;
 
 // ============================================================
 // DEFAULT ITEM CATALOG (fallback if sheet not ready)
