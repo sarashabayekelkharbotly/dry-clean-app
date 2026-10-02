@@ -14,7 +14,7 @@
 <meta name="theme-color" content="#cc5f5f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="المخزون">
-<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://geszrsrdqxwtihrqzxiu.supabase.co">
 <link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -382,7 +382,9 @@ body {
 // ============================================================
 // AUTH
 // ============================================================
-const SCRIPT_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+// switch B (2026-10-02): inventory runs on the new engine. ROLLBACK = the old address: https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec
+const SCRIPT_URL_AUTH = 'https://geszrsrdqxwtihrqzxiu.supabase.co/functions/v1/elcontrol';
+const OWH_SESS_KEY = 'owh_session_engine';   // the engine's own sign-ins (shared with Emad's and Dani's pages)
 let currentUser     = null;
 let currentUserName = null;
 let currentUserRole = null;
@@ -395,7 +397,7 @@ let currentUserRole = null;
    its JSON body, and an 'AUTH' reply returns the user to the sign-in screen.
    ============================================================ */
 function owhSid() {
-  try { const s = JSON.parse(localStorage.getItem('owh_session') || 'null'); return (s && s.sid) ? s.sid : ''; }
+  try { const s = JSON.parse(localStorage.getItem(OWH_SESS_KEY) || 'null'); return (s && s.sid) ? s.sid : ''; }
   catch (e) { return ''; }
 }
 (function () {
@@ -427,7 +429,7 @@ let owhExpiredShown = false;
 function owhSessionExpired() {
   if (owhExpiredShown) return;
   owhExpiredShown = true;
-  localStorage.removeItem('owh_session');
+  localStorage.removeItem(OWH_SESS_KEY);
   currentUser = null; currentUserName = null; currentUserRole = null;
   const el = document.getElementById('loginScreen');
   if (el) el.style.display = 'flex';
@@ -437,7 +439,7 @@ function owhSessionExpired() {
 
 async function initAuth() {
   // Check localStorage for saved session
-  const saved = localStorage.getItem('owh_session');
+  const saved = localStorage.getItem(OWH_SESS_KEY);
   if (saved) {
     try {
       const s = JSON.parse(saved);
@@ -451,8 +453,8 @@ async function initAuth() {
         hideLoginScreen();
         return;
       }
-      localStorage.removeItem('owh_session');   // pre-token or malformed session
-    } catch(e) { localStorage.removeItem('owh_session'); }
+      localStorage.removeItem(OWH_SESS_KEY);   // pre-token or malformed session
+    } catch(e) { localStorage.removeItem(OWH_SESS_KEY); }
   }
   // Show login
   document.getElementById('loginScreen').style.display = 'flex';
@@ -478,7 +480,7 @@ async function doLogin() {
       currentUser     = data.username;
       currentUserName = data.displayName;
       currentUserRole = data.role;
-      localStorage.setItem('owh_session', JSON.stringify(data));
+      localStorage.setItem(OWH_SESS_KEY, JSON.stringify(data));
       hideLoginScreen();
     } else {
       showLoginError(data.error || 'خطأ في تسجيل الدخول');
@@ -511,7 +513,7 @@ function showSwitchUser() {
     try { window.fetch(SCRIPT_URL_AUTH, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action: 'auth_logout', sid }) }).catch(function () {}); } catch (e) {}
   }
-  localStorage.removeItem('owh_session');
+  localStorage.removeItem(OWH_SESS_KEY);
   currentUser = null; currentUserName = null; currentUserRole = null;
   document.getElementById('loginUsername').value = '';
   document.getElementById('loginPassword').value = '';
@@ -717,7 +719,7 @@ window.addEventListener('load',function(){
 // ─────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBCw9HrbnW7lVHeaRQF6FIqM9mERoTd0a34S_zvUnhaCsdFlbsGthYtoZggfNI6YgvQ/exec';
+const SCRIPT_URL = SCRIPT_URL_AUTH;
 
 const DEFAULT_ITEMS = [
   {id:1,  cat:'cleaning',emoji:'🧻',ar:'مناديل حمام',         en:'Toilet paper',               brand:'',             par:24,cur:4 },
@@ -975,7 +977,8 @@ async function cancelOrder(orderId, itemId) {
   if (!confirm('إلغاء هذا الطلب؟')) return;
   toast('⏳ جاري الإلغاء...');
   try {
-    await api('inv_cancel_order', { orderId, itemId });
+    const r = await api('inv_cancel_order', { orderId, itemId });
+    if (!r || r.ok !== true) { toast('❌ ' + ((r && r.error) || 'الإلغاء ماتمش')); return; }   // a refused cancel says so (Sarah 2026-10-02)
     orders = orders.filter(o => o.id !== orderId);
     saveCache();
     renderAll();
