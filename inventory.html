@@ -558,6 +558,9 @@ window.addEventListener('load',function(){
   <button class="nav-tab" onclick="showPage('stats',this)">
     <span class="tab-icon">📊</span>إحصائيات
   </button>
+  <button class="nav-tab" id="nav-recon" style="display:none" onclick="showPage('recon',this);loadRecon()">
+    <span class="tab-icon">🧮</span>مطابقة
+  </button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -586,6 +589,11 @@ window.addEventListener('load',function(){
 <!-- ORDERS -->
 <div class="page" id="page-orders">
   <div id="orders-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- RECONCILIATION (Sarah/Khaled) -->
+<div class="page" id="page-recon">
+  <div id="recon-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
 </div>
 
 <!-- STATS -->
@@ -829,11 +837,13 @@ let lastSyncTs = 0;
 // ─────────────────────────────────────────────
 const CACHE_KEY = 'owh_inv_cache_v1';
 
-function saveCache() {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, orders, events, categoriesList, countFixDay, ts: lastSyncTs }));   // snapshots no longer cached (2026-09-30)
-  } catch(e) { console.error('saveCache', e); }
-}
+/* NO OLD NUMBERS (Sarah 2026-10-02: "i don't want anyone to see an old number anymore"). The page never paints a
+   saved copy: it shows what the server says right now, or nothing. A copy left on a phone from the old app is
+   removed. saveCache stays as a name only (many callers) and keeps nothing. */
+function saveCache() { try { localStorage.removeItem(CACHE_KEY); } catch(e) {} }
+let dataFresh = false;            // true only while the last sync succeeded — saves are refused otherwise
+let countProgress = null;         // today's count: {counted, total} from the server
+let countMode = '', invCloseInfo = null, monthConfirm = null, usageRows = [];   // count kind of the day · the pending closing count · the 28th · monthly usage (server ledger)
 
 function loadCache() {
   try {
@@ -895,6 +905,8 @@ function agoText(ts) {
 // API
 // ─────────────────────────────────────────────
 async function api(action, extra = {}) {
+  // a save is only made on fresh numbers — never on a screen that couldn't reach the server
+  if (!dataFresh && !/^inv_get_|^inv_recon$|^auth_/.test(action)) throw new Error('not fresh');
   return apiWithRetry(action, extra, 1);
 }
 
@@ -1019,9 +1031,9 @@ async function syncData(silent = false) {
     if (done) return;
     done = true;
     syncing = false;
-    if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
-    renderAll();
+    dataFresh = false;
     hideSplash();
+    renderOffline();
     setFreshness('offline');
     if (!silent) toast('⚠️ تعذر الاتصال');
   }, 55000);
@@ -1043,6 +1055,8 @@ async function syncData(silent = false) {
     if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
     if (res.categories && res.categories.length) categoriesList = res.categories;
     countFixDay = res.countFixDay || '';
+    countProgress = res.countProgress || null;
+    countMode = res.countMode || ''; invCloseInfo = res.invClose || null; monthConfirm = res.monthConfirm || null; usageRows = res.usage || [];
     applyCategories(categoriesList);
     warnDuplicateIds();
     lastSyncTs = Date.now();
@@ -1064,29 +1078,31 @@ async function syncData(silent = false) {
       lastSyncTs = Date.now();
       saveCache();
       syncOk = true;
-    } catch(e2) {
-      if (items.length === 0) items = DEFAULT_ITEMS.map(i => ({...i}));
-      orders = orders || [];
-      events = events || [];
-    }
+    } catch(e2) { /* nothing fresh — renderOffline below */ }
   }
 
   if (done) return; // safety timer already fired
   done = true;
   clearTimeout(safetyTimer);
-  renderAll();
+  dataFresh = syncOk;
   hideSplash();
+  if (syncOk) { const sg = document.getElementById('summary-stats'); if (sg) sg.style.visibility = ''; renderAll();
+    if (document.getElementById('page-recon') && document.getElementById('page-recon').classList.contains('active')) loadRecon(); }
+  else renderOffline();
   setFreshness(syncOk ? 'live' : 'offline');
   if (!silent) toast(syncOk ? '✅ تم التحديث' : '⚠️ تعذر الاتصال');
   syncing = false;
 }
 
 // Re-sync when the user returns to the tab (if data is older than 60s)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && currentUser && Date.now() - lastSyncTs > 60000) {
-    syncData(true);
-  }
+document.addEventListener('visibilitychange', () => {        // back on the screen = fresh numbers, always
+  if (document.visibilityState === 'visible' && currentUser) syncData(true);
 });
+function renderOffline() {      // no connection → no numbers (never an old copy someone might act on)
+  const msg = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">مش متصل — الأرقام مش محدثة<br><button class="btn-ghost" style="margin-top:10px" onclick="syncData()">🔄 حاول تاني</button></div></div>';
+  ['nawaqes-content','list-cleaning','list-snacks','orders-content','stats-content','recon-content'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = msg; });
+  const sg = document.getElementById('summary-stats'); if (sg) sg.style.visibility = 'hidden';
+}
 
 function hideSplash() {
   var s = document.getElementById('splash');
@@ -1156,6 +1172,25 @@ function renderSummary() {
 
 /* 📐 gate bar — Sarah/Khaled hold the key; Emad only ever sees status.
    Three states: nothing scheduled · scheduled for a future day · open (today is the day). */
+function countProgressText() { return countProgress && countGateOpen() ? ` — اتعدّ ${countProgress.counted} من ${countProgress.total}` : ''; }
+function countKindText() { return countMode === 'close' && invCloseInfo ? `جرد إقفال ${invCloseInfo.month} — الفرق بيتسجل على رصيد آخر الشهر` : countMode === 'usage' ? 'جرد أسبوعي — الناقص بيتسجل استهلاك' : 'جرد تصحيح'; }
+function countExtraHtml() {     // the closing-count lock and Emad's 28th confirmation
+  let h = '';
+  if (invCloseInfo) h += `<div style="margin:0 0 10px;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;background:rgba(204,95,95,0.1);color:var(--danger)">🔒 الاستلام مقفول لحد ما جرد إقفال ${invCloseInfo.month} يخلص (يوم ${invCloseInfo.day}) — كل صنف لازم يتعدّ</div>`;
+  if (monthConfirm) {
+    if (monthConfirm.done) h += `<div style="margin:0 0 10px;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;background:rgba(92,170,127,0.12);color:var(--ok)">✅ أعداد آخر الشهر اتأكدت</div>`;
+    else if (!isReadonly() && countProgress && countProgress.counted >= countProgress.total)
+      h += `<button onclick="confirmMonth()" style="width:100%;margin:0 0 10px;padding:12px;border:none;border-radius:12px;background:var(--ok);color:white;font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;cursor:pointer">✅ أعداد آخر الشهر مظبوطة</button>`;
+    else h += `<div style="margin:0 0 10px;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;background:rgba(232,168,56,0.12);color:var(--warn)">📅 آخر الشهر: عدّ كل الأصناف وبعدين أكّد إن الأعداد مظبوطة${countProgressText()}</div>`;
+  }
+  return h;
+}
+async function confirmMonth() {
+  if (!confirm('متأكد إن كل الأعداد على الرف مطابقة للتطبيق دلوقتي؟')) return;
+  let r = null; try { r = await api('inv_month_confirm', {}); } catch(e) { r = null; }
+  if (!r || r.ok !== true) { toast('❌ ' + ((r && r.error) || 'لم يتم — تحقق من الإنترنت')); return; }
+  toast('✅ اتأكدت أعداد آخر الشهر'); syncData(true);
+}
 function renderCountGate() {
   const el = document.getElementById('countgate-bar');
   if (!el) return;
@@ -1163,14 +1198,14 @@ function renderCountGate() {
   const btnCss = `border:1px solid var(--border);background:white;border-radius:8px;padding:4px 10px;font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer`;
   if (isReadonly()) {   // sarah / khaled — the keyholders
     if (countGateOpen())
-      el.innerHTML = `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)"><span style="flex:1">📐 يوم الجرد — مفتوح لعماد طول اليوم</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">قفل الآن</button></div>`;
+      el.innerHTML = countExtraHtml() + `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)"><span style="flex:1">📐 ${countKindText()} — مفتوح لعماد طول اليوم${countProgressText()}</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">قفل الآن</button></div>`;
     else if (countGateFuture())
       el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)"><span style="flex:1">📐 جرد متجدول يوم ${countFixDay}</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">إلغاء / تغيير</button></div>`;
     else
       el.innerHTML = `<div style="${base}background:var(--bg);color:var(--text2)"><span style="flex:1">📐 الجرد مقفول</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">تحديد يوم جرد لعماد</button></div>`;
   } else {
     if (countGateOpen())
-      el.innerHTML = `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)">📐 النهارده يوم الجرد — عدّ على الرف وصحّح بزرار 📐 جنب الصنف</div>`;
+      el.innerHTML = countExtraHtml() + `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)">📐 ${countKindText()} — عدّ كل صنف وسجّله بزرار 📐 (حتى لو مطابق)${countProgressText()}</div>`;
     else if (countGateFuture())
       el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)">📐 جرد متجدول يوم ${countFixDay}</div>`;
     else el.innerHTML = '';
@@ -1747,12 +1782,7 @@ function renderStats() {
 
     // ── Q6: Consumption this month ──
     // Use consume events + negative adjust/par_change events (Emad's − taps)
-    const consumeEvents = events.filter(e => {
-      if (!e.timestamp || !e.timestamp.startsWith(selectedStatMonth)) return false;
-      return e.type === 'consume' ||
-             (e.type === 'adjust' && (e.qty||0) < 0) ||
-             (e.type === 'par_change' && (e.qty||0) < 0);
-    });
+    const consumeEvents = usageEvents().filter(e => e.timestamp.startsWith(selectedStatMonth));   // the server ledger, all history (2026-10-03)
     if (consumeEvents.length > 0) {
       const consumed = {};
       consumeEvents.forEach(e => {
@@ -1772,7 +1802,7 @@ function renderStats() {
       const maxC = Math.max(...consumptionList.map(c => c.value || c.qty), 1);
       const catAlias5 = { snacks: 'basket' };
       html += `<div class="insight-card" style="margin-bottom:16px">
-        <div class="insight-title">الاستهلاك هذا الشهر${totalConsumedVal > 0 ? ' — ' + totalConsumedVal.toFixed(0) + ' ج.م' : ''}</div>`;
+        <div class="insight-title">الاستهلاك هذا الشهر${totalConsumedVal > 0 ? ' — ' + totalConsumedVal.toFixed(0) + ' ج.م' : ''}${selectedStatMonth < '2026-10' ? ' <span style="font-size:11px;color:var(--text3)">(تقديري — قبل أول جرد)</span>' : ''}</div>`;
       consumptionList.forEach(c => {
         const cat = catAlias5[c.cat] || (catKeys.includes(c.cat) ? c.cat : 'cleaning');
         const barVal = c.value > 0 ? c.value : c.qty;
@@ -1831,11 +1861,7 @@ function renderStats() {
     }
 
     // ── All time consumption ──
-    const allConsumeEvents = events.filter(e =>
-      e.type === 'consume' ||
-      (e.type === 'adjust' && (e.qty||0) < 0) ||
-      (e.type === 'par_change' && (e.qty||0) < 0)
-    );
+    const allConsumeEvents = usageEvents();
 
     if (allConsumeEvents.length > 0) {
       // Monthly consumption trend (stacked by category)
@@ -2246,18 +2272,20 @@ async function countFix(id) {
   if (isReadonly()) { toast('عماد فقط يمكنه التعديل'); return; }
   const it = items.find(i => i.id == id);
   if (!it) return;
-  const v = prompt(`📐 جرد ${it.ar}\nالعدد في التطبيق: ${it.cur}\n\nاكتب العدد الفعلي اللي عدّيته على الرف:`, '');
+  // blind count (Sarah 2026-10-02): Emad types what is on the shelf — he is not shown the system's number
+  const v = prompt(`📐 جرد ${it.ar}\n\nاكتب العدد الفعلي اللي عدّيته على الرف (حتى لو مطابق):`, '');
   if (v === null || String(v).trim() === '') return;
   const actual = Math.floor(Number(String(v).trim()));
   if (!(actual >= 0)) { toast('اكتب رقم صحيح'); return; }
   let r = null;
   try { r = await api('inv_count_fix', { itemId: it.id, actual }); } catch(e) { r = null; }
   if (!r || r.ok !== true) { toast('❌ لم يُحفظ التصحيح — ' + ((r && r.error) || 'تحقق من الإنترنت وحاول مرة أخرى')); return; }
-  if (r.same) { toast(`ℹ️ العدد أصلاً ${r.cur} — لا تغيير`); return; }
+  if (r.same) { toast(`✅ ${it.ar}: مطابق — اتسجل`); syncData(true); return; }   // a match is recorded too (counted ≠ never counted)
   it.cur = r.cur;
   events.unshift({ id:genId(), itemId:it.id, itemName:it.ar, type:'correction', qty:r.cur - r.old, user:currentUserName, timestamp:new Date().toISOString(), note:`جرد: من ${r.old} إلى ${r.cur}`, curAfter:r.cur });
   updateCardUI(it); renderSummary(); renderNawaqes(); saveCache();
-  toast(`📐 اتصحح: ${it.ar} من ${r.old} إلى ${r.cur}`);
+  toast(r.kind === 'usage' ? `📉 ${it.ar}: الفرق اتسجل كاستهلاك` : r.kind === 'above' ? `⬆️ ${it.ar}: أكتر من السيستم — اتسجل وسارة وخالد هيشوفوه` : `📐 اتسجل: ${it.ar}`);   // blind: the old number is not echoed back
+  syncData(true);
 }
 
 async function adjPar(id, delta) {
@@ -2596,6 +2624,92 @@ async function addItem() {
 // ─────────────────────────────────────────────
 // TABS & MODALS
 // ─────────────────────────────────────────────
+/* 🧮 المطابقة (Sarah 2026-10-02) — per item per month: opening + received − used + undone ± count corrections ± system
+   repairs = closing. Every figure comes from the server's ledger (inv_recon) and adds up by construction; the EGP view
+   values every column at the item's last price paid by the month's end, so the money identity holds too (the month's
+   actual purchase cost is shown beside it). Mismatches first. */
+let reconMonth = todayYmd().slice(0, 7), reconMode = 'qty', reconData = null, reconOpen = {};
+const RECON_FIRST = '2026-06';
+const LINE_AR = { consume: 'استهلاك', consume_repeat: 'تكرار (مش محسوب)', purchase: 'استلام', purchase_repeat: 'استلام مكرر (مش محسوب)',
+  adjust: 'تراجع', adjust_repeat: 'تراجع مكرر (مش محسوب)', correction: 'جرد — فرق', count: 'جرد — مطابق', system_repair: 'تصحيح نظام',
+  count_usage: 'جرد — استهلاك ماتسجلش', close_correction: 'جرد إقفال — تصحيح' };
+function reconShift(n) {
+  const d = new Date(reconMonth + '-15T12:00:00'); d.setMonth(d.getMonth() + n);
+  const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (m < RECON_FIRST || m > todayYmd().slice(0, 7)) return;
+  reconMonth = m; loadRecon();
+}
+async function loadRecon() {
+  const el = document.getElementById('recon-content'); if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  let r = null; try { r = await api('inv_recon', { month: reconMonth }); } catch(e) { r = null; }
+  if (!r || r.ok !== true) { el.innerHTML = '<div class="empty"><div class="empty-text">❌ ' + ((r && r.error) || 'مش متصل') + '</div></div>'; return; }
+  reconData = r; renderRecon();
+}
+function reconFmt(x) { const v = Math.round(Number(x) * 100) / 100; return (v > 0 ? '' : '') + v.toLocaleString('en-US'); }
+function reconSigned(x) { const v = Math.round(Number(x) * 100) / 100; return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('en-US'); }
+function renderRecon() {
+  const el = document.getElementById('recon-content'); if (!el || !reconData) return;
+  const egp = reconMode === 'egp', mName = new Date(reconMonth + '-15T12:00:00').toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+  const V = (it, q) => egp ? Number(q) * Number(it.price || 0) : Number(q);
+  const rows = (reconData.items || []).map(it => ({ it, diff: Number(it.counts) + Number(it.repairs), egpDiff: (Number(it.counts) + Number(it.repairs)) * Number(it.price || 0) }));
+  rows.sort((a, b) => (b.diff !== 0) - (a.diff !== 0) || Math.abs(b.egpDiff) - Math.abs(a.egpDiff) || String(a.it.cat).localeCompare(String(b.it.cat)));
+  const tot = { opening: 0, received: 0, used: 0, undone: 0, counts: 0, repairs: 0, closing: 0, cost: 0 };
+  rows.forEach(({ it }) => { it.used = Number(it.used) + Number(it.count_used || 0);   // usage = taps + usage found by counts
+    ['opening','received','used','undone','counts','repairs','closing'].forEach(k => { tot[k] += Number(it[k]) * Number(it.price || 0); }); tot.cost += Number(it.received_cost || 0);
+    tot.est = (tot.est || 0) + Number(it.est_opening ?? it.opening) * Number(it.price || 0); });
+  const hasEst = rows.some(({ it }) => Number(it.phantom) || Number(it.expected_unlogged));
+  const mism = rows.filter(x => x.diff !== 0), counted = rows.filter(x => Number(x.it.counted_lines) > 0).length;
+  const btn = (on, label, js) => `<button onclick="${js}" style="border:1px solid var(--border);background:${on ? 'var(--primary)' : 'white'};color:${on ? 'white' : 'var(--text2)'};border-radius:8px;padding:4px 12px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${label}</button>`;
+  let h = `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px">
+      <button class="btn-ghost" onclick="reconShift(-1)" ${reconMonth <= RECON_FIRST ? 'disabled' : ''}>◀</button>
+      <div style="font-weight:800;font-size:15px">${mName}</div>
+      <button class="btn-ghost" onclick="reconShift(1)" ${reconMonth >= todayYmd().slice(0, 7) ? 'disabled' : ''}>▶</button></div>
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">${btn(!egp, 'العدد', "reconMode='qty';renderRecon()")}${btn(egp, 'القيمة (ج)', "reconMode='egp';renderRecon()")}</div>
+    <div class="stat-card" style="text-align:right;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.9">
+      <div style="font-weight:800;margin-bottom:4px">💰 الشهر بالقيمة (بآخر سعر)</div>
+      أول الشهر ${reconFmt(tot.opening)} + استلام ${reconFmt(tot.received)} − استهلاك ${reconFmt(tot.used)} + تراجع ${reconFmt(tot.undone)}
+      ${reconSigned(tot.counts)} فروق جرد ${reconSigned(tot.repairs)} تصحيح نظام = <b>آخر الشهر ${reconFmt(tot.closing)} ج</b>
+      <div style="color:var(--text3);font-size:11.5px">تكلفة الاستلام الفعلية الشهر ده: ${reconFmt(tot.cost)} ج</div>
+      ${hasEst ? `<div style="font-size:11.5px;color:var(--warn);font-weight:700">📏 أول الشهر الحقيقي التقديري: ${reconFmt(tot.est)} ج (من غير المخزون الوهمي والاستهلاك اللي ماتسجلش — لحد أول جرد)</div>` : ''}
+      ${reconData.confirmed ? `<div style="font-size:11.5px;color:var(--ok);font-weight:700">✅ أعداد آخر الشهر أكدها ${String(reconData.confirmed).split('|')[1] || ''} يوم ${String(reconData.confirmed).slice(0, 10)}</div>` : ''}
+      <div style="margin-top:4px;font-weight:700;color:${mism.length ? 'var(--danger)' : 'var(--ok)'}">${mism.length ? '⚠️ ' + mism.length + ' صنف فيه فرق — بقيمة ' + reconSigned(tot.counts + tot.repairs) + ' ج' : '✅ مفيش فروق'} · اتعدّ ${counted} من ${rows.length}</div>
+    </div>`;
+  rows.forEach(({ it, diff }) => {
+    const open = !!reconOpen[it.id], bad = diff !== 0, u = egp ? ' ج' : '';
+    const parts = [reconFmt(V(it, it.opening)), '+ ' + reconFmt(V(it, it.received)), '− ' + reconFmt(V(it, it.used))];
+    if (Number(it.undone)) parts.push('+ ' + reconFmt(V(it, it.undone)) + ' تراجع');
+    if (Number(it.counts)) parts.push(reconSigned(V(it, it.counts)) + ' جرد');
+    if (Number(it.repairs)) parts.push(reconSigned(V(it, it.repairs)) + ' تصحيح');
+    h += `<div class="stat-card" onclick="reconOpen['${it.id}']=!reconOpen['${it.id}'];renderRecon()" style="text-align:right;padding:10px 12px;margin-bottom:8px;cursor:pointer;border-right:4px solid ${bad ? 'var(--danger)' : 'var(--ok)'}">
+      <div style="display:flex;justify-content:space-between;gap:6px"><b>${it.emoji || ''} ${it.name}</b><span style="font-size:11px;color:var(--text3)">${Number(it.counted_lines) ? '📐 اتعدّ' : ''}</span></div>
+      <div style="font-size:12.5px;margin-top:3px;direction:rtl">${parts.join(' ')} = <b>${reconFmt(V(it, it.closing))}${u}</b></div>
+      ${bad ? `<div style="font-size:12px;color:var(--danger);font-weight:700;margin-top:2px">⚠️ فرق ${reconSigned(diff)} (${reconSigned(diff * Number(it.price || 0))} ج)</div>` : ''}
+      ${(Number(it.phantom) || Number(it.expected_unlogged)) ? `<div style="font-size:11.5px;color:var(--warn);margin-top:2px">📏 أول الشهر: السيستم ${reconFmt(it.opening)} · الحقيقي التقديري ${reconFmt(it.est_opening)} (${[Number(it.phantom) ? '−' + reconFmt(it.phantom) + ' وهمي' : '', Number(it.expected_unlogged) ? '−' + reconFmt(it.expected_unlogged) + ' استهلاك متوقع ماتسجلش' : ''].filter(Boolean).join('، ')})</div>` : ''}`;
+    if (open) {
+      h += `<div style="margin-top:8px;font-size:11.5px;line-height:1.8;color:var(--text2)" onclick="event.stopPropagation()">
+        <div>سعر آخر شراء: ${reconFmt(it.price)} ج · تكلفة استلام الشهر: ${reconFmt(it.received_cost)} ج</div>`;
+      if ((it.orders || []).length) {
+        h += '<div style="font-weight:800;margin-top:6px">🛒 الطلبات</div>';
+        it.orders.forEach(o => { h += `<div>• اتطلب ${o.ordered || '—'} · ${o.received ? 'اتستلم ' + o.received : 'لسه ماوصلش'} · ×${reconFmt(o.qty)} · ${reconFmt(o.price || 0)} ج = ${reconFmt(o.total || 0)} ج</div>`; });
+      }
+      if ((it.lines || []).length) {
+        h += '<div style="font-weight:800;margin-top:6px">📋 الحركة</div>';
+        it.lines.forEach(l => { h += `<div>• ${l.at} — ${LINE_AR[l.type] || l.type} ${reconSigned(l.type === 'consume' ? -l.qty : l.qty)} → ${reconFmt(l.after)}${l.by ? ' · ' + l.by : ''}${l.note ? ' · <span style="color:var(--text3)">' + l.note + '</span>' : ''}</div>`; });
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+/* monthly usage per item from the server ledger: taps + usage found by counts + usage whose line was lost − undos.
+   Shaped like events (mid-month timestamp) so the existing price-at-date and month grouping work unchanged. */
+function usageEvents() {
+  return (usageRows || []).map(u => ({ type: 'consume', itemId: u.id, itemName: u.name, qty: Number(u.qty) || 0, timestamp: u.m + '-15T12:00:00' }));
+}
+
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -2649,13 +2763,11 @@ function onAuthReady() {
   const nc = document.getElementById('nav-comms');
   if (nc && (u === 'sarah' || u === 'khaled')) nc.style.display = '';
 
-  if (loadCache()) {
-    // Instant load from cache, then refresh silently in the background
-    hideSplash();
-    renderAll();
-    setFreshness('stale');
-    syncData(true);
-  } else {
+  try { localStorage.removeItem(CACHE_KEY); } catch(e) {}       // the old saved copy is never shown again
+  const nr = document.getElementById('nav-recon');               // 🧮 reconciliation: Sarah/Khaled only
+  if (nr && (u === 'sarah' || u === 'khaled')) nr.style.display = '';
+  setInterval(() => { if (document.visibilityState === 'visible' && currentUser && !syncing) syncData(true); }, 60000);   // fresh every minute while open
+  {
     try {
       ['nawaqes-content','list-cleaning','list-snacks','orders-content','stats-content'].forEach(id => {
         const el = document.getElementById(id);
