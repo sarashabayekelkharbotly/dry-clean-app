@@ -87,6 +87,24 @@ textarea.wa{width:100%;min-height:210px;direction:rtl;font-family:'Cairo',sans-s
 .err{background:#f6e3e3;border:1px solid #e6b9b9;border-radius:10px;padding:12px;font-size:13px}
 .muted{color:var(--soft);font-size:11px}
 </style>
+<script>
+/* FRESH PAGE (2026-10-04): GitHub Pages lets a phone keep a saved copy for 10 minutes, so a refresh right after a
+   change showed the old screen. On open: ask the server for this page's date (no cache); if it is newer than the copy
+   on screen, reload once from the server. One check per new server date — never a loop. */
+(function () {
+  try {
+    var mine = Date.parse(document.lastModified);
+    fetch(location.pathname + '?fresh=' + Date.now(), { method: 'HEAD', cache: 'no-store' }).then(function (r) {
+      var srv = Date.parse(r.headers.get('last-modified') || '');
+      if (!srv || !mine || srv <= mine + 2000) return;
+      var k = 'owh_fresh|' + location.pathname + '|' + srv;
+      if (sessionStorage.getItem(k)) return;
+      sessionStorage.setItem(k, '1');
+      location.replace(location.pathname + '?v=' + srv + location.hash);
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <div class="frame">
