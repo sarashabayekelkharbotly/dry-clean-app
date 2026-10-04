@@ -372,12 +372,20 @@ window.addEventListener('load',function(){
   <button class="nav-tab" id="nav-comms" style="display:none" onclick="window.location.href='comms_index.html'">
     <span class="tab-icon">📨</span>التواصل
   </button>
+  <!-- 🗓️📶 Switch C (Sarah 2026-10-03): the Week and Internet screens moved here from the Hub — Sarah/Khaled only -->
+  <button class="nav-tab" id="nav-week" style="display:none" onclick="window.location.href='week.html'">
+    <span class="tab-icon">🗓️</span>الأسبوع
+  </button>
+  <button class="nav-tab" id="nav-net" style="display:none" onclick="window.location.href='internet.html'">
+    <span class="tab-icon">📶</span>النت
+  </button>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <!-- ===================== HOME PAGE ===================== -->
 <div class="page active" id="page-home">
+  <div id="ownersCard" style="display:none"></div>
   <div id="homeContent">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
   </div>
@@ -833,6 +841,8 @@ function onAuthReady() {
   // 📨 comms tab appears for Sarah/Khaled only (Emad's account is refused by it server-side)
   const nc = document.getElementById('nav-comms');
   if (nc && (currentUser === 'sarah' || currentUser === 'khaled')) nc.style.display = '';
+  if (isOwnerUser()) { ['nav-week', 'nav-net'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = ''; }); loadOwnersCard(); }
+  if (location.hash === '#repairs') setTimeout(() => showPage('repairs'), 0);   // the Week/Internet screens' 🔧 tab lands here
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('newDate').valueAsDate = new Date();
   const userEl = document.getElementById('currentUserDisplay');
@@ -1220,6 +1230,36 @@ async function loadEmadHome(force) {
     const r = await callScript({ action: 'emad_home', force: force ? 1 : 0 });
     if (r && r.ok) { EMAD = r; try { localStorage.setItem('emadCache', JSON.stringify(r)); } catch(e) {} renderHome(); }
   } catch (e) {}                                   // the panel is additive — home still works without it
+  if (isOwnerUser()) loadOwnersCard();
+}
+/* ============================================================
+   «مطلوب منكم» — Sarah and Khaled's card on the front page (Switch C, Sarah 2026-10-03): each flat's
+   next action (the same truth the Hub's Today shows), the Thursday confirm, internet dangers and overdue
+   repairs. Never shown to Emad — the engine refuses his account too.
+   ============================================================ */
+function isOwnerUser(){ return currentUser === 'sarah' || currentUser === 'khaled'; }
+let OWNERS_CARD = null;
+async function loadOwnersCard(){
+  try {
+    const r = await callScript({ action: 'owners_card' });
+    if (r && r.ok) { OWNERS_CARD = r; renderOwnersCard(); }
+  } catch (e) {}
+}
+function renderOwnersCard(){
+  const el = document.getElementById('ownersCard'); if (!el || !OWNERS_CARD) return;
+  const c = OWNERS_CARD, row = (a, b) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border,#eee);font-size:12.5px"><b>${a}</b><span style="text-align:left;color:var(--text2,#555)">${b}</span></div>`;
+  let warn = '';
+  if (c.confirmWeek) warn += `<div style="background:#fdecea;color:#b23b3b;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">📅 جدول أسبوع <span dir="ltr">${String(c.confirmWeek.week).slice(8,10)}/${String(c.confirmWeek.week).slice(5,7)}</span> لسه ماتأكدش — <a href="week.html" style="color:inherit">افتح الأسبوع</a> وابعتوا الواتساب</div>`;
+  (c.internet || []).forEach(n => { warn += `<div style="background:#fff4e0;color:#8a5a00;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">${n.text} <a href="internet.html" style="color:inherit">← النت</a></div>`; });
+  (c.overdue || []).forEach(r => { warn += `<div style="background:#fdecea;color:#b23b3b;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">🔧 ${emadFlatAr(r.flat)} — ${r.trade} متأخر من <span dir="ltr">${r.date}</span>${r.what ? ' — ' + r.what : ''} <a href="#" onclick="showPage('repairs');return false" style="color:inherit">← الصيانة</a></div>`; });
+  el.innerHTML = `<div class="card" style="padding:12px;margin-bottom:12px;border:2px solid var(--primary,#cc5f5f)">
+    <div style="font-weight:800;font-size:14px;margin-bottom:8px">📌 مطلوب منكم</div>${warn}
+    ${(c.next || []).map(n => row(emadFlatAr(n.flat), `${n.action} <span style="color:var(--text3);font-size:11px">· ${n.state}</span>`)).join('')}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <a href="week.html" style="flex:1;text-align:center;border:1px solid var(--border,#ddd);border-radius:9px;padding:8px;font-weight:700;font-size:13px;color:inherit;text-decoration:none">🗓️ الأسبوع</a>
+      <a href="internet.html" style="flex:1;text-align:center;border:1px solid var(--border,#ddd);border-radius:9px;padding:8px;font-weight:700;font-size:13px;color:inherit;text-decoration:none">📶 النت</a>
+    </div></div>`;
+  el.style.display = '';
 }
 const EMAD_TYPE_AR = { checkout: 'تنظيف خروج', midstay: 'نظافة اثناء وجود ضيف', weekly: 'نظافة اثناء وجود ضيف',
                        revision: 'إعادة', codechange: 'تغيير الكود', custom: 'تنظيف إضافي' };
@@ -1673,12 +1713,14 @@ async function renderRepairsScreen(force){
   h += `<div class="section-title">البلاغات المفتوحة (${(REP.open||[]).length})</div>`;
   if (!(REP.open||[]).length) h += `<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">لا توجد بلاغات مفتوحة</div></div>`;
   (REP.open||[]).forEach(t => {
-    const closing = REP_CLOSE_ID === t.id;
-    h += `<div class="card" style="padding:10px 12px;margin-bottom:8px${closing ? ';border:2px solid var(--primary,#cc5f5f)' : ''}">
+    const closing = REP_CLOSE_ID === t.id, over = repIsOverdue(t);
+    h += `<div class="card" style="padding:10px 12px;margin-bottom:8px${closing ? ';border:2px solid var(--primary,#cc5f5f)' : (over ? ';border:2px solid #e57373' : '')}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:800;font-size:13.5px">🔧 ${emadFlatAr(t.flat)} — ${t.trade}</div>
+          <div style="font-weight:800;font-size:13.5px">🔧 ${emadFlatAr(t.flat)} — ${t.trade}${over ? ' <span style="background:#fdecea;color:#b23b3b;border-radius:6px;padding:1px 6px;font-size:10.5px">متأخر</span>' : ''}</div>
           <div style="font-size:11.5px;color:var(--text3);margin-top:2px"><span dir="ltr">${t.date || 'بدون تاريخ'}</span>${t.time && /^\d/.test(t.time) ? ' — ' + emadHmAr(t.time) : ''}${t.what ? ' — ' + t.what : ''}</div>
+          ${t.by ? `<div style="font-size:10.5px;color:var(--text3);margin-top:2px">فتحه ${t.by}${t.openedAt ? ' · <span dir="ltr">' + String(t.openedAt).slice(0,10) + '</span>' : ''}</div>` : ''}
+          ${isOwnerUser() ? `<div style="margin-top:4px"><a href="#" onclick="repOwnerEdit('${t.id}');return false" style="font-size:11.5px;color:var(--primary,#cc5f5f);font-weight:700;text-decoration:none">✎ تعديل</a> · <a href="#" onclick="repOwnerDelete('${t.id}');return false" style="font-size:11.5px;color:#b23b3b;font-weight:700;text-decoration:none">🗑 حذف</a></div><div id="repEd_${t.id}"></div>` : ''}
         </div>
         <button onclick="REP_CLOSE_ID=${closing ? 'null' : `'${t.id}'`};renderRepairsScreen()" style="flex-shrink:0;border:1px solid ${closing ? 'var(--border,#ddd)' : '#a5d6a7'};border-radius:8px;background:${closing ? 'none' : '#e8f5e9'};color:${closing ? 'var(--text3)' : '#2e7d32'};font-family:'Cairo',sans-serif;font-weight:700;font-size:12px;padding:6px 12px;cursor:pointer">${closing ? '✕' : '✅ إغلاق'}</button>
       </div>`;
@@ -1692,7 +1734,100 @@ async function renderRepairsScreen(force){
     }
     h += `</div>`;
   });
+  if (isOwnerUser()) h += repOwnerClosedHtml();
   el.innerHTML = h;
+  if (isOwnerUser() && !REP_ALL) repOwnerLoad();
+}
+/* ============================================================
+   🔧 ONE REPAIRS LOG (Switch C, Sarah 2026-10-03: "there is already a repairs page in elcontrol so this
+   should be one"). Everyone sees the open tickets, who opened them, and which are overdue. Sarah/Khaled
+   also get what the Hub's repairs page gave them: edit/delete any ticket (flat and trade too) and the
+   CLOSED log — whose cost/date/trade/note edits and deletes carry the WeShare Maintenance row with them
+   (a confirmed row whose amount changes goes back to pending for Khaled).
+   ============================================================ */
+const REP_GRACE_H = 24;
+function repIsOverdue(t){
+  if (!t.date || !/^\d{4}-\d{2}-\d{2}/.test(t.date)) return false;
+  const tm = t.time && /^\d\d:\d\d/.test(t.time) ? t.time.slice(0,5) : '17:00';
+  return Date.now() > new Date(t.date.slice(0,10) + 'T' + tm + ':00').getTime() + REP_GRACE_H * 3600000;
+}
+let REP_ALL = null, REP_CLOSED_N = 15;
+async function repOwnerLoad(){
+  try { const r = await callScript({ action: 'repairs_all' }); if (r && r.ok) { REP_ALL = r; renderRepairsScreen(); } } catch(e) {}
+}
+function repOwnerFind(id){ return ((REP_ALL && REP_ALL.repairs) || []).find(x => x.id === id); }
+function repSel(id, list, cur, ar){ return `<select id="${id}" style="flex:1;border:1px solid var(--border,#ddd);border-radius:8px;padding:7px;font-family:'Cairo',sans-serif;font-size:12.5px">${list.map(v => `<option value="${v}"${v === cur ? ' selected' : ''}>${ar ? emadFlatAr(v) : v}</option>`).join('')}</select>`; }
+const repInp = "border:1px solid var(--border,#ddd);border-radius:8px;padding:7px;font-family:'Cairo',sans-serif;font-size:12.5px";
+function repOwnerClosedHtml(){
+  if (!REP_ALL) return `<div class="section-title">السجل المقفول</div><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
+  const closed = (REP_ALL.repairs || []).filter(r => r.status === 'closed').sort((a, b) => String(b.closedDate).localeCompare(String(a.closedDate)));
+  let h = `<div class="section-title">السجل المقفول (${closed.length})</div>`;
+  closed.slice(0, REP_CLOSED_N).forEach(r => {
+    h += `<div class="card" style="padding:9px 12px;margin-bottom:7px">
+      <div style="font-weight:800;font-size:13px">✅ ${emadFlatAr(r.flat)} — ${r.trade} <span style="font-weight:600;color:var(--text3);font-size:11.5px">· اتقفل <span dir="ltr">${r.closedDate || '—'}</span>${r.cost ? ' · ' + Number(r.cost).toLocaleString('en-US') + ' ج' : ' · مجاناً'}</span></div>
+      ${(r.done || r.what) ? `<div style="font-size:11.5px;color:var(--text3);margin-top:2px">${r.done || r.what}</div>` : ''}
+      <div style="margin-top:4px"><a href="#" onclick="repOwnerEditClosed('${r.id}');return false" style="font-size:11.5px;color:var(--primary,#cc5f5f);font-weight:700;text-decoration:none">✎ تعديل</a> · <a href="#" onclick="repOwnerDeleteClosed('${r.id}');return false" style="font-size:11.5px;color:#b23b3b;font-weight:700;text-decoration:none">🗑 حذف</a></div>
+      <div id="repEdc_${r.id}"></div></div>`;
+  });
+  if (closed.length > REP_CLOSED_N) h += `<button onclick="REP_CLOSED_N+=30;renderRepairsScreen()" style="width:100%;border:1px solid var(--border,#ddd);border-radius:9px;background:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:8px;cursor:pointer">عرض أقدم (${closed.length - REP_CLOSED_N})</button>`;
+  h += `<div style="font-size:11px;color:var(--text3);margin:8px 2px 0">تعديل التكلفة أو التاريخ أو النوع أو الملاحظة بيعدّل صف الصيانة في «وي شير» معاه، ولو كان متأكد والمبلغ اتغيّر بيرجع pending لخالد. الحذف بيشيل صف وي شير كمان — والاتنين بيوصلهم تليجرام.</div>`;
+  return h;
+}
+function repOwnerEdit(id){
+  const box = document.getElementById('repEd_' + id); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  const r = repOwnerFind(id) || (REP.open || []).find(x => x.id === id); if (!r) { showToast('⏳ لحظة — بيحمّل'); return; }
+  const flats = (REP_ALL && REP_ALL.flats) || REP.flats || [], trades = (REP_ALL && REP_ALL.trades) || REP.trades || [];
+  box.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee)">
+    <div style="display:flex;gap:6px">${repSel('roF_' + id, flats, r.flat, true)}${repSel('roT_' + id, trades, r.trade, false)}</div>
+    <div style="display:flex;gap:6px"><input id="roD_${id}" type="date" value="${String(r.date || '').slice(0,10)}" style="flex:1;${repInp}"><input id="roH_${id}" type="time" value="${String(r.time || '').slice(0,5)}" style="flex:1;${repInp}"></div>
+    <input id="roW_${id}" value="${String(r.what || '').replace(/"/g, '&quot;')}" placeholder="ما المشكلة؟" style="${repInp}">
+    <button onclick="repOwnerSave('${id}')" style="border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:9px;cursor:pointer">حفظ التعديل</button></div>`;
+}
+async function repOwnerSave(id){
+  const g = k => document.getElementById(k + '_' + id).value;
+  try {
+    const r = await callScript({ action: 'ops_edit_repair', id, flat: g('roF'), trade: g('roT'), date: g('roD'), time: g('roH'), what: g('roW').trim() }, { timeout: 40000, retries: 0 });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ اتعدل'); REP_ALL = null; await renderRepairsScreen(true); loadEmadHome();
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
+}
+async function repOwnerDelete(id){
+  const r = (REP.open || []).find(x => x.id === id) || repOwnerFind(id);
+  if (!confirm('حذف البلاغ المفتوح ده؟\n' + (r ? emadFlatAr(r.flat) + ' · ' + r.trade : ''))) return;
+  try {
+    const x = await callScript({ action: 'ops_delete_repair', id }, { timeout: 40000, retries: 0 });
+    if (!x || x.ok !== true) throw new Error((x && x.error) || 'failed');
+    showToast('🗑 اتشال'); REP_ALL = null; await renderRepairsScreen(true); loadEmadHome();
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
+}
+function repOwnerEditClosed(id){
+  const box = document.getElementById('repEdc_' + id); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  const r = repOwnerFind(id); if (!r) return;
+  box.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#eee)">
+    <div style="display:flex;gap:6px">${repSel('rcF_' + id, REP_ALL.flats || [], r.flat, true)}${repSel('rcT_' + id, REP_ALL.trades || [], r.trade, false)}</div>
+    <div style="display:flex;gap:6px"><input id="rcD_${id}" type="date" value="${String(r.closedDate || '').slice(0,10)}" style="flex:1;${repInp}"><input id="rcC_${id}" type="number" min="0" step="1" inputmode="numeric" value="${r.cost != null ? r.cost : ''}" placeholder="التكلفة ج" style="flex:1;${repInp}"></div>
+    <input id="rcN_${id}" value="${String(r.done || '').replace(/"/g, '&quot;')}" placeholder="ماذا تم عمله؟" style="${repInp}">
+    <button onclick="repOwnerSaveClosed('${id}')" style="border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:9px;cursor:pointer">حفظ — صف وي شير هيتعدل معاه</button></div>`;
+}
+async function repOwnerSaveClosed(id){
+  const g = k => document.getElementById(k + '_' + id).value;
+  if (String(g('rcC')).trim() === '') { showToast('❌ التكلفة مطلوبة (0 مسموح)'); return; }
+  try {
+    const r = await callScript({ action: 'ops_edit_repair', id, flat: g('rcF'), trade: g('rcT'), closedDate: g('rcD'), cost: g('rcC'), done: g('rcN').trim() }, { timeout: 40000, retries: 0 });
+    if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+    showToast('✅ اتعدل' + (r.result && r.result.weshare ? ' — ' + r.result.weshare : '')); REP_ALL = null; await renderRepairsScreen(true);
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
+}
+async function repOwnerDeleteClosed(id){
+  const r = repOwnerFind(id); if (!r) return;
+  if (!confirm('حذف بلاغ مقفول من السجل؟\n' + emadFlatAr(r.flat) + ' · ' + r.trade + (r.cost ? ' · ' + r.cost + ' ج' : '') + '\n\nصف الصيانة في «وي شير» هيتشال معاه، وسارة وخالد هيوصلهم تليجرام.')) return;
+  try {
+    const x = await callScript({ action: 'ops_delete_repair', id }, { timeout: 40000, retries: 0 });
+    if (!x || x.ok !== true) throw new Error((x && x.error) || 'failed');
+    showToast('🗑 اتشال' + (x.result && x.result.weshare ? ' — ' + x.result.weshare : '')); REP_ALL = null; await renderRepairsScreen(true);
+  } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
 async function repairOpenSave(){
   const nt = REP_NEW_TRADE ? (document.getElementById('repNewTrade')?.value || '').trim() : '';
@@ -1708,7 +1843,7 @@ async function repairOpenSave(){
     const r = await callScript(body);
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('✅ تم فتح البلاغ');
-    REP_ADD_OPEN = false; REP_NEW_TRADE = false;
+    REP_ADD_OPEN = false; REP_NEW_TRADE = false; REP_ALL = null;
     await renderRepairsScreen(true); loadEmadHome();
   } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
@@ -1724,7 +1859,7 @@ async function repairCloseSave(id){
       date: document.getElementById('repCloseDate').value });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('✅ تم الإغلاق' + (r.weshare === 'pending row added' ? ' — في انتظار تأكيد خالد' : ''));
-    REP_CLOSE_ID = null;
+    REP_CLOSE_ID = null; REP_ALL = null;
     await renderRepairsScreen(true); loadEmadHome();
   } catch(e) { showToast('❌ لم يتم — ' + (e.message || 'حاول مرة أخرى')); }
 }
@@ -3052,7 +3187,7 @@ async function updateSheetCell(range, value) {
    try again" instead of a long stare. Safe because the write paths are idempotent server-side
    (task add dedupes, ticks dedupe, repair close is once-per-ticket): a landed-but-unconfirmed
    first attempt can never duplicate. Explicit opts always win (the sync pipeline passes its own). */
-const READ_ACTIONS = { dc_get_boot:1, dc_get_all:1, emad_home:1, repairs_data:1, meter_screen:1, hub_sync_status:1, dc_version:1 };
+const READ_ACTIONS = { dc_get_boot:1, dc_get_all:1, emad_home:1, repairs_data:1, meter_screen:1, hub_sync_status:1, dc_version:1, owners_card:1, repairs_all:1 };
 /* RETRY ONLY WHAT CANNOT DUPLICATE (2026-09-10, caught in the same evening it was introduced):
    the blanket writes-retry was safe for the deduping actions but a raw `append` (submission
    save) or a meter_log has NO server-side dedupe — a slow first attempt plus a retry would file
