@@ -1280,7 +1280,7 @@ function renderOwnersCard(){
         '<td style="' + td + '">' + esc(r.what) + (r.when ? '<div style="font-size:9.5px;color:var(--text3);font-weight:700;margin-top:1px" dir="ltr">' + esc(r.when) + '</div>' : '') + '</td>' +
         '<td style="' + td + ';text-align:center;font-weight:800;font-family:monospace;font-size:11px;letter-spacing:.5px">' + esc(r.code || '') + '</td></tr>').join('') +
       '</tbody></table>' +
-      '<div style="font-size:9.5px;color:var(--text3);margin-top:6px">' + dot('airbnb') + 'Airbnb &nbsp;' + dot('booking') + 'Booking &nbsp;' + dot('direct') + 'Direct</div></div>';
+      '<div style="font-size:9.5px;color:var(--text3);margin-top:6px;display:flex;gap:10px">' + [['airbnb', 'Airbnb'], ['booking', 'Booking'], ['direct', 'Direct']].map(x => '<span style="white-space:nowrap">' + dot(x[0]) + x[1] + '</span>').join('') + '</div></div>';
   }
   el.innerHTML = h;
   el.style.display = '';
