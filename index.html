@@ -1286,12 +1286,13 @@ function renderOwnersCard(){
     const PILL = { out: ['خروج', '#f4dede', '#a24a4a'], 'in': ['وصول', '#dce9df', '#3a7d4d'], stay: ['فيه ضيف', '#e2edf3', '#2c5468'], gap: ['فاضي', '#f3ead9', '#8a6d2f'], free: ['مفيش حجز', '#fdeaea', '#cc5f5f'] };
     const until = r => { const m = String(r.state || '').match(/(\d{2}\/\d{2})/); return m ? (r.kind === 'gap' ? 'الوصول ' : r.kind === 'stay' ? 'لحد ' : '') + m[1] : ''; };
     const one = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    const shortName = g => { const w = String(g || '').trim().split(/s+/); return w.length > 2 ? w[0] + ' ' + w[w.length - 1] : w.join(' '); };   // first + last
     const small = 'font-size:10px;color:var(--text3);margin-top:3px;' + one;
     const th = 'padding:6px 6px;font-size:10px;color:var(--text3);font-weight:700;text-align:right;background:var(--surface2,#fdf6f6);border-bottom:1px solid var(--border,#e8d8d8)';
     h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:8px">🏠 البيوت — اللي جاي</div>' +
       '<div style="border:1px solid var(--border,#e8d8d8);border-radius:10px;overflow:hidden">' +
       '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<colgroup><col style="width:21%"><col style="width:37%"><col style="width:28%"><col style="width:14%"></colgroup>' +
+      '<colgroup><col style="width:19%"><col style="width:34%"><col style="width:34%"><col style="width:13%"></colgroup>' +
       '<thead><tr><th style="' + th + '">البيت</th><th style="' + th + '">الضيف</th><th style="' + th + '">اللي جاي</th><th style="' + th + ';text-align:center">الكود</th></tr></thead><tbody>' +
       rows.map((r, i) => {
         const ch = CH(r.portal), pl = PILL[r.kind] || PILL.free, u = until(r);
@@ -1299,11 +1300,11 @@ function renderOwnersCard(){
         return '<tr>' +
           '<td style="' + td + '"><div style="font-weight:800;font-size:12.5px;' + one + '">' + emadFlatAr(r.flat) + '</div>' +
             '<div style="' + small + '"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + ch[1] + ';margin-left:4px"></span>' + ch[0] + '</div></td>' +
-          '<td style="' + td + '"><div style="font-size:12px;font-weight:600;' + one + '"><bdi>' + esc(r.guest || '—') + '</bdi></div>' +
+          '<td style="' + td + '"><div style="font-size:12px;font-weight:600;' + one + '"><bdi>' + esc(shortName(r.guest) || '—') + '</bdi></div>' +
             '<div style="' + small + '"><span style="display:inline-block;font-size:9.5px;font-weight:700;padding:0 6px;border-radius:8px;background:' + pl[1] + ';color:' + pl[2] + '">' + pl[0] + '</span>' + (u ? ' ' + u : '') + '</div></td>' +
           '<td style="' + td + '"><div style="font-size:12px;' + one + '">' + esc(r.what) + '</div>' +
             '<div style="' + small + ';font-weight:700" dir="ltr">' + esc(r.when || '') + '</div></td>' +
-          '<td style="' + td + ';text-align:center"><span style="display:inline-block;font-family:monospace;font-weight:800;font-size:12px;letter-spacing:1px;background:#fff;border:1px solid var(--border,#e8d8d8);border-radius:6px;padding:2px 4px">' + esc(r.code || '') + '</span></td>' +
+          '<td style="' + td + ';text-align:center"><span style="display:inline-block;font-family:monospace;font-weight:800;font-size:11px;background:#fff;border:1px solid var(--border,#e8d8d8);border-radius:6px;padding:1px 3px">' + esc(r.code || '') + '</span></td>' +
           '</tr>';
       }).join('') +
       '</tbody></table></div></div>';
