@@ -1286,7 +1286,7 @@ function renderOwnersCard(){
     const PILL = { out: ['خروج', '#f4dede', '#a24a4a'], 'in': ['وصول', '#dce9df', '#3a7d4d'], stay: ['فيه ضيف', '#e2edf3', '#2c5468'], gap: ['فاضي', '#f3ead9', '#8a6d2f'], free: ['مفيش حجز', '#fdeaea', '#cc5f5f'] };
     const until = r => { const m = String(r.state || '').match(/(\d{2}\/\d{2})/); return m ? (r.kind === 'gap' ? 'الوصول ' : r.kind === 'stay' ? 'لحد ' : '') + m[1] : ''; };
     const one = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-    const shortName = g => { const w = String(g || '').trim().split(/s+/); return w.length > 2 ? w[0] + ' ' + w[w.length - 1] : w.join(' '); };   // first + last
+    const shortName = g => { const w = String(g || '').trim().split(/\s+/); return w.length > 2 ? w[0] + ' ' + w[w.length - 1] : w.join(' '); };   // first + last
     const small = 'font-size:10px;color:var(--text3);margin-top:3px;' + one;
     const th = 'padding:6px 6px;font-size:10px;color:var(--text3);font-weight:700;text-align:right;background:var(--surface2,#fdf6f6);border-bottom:1px solid var(--border,#e8d8d8)';
     h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:8px">🏠 البيوت — اللي جاي</div>' +
