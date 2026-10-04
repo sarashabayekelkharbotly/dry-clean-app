@@ -419,6 +419,16 @@ const FLAT_PIN={
   'Zayed 2000':'https://maps.app.goo.gl/ZoXaN4DijpW2BidP8'
 };
 function pinFor(st){ return (st&&FLAT_PIN[st.flat])||''; }
+/* 🏠 THE HOUSE GUIDES (Sarah 2026-10-05: "include all the house guides in the comms ladder"). Each home's guide lives at
+   stay.ourwelcomehome.com — one private address per home, English at the root and Arabic under /ar/. The «دليل البيت»
+   message carries the guest's own language version as its last line, whatever wording the template editor holds. */
+const FLAT_GUIDE={
+  '8A':'https://stay.ourwelcomehome.com/8a-7f3k9q2m/',
+  '17A':'https://stay.ourwelcomehome.com/17a-wh4qqcqf/',
+  '28A':'https://stay.ourwelcomehome.com/28a-geewjmmf/',
+  'Zayed 2000':'https://stay.ourwelcomehome.com/z2000-znqs5jbr/'
+};
+function guideFor(st){ const u=st&&FLAT_GUIDE[st.flat]; return u ? (tplLang(st)==='ar' ? u+'ar/' : u) : ''; }
 function copyTpl(stayId,k,occ){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   // the pin needs no language and no gender, so it never triggers those prompts
@@ -431,6 +441,7 @@ function copyTpl(stayId,k,occ){
     return;
   }
   if(!ensureLangGender(st)) return;
+  if(k==='manual' && !guideFor(st)) toast('⚠️ مفيش دليل بيت لـ '+st.flat+' — الرسالة اتنسخت من غير لينك');
   const t=tpl(k,st,occ);
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
     ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
@@ -1099,6 +1110,12 @@ function sheetTpl(k, st, occ){
   return (row&&row.text&&row.text.trim()) ? renderTpl(row.text, st) : null;
 }
 function tpl(k, st, occ){
+  const t0=tplBase(k, st, occ);
+  if(k!=='manual') return t0;
+  const g=guideFor(st);
+  return g && t0.indexOf(g)<0 ? String(t0).replace(/\s+$/,'')+'\n'+g : t0;   // the guide link closes the «دليل البيت» message
+}
+function tplBase(k, st, occ){
   const sheet=sheetTpl(k, st, occ); if(sheet!==null) return sheet;
   if(tplLang(st)==='ar') return tplAR(k, st, occ);
   const n=firstName(st.guest);
