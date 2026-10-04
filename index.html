@@ -1306,7 +1306,7 @@ function renderOwnersCard(){
           '<td style="' + td + '"><div dir="ltr" style="text-align:right;font-size:12px;font-weight:600;' + one + '"><bdi>' + esc(shortName(r.guest) || '—') + '</bdi></div>' +
             '<div style="' + small + '"><span style="display:inline-block;font-size:9px;font-weight:700;padding:0 4px;border-radius:8px;background:' + pl[1] + ';color:' + pl[2] + '">' + pl[0] + '</span>' + (u ? ' ' + u : '') + '</div></td>' +
           '<td style="' + td + '"><div style="font-size:12px;' + one + '">' + esc(r.what) + '</div>' +
-            '<div style="' + small + ';font-weight:700" dir="ltr">' + esc(r.when || '') + '</div></td>' +
+            '<div style="' + small + ';font-weight:700;text-align:right"><bdi dir="ltr">' + esc(r.when || '') + '</bdi></div></td>' +
           '<td style="' + td + ';text-align:center"><span style="display:inline-block;font-family:monospace;font-weight:800;font-size:11px;background:#fff;border:1px solid var(--border,#e8d8d8);border-radius:6px;padding:1px 3px">' + esc(r.code || '') + '</span></td>' +
           '</tr>';
       }).join('') +
@@ -1765,7 +1765,8 @@ async function renderRepairsScreen(force){
   }
 
   h += `<div class="section-title">البلاغات المفتوحة (${(REP.open||[]).length})</div>`;
-  if (!(REP.open||[]).length) h += `<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">لا توجد بلاغات مفتوحة</div></div>`;
+  // one quiet line, not a big empty-state block — the closed log follows right after (Sarah 2026-10-05)
+  if (!(REP.open||[]).length) h += `<div style="background:rgba(92,170,127,0.10);color:#2e7d32;border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:700;margin-bottom:12px">✨ لا توجد بلاغات مفتوحة</div>`;
   (REP.open||[]).forEach(t => {
     const closing = REP_CLOSE_ID === t.id, over = repIsOverdue(t);
     h += `<div class="card" style="padding:10px 12px;margin-bottom:8px${closing ? ';border:2px solid var(--primary,#cc5f5f)' : (over ? ';border:2px solid #e57373' : '')}">

@@ -5,13 +5,14 @@
  * One rule, every screen, every person:
  *   1. ONE header — logo + «الكنترول» + who is signed in; on the other side only that screen's own tools,
  *      then 🔄 (full sync — new bookings in, this screen refreshed) and 👤 (switch user / sign out). No duplicates.
- *   2. The MAIN MENU right under it, icons + words:
+ *   (2026-10-05, Sarah's second pass: "the sub banners up and the main banner down in all pages, the sub banners should
+ *    all have emojis like they used to") — so:
+ *   2. The MAIN MENU sits at the BOTTOM of the screen, fixed, icons + words:
  *        Sarah / Khaled:  الرئيسية · التواصل · دراي كلين · المخزون · الجدولة
  *        Emad:            الرئيسية · دراي كلين · كهرباء · إصلاحات · سجل · المخزون
  *        Dani:            (none — his account opens the comms screen only)
- *   3. The screen's SECTIONS as small pill tabs under the menu — words only, no emojis
+ *   3. The screen's SECTIONS sit at the TOP, under the header — a tab bar with their emojis
  *      (dry clean · الجدولة · inventory · comms).
- *   4. Nothing at the bottom of any screen.
  * Each page keeps its own native header/tabs in the DOM (hidden) — the pills click them, so every page's own logic
  * (active tab, data loading) is untouched. A page describes itself in window.CTL_PAGE before calling init().
  * ============================================================ */
@@ -37,9 +38,9 @@
   };
   // sections that live inside index.html (pills switch the page in place there)
   var GROUPS = {
-    dc: [{ k: 'new', t: 'إرسال جديد', page: 'new' }, { k: 'review', t: 'مراجعة', page: 'review' }, { k: 'stats', t: 'إحصائيات', page: 'stats' }, { k: 'manage', t: 'إدارة', page: 'manage' }],
-    sched: [{ k: 'week', t: 'الأسبوع', href: 'week.html' }, { k: 'repairs', t: 'الصيانة', page: 'repairs' }, { k: 'net', t: 'النت', href: 'internet.html' },
-            { k: 'elec', t: 'الكهرباء', page: 'elec' }, { k: 'log', t: 'السجل', page: 'log' }]
+    dc: [{ k: 'new', ic: '➕', t: 'إرسال جديد', page: 'new' }, { k: 'review', ic: '📦', t: 'مراجعة', page: 'review' }, { k: 'stats', ic: '📊', t: 'إحصائيات', page: 'stats' }, { k: 'manage', ic: '⚙️', t: 'إدارة', page: 'manage' }],
+    sched: [{ k: 'week', ic: '🗓️', t: 'الأسبوع', href: 'week.html' }, { k: 'repairs', ic: '🔧', t: 'الصيانة', page: 'repairs' }, { k: 'net', ic: '📶', t: 'النت', href: 'internet.html' },
+            { k: 'elec', ic: '⚡', t: 'الكهرباء', page: 'elec' }, { k: 'log', ic: '📋', t: 'السجل', page: 'log' }]
   };
   var DC_PAGES = { 'new': 1, review: 1, stats: 1, manage: 1, dc: 1 };
   function sess() { try { var s = JSON.parse(localStorage.getItem('owh_session_engine') || 'null'); return s && s.sid ? s : null; } catch (e) { return null; } }
@@ -60,14 +61,17 @@
       '#ctlChrome .hd .sp{flex:1}' +
       '#ctlChrome .hd button{border:1px solid #e8d8d8;background:#fff;border-radius:9px;min-width:34px;height:34px;padding:0 7px;font-size:15px;cursor:pointer;font-family:Cairo,sans-serif;font-weight:700;color:#555}' +
       '#ctlChrome .hd button:disabled{opacity:.6}' +
-      '#ctlChrome .mn{display:flex;max-width:980px;margin:0 auto;border-bottom:1px solid #e8d8d8}' +
-      '#ctlChrome .mn a{flex:1 1 0;min-width:0;text-align:center;padding:7px 1px 6px;font-size:10.5px;font-weight:700;color:#999;text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer}' +
-      '#ctlChrome .mn a .ic{display:block;font-size:16px;line-height:1.2}' +
-      '#ctlChrome .mn a.on{color:#cc5f5f;border-bottom-color:#cc5f5f}' +
-      '#ctlChrome .sb{display:flex;gap:4px;max-width:980px;margin:0 auto;padding:6px 8px;background:#fdf6f6;overflow-x:auto;scrollbar-width:none}' +
-      '#ctlChrome .sb::-webkit-scrollbar{display:none}' +
-      '#ctlChrome .sb a{flex:1 1 auto;text-align:center;padding:5px 3px;border-radius:16px;font-size:11px;font-weight:700;color:#6b6b6b;background:#fff;border:1px solid #e8d8d8;text-decoration:none;white-space:nowrap;cursor:pointer}' +
-      '#ctlChrome .sb a.on{background:#cc5f5f;color:#fff;border-color:#cc5f5f}';
+      '#ctlChrome .sb{display:flex;max-width:980px;margin:0 auto;border-bottom:1px solid #e8d8d8;background:#fff}' +
+      '#ctlChrome .sb a{flex:1 1 0;min-width:0;text-align:center;padding:6px 1px 5px;font-size:10.5px;font-weight:700;color:#999;text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer;overflow:hidden;text-overflow:ellipsis}' +
+      '#ctlChrome .sb a .ic{display:block;font-size:15px;line-height:1.25}' +
+      '#ctlChrome .sb a.on{color:#cc5f5f;border-bottom-color:#cc5f5f}' +
+      '#ctlBottom{direction:rtl;position:fixed;left:0;right:0;bottom:0;z-index:150;background:#fff;border-top:1px solid #e8d8d8;box-shadow:0 -2px 8px rgba(0,0,0,.06);font-family:Cairo,sans-serif;padding-bottom:env(safe-area-inset-bottom)}' +
+      '#ctlBottom .mn{display:flex;max-width:980px;margin:0 auto}' +
+      '#ctlBottom .mn a{flex:1 1 0;min-width:0;text-align:center;padding:6px 1px 7px;font-size:10.5px;font-weight:700;color:#999;text-decoration:none;border-top:3px solid transparent;white-space:nowrap;cursor:pointer}' +
+      '#ctlBottom .mn a .ic{display:block;font-size:18px;line-height:1.2}' +
+      '#ctlBottom .mn a.on{color:#cc5f5f;border-top-color:#cc5f5f}' +
+      'body.ctl-has-bottom{padding-bottom:64px!important}' +
+      'body.ctl-has-bottom .toast,body.ctl-has-bottom #ctlNote{bottom:84px!important}';
     document.head.appendChild(st);
   }
   var state = { top: '', sub: '' };
@@ -118,8 +122,9 @@
     var box = document.querySelector(cfg.subFrom.sel); if (!box) return null;
     return Array.prototype.filter.call(box.querySelectorAll(cfg.subFrom.item), function (b) { return b.style.display !== 'none'; })
       .map(function (b) {
-        var cl = b.cloneNode(true); Array.prototype.forEach.call(cl.querySelectorAll('.tab-icon,.ti,.ni'), function (x) { x.remove(); });
-        return { el: b, t: cl.textContent.replace(/\s+/g, ' ').trim(), on: b.classList.contains(cfg.subFrom.on) };
+        var cl = b.cloneNode(true), icEl = cl.querySelector('.tab-icon,.ti,.ni'), ic = icEl ? icEl.textContent.trim() : '';
+        if (icEl) icEl.remove();
+        return { el: b, ic: ic, t: cl.textContent.replace(/\s+/g, ' ').trim(), on: b.classList.contains(cfg.subFrom.on) };
       });
   }
   function draw() {
@@ -129,21 +134,27 @@
       (cfg.status ? ' · <span id="ctlStatus"></span>' : '') + '</div></div><div class="sp"></div>';
     nativeTools().forEach(function (b, i) { h += '<button data-t="' + i + '" title="' + esc(b.title || '') + '">' + esc(b.textContent.trim()) + '</button>'; });
     h += '<button data-a="sync" title="مزامنة شاملة — الحجوزات الجديدة وتحديث الشاشة">🔄</button><button data-a="user" title="تغيير المستخدم / خروج">👤</button></div>';
-    if (menu) h += '<div class="mn">' + menu.map(function (x, i) {
-      return '<a data-m="' + i + '" class="' + (state.top === x.k ? 'on' : '') + '" href="' + x.href + '"><span class="ic">' + x.ic + '</span>' + x.t + '</a>'; }).join('') + '</div>';
     var subs = null;
-    if (cfg.subFrom) subs = (nativeSections() || []).map(function (x, i) { return '<a data-n="' + i + '" class="' + (x.on ? 'on' : '') + '">' + esc(x.t) + '</a>'; });
+    if (cfg.subFrom) subs = (nativeSections() || []).map(function (x, i) { return '<a data-n="' + i + '" class="' + (x.on ? 'on' : '') + '"><span class="ic">' + esc(x.ic || '•') + '</span>' + esc(x.t) + '</a>'; });
     else if (state.top === 'dc' || (state.top === 'sched' && r === 'owner'))
-      subs = GROUPS[state.top].map(function (x, i) { return '<a data-g="' + i + '" class="' + (state.sub === x.k ? 'on' : '') + '" href="' + (x.href || ('index.html#' + x.page)) + '">' + x.t + '</a>'; });
+      subs = GROUPS[state.top].map(function (x, i) { return '<a data-g="' + i + '" class="' + (state.sub === x.k ? 'on' : '') + '" href="' + (x.href || ('index.html#' + x.page)) + '"><span class="ic">' + x.ic + '</span>' + x.t + '</a>'; });
     if (subs && subs.length > 1) h += '<div class="sb">' + subs.join('') + '</div>';
     el.innerHTML = h;
+    // the main menu: a fixed bar at the bottom (none for Dani)
+    var bot = document.getElementById('ctlBottom');
+    if (menu) {
+      if (!bot) { bot = document.createElement('div'); bot.id = 'ctlBottom'; document.body.appendChild(bot); }
+      bot.innerHTML = '<div class="mn">' + menu.map(function (x, i) {
+        return '<a data-m="' + i + '" class="' + (state.top === x.k ? 'on' : '') + '" href="' + x.href + '"><span class="ic">' + x.ic + '</span>' + x.t + '</a>'; }).join('') + '</div>';
+      document.body.classList.add('ctl-has-bottom');
+    } else if (bot) { bot.remove(); document.body.classList.remove('ctl-has-bottom'); }
     var st = document.getElementById('ctlStatus'); if (st && cfg.status) { var src = document.querySelector(cfg.status); st.textContent = src ? src.textContent.trim() : ''; }
     // wiring
     var tools = nativeTools();
     Array.prototype.forEach.call(el.querySelectorAll('button[data-t]'), function (b) { b.onclick = function () { tools[+b.getAttribute('data-t')].click(); }; });
     el.querySelector('button[data-a="sync"]').onclick = function () { fullSync(this); };
     el.querySelector('button[data-a="user"]').onclick = function () { if (cfg.user) cfg.user(); };
-    Array.prototype.forEach.call(el.querySelectorAll('a[data-m]'), function (a) { a.onclick = function (ev) {
+    Array.prototype.forEach.call(document.querySelectorAll('#ctlBottom a[data-m]'), function (a) { a.onclick = function (ev) {
       var it = menu[+a.getAttribute('data-m')];
       if (it.page && onIndex()) { ev.preventDefault(); window.showPage(it.page); }
     }; });
@@ -160,7 +171,8 @@
     cfg = window.CTL_PAGE || {};
     if (screen) cfg.screen = screen;
     var old = document.getElementById('ctlChrome');
-    if (!role()) { if (old) old.remove(); if (hideCss) { hideCss.remove(); hideCss = null; } return false; }   // signed out: the page's own sign-in shows
+    if (!role()) { if (old) old.remove(); var ob = document.getElementById('ctlBottom'); if (ob) ob.remove(); document.body.classList.remove('ctl-has-bottom');
+      if (hideCss) { hideCss.remove(); hideCss = null; } return false; }   // signed out: the page's own sign-in shows
     css();
     if (!hideCss && (cfg.hide || []).length) { hideCss = document.createElement('style'); hideCss.textContent = cfg.hide.join(',') + '{display:none!important}'; document.head.appendChild(hideCss); }
     if (!old) { old = document.createElement('div'); old.id = 'ctlChrome'; document.body.insertBefore(old, document.body.firstChild); }
