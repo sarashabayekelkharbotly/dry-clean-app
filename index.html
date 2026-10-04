@@ -1263,9 +1263,9 @@ function renderOwnersCard(){
   if (rows.length) {
     const th = 'padding:7px 6px;font-size:11px;color:var(--text3);font-weight:700;text-align:right;border-bottom:2px solid var(--border,#e8d8d8);white-space:nowrap';
     const td = 'padding:8px 6px;font-size:12.5px;border-bottom:1px solid var(--border,#f0e4e4);vertical-align:top';
-    h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px">🏠 الشقق — اللي جاي</div>' +
+    h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px">🏠 البيوت — اللي جاي</div>' +
       '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
-      '<th style="' + th + '">الشقة</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + '">امتى</th></tr></thead><tbody>' +
+      '<th style="' + th + '">البيت</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + '">امتى</th></tr></thead><tbody>' +
       rows.map(r => '<tr><td style="' + td + ';font-weight:800;white-space:nowrap">' + emadFlatAr(r.flat) + '</td>' +
         '<td style="' + td + ';color:var(--text2,#555)">' + esc(r.state) + '</td>' +
         '<td style="' + td + '">' + esc(r.what) + '</td>' +
