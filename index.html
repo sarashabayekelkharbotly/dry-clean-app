@@ -425,9 +425,9 @@ window.addEventListener('load',function(){
   <div class="section-title">إرسال طلب جديد للغسيل</div>
   <div class="card">
     <div class="form-group">
-      <label class="form-label">الشقة</label>
+      <label class="form-label">البيت</label>
       <select class="form-select" id="newApt">
-        <option value="">اختر الشقة</option>
+        <option value="">اختر البيت</option>
         <option value="8A">8A</option>
         <option value="17A">17A</option>
         <option value="28A">28A</option>
@@ -519,7 +519,7 @@ window.addEventListener('load',function(){
     <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">إجمالي القطع</div></div>
     <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">متوسط الطلب</div></div>
   </div>
-  <div class="section-title">التكلفة حسب الشقة</div>
+  <div class="section-title">التكلفة حسب البيت</div>
   <div class="apt-breakdown" id="aptBreakdown"><div class="loading"><div class="spinner"></div></div></div>
   <div class="section-title" style="margin-top:16px">القطع المرسلة هذا الشهر</div>
   <div class="card" id="topItems"><div class="loading"><div class="spinner"></div></div></div>
@@ -1292,8 +1292,8 @@ function emadFlatAr(f){ return f === 'Zayed 2000' ? 'زايد 2000' : f; }
 function emadTaskLine(c){
   // no hardcoded «غدا» — since 2026-08-16 the trip can sit ON the arrival day itself, and this line
   // said "tomorrow" about a guest already walking in; the lock-code task carries the exact timing
-  if (c.type === 'codechange') return `شقة ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — قبل دخول الضيف`;
-  let t = `شقة ${emadFlatAr(c.flat)}: ${EMAD_TYPE_AR[c.type] || 'تنظيف'}`;
+  if (c.type === 'codechange') return `بيت ${emadFlatAr(c.flat)}: تغيير كود الباب إلى ${c.code} — قبل دخول الضيف`;
+  let t = `بيت ${emadFlatAr(c.flat)}: ${EMAD_TYPE_AR[c.type] || 'تنظيف'}`;
   if (c.time && /^\d/.test(c.time)) t += ` الساعة ${emadHmAr(c.time)}`;
   if (c.cleaner === 'jinny') t += ' — النظافة: جيني';
   else if (c.cleaner === 'both') t += ' — النظافة: أمل + جيني';
@@ -1406,9 +1406,9 @@ async function emadCleanEnd(date, flat, type, time, late){
     if (!/^\d{1,2}:\d{2}$/.test(endTime)) { alert('اكتب الساعة كده: 15:30'); return; }
   }
   // Sarah 2026-08-02: house-status notes are required on EVERY clean — the سجل screen reads them
-  const notes = prompt('حالة الشقة؟ (إجباري) — أعطال، نواقص، أو "كله تمام"');
+  const notes = prompt('حالة البيت؟ (إجباري) — أعطال، نواقص، أو "كله تمام"');
   if (notes === null) return;
-  if (!notes.trim()) { alert('لازم تكتب حالة الشقة — لو مفيش حاجة اكتب "كله تمام"'); return; }
+  if (!notes.trim()) { alert('لازم تكتب حالة البيت — لو مفيش حاجة اكتب "كله تمام"'); return; }
   try {
     const r = await callScript({ action: 'clean_end', date, flat, type, time, notes: notes.trim(), endTime });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
@@ -1557,7 +1557,7 @@ async function renderCleanLog(force){
     (tDays[d] || []).sort((a,b)=>String(a.time||'98:99').localeCompare(String(b.time||'98:99'))).forEach(t => {
       h += `<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:5px;border-right:3px solid ${t.done?'#2e7d32':'#cc5f5f'}">
         <div style="display:flex;justify-content:space-between;gap:6px">
-          <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}${t.apt?` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home'?'البيت':t.apt}</span>`:''}</div>
+          <div style="font-size:13px${t.done?'':';font-weight:700'}">${t.done?'✅':'⬜'} ${t.time?`<b>${t.time}</b> · `:''}${clogEsc(t.text)}${t.apt?` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home' ? 'شخصي':t.apt}</span>`:''}</div>
           <div style="font-size:11.5px;color:#666;white-space:nowrap">${t.who==='malah'?'داني':'عماد'}${t.by?' · من '+clogEsc(t.by):''}</div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px">
@@ -1659,7 +1659,7 @@ async function cardRechargeSave(force) {
 
 /* 📶 §9 — router GB entry, same shape as the meter prompt. Written into the Hub's readings tab. */
 async function emadInetPrompt(flat){
-  const v = prompt('الجيجا المتبقية في راوتر شقة ' + emadFlatAr(flat) + ' (زي ما ظاهرة في صفحة الراوتر):');
+  const v = prompt('الجيجا المتبقية في راوتر بيت ' + emadFlatAr(flat) + ' (زي ما ظاهرة في صفحة الراوتر):');
   if (v === null) return;
   const g = parseFloat(String(v).replace(/[^\d.]/g, ''));
   if (isNaN(g) || g < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
@@ -2077,7 +2077,7 @@ function renderEmadPanel() {
     const ageTxt = ageDays > 0 ? ` <span style="color:${ageDays >= 3 ? '#cc5f5f' : 'var(--text3)'};font-size:11px;font-weight:700">⏳ من ${ageDays} يوم</span>` : '';
     /* NO delete on the home list (Sarah 2026-08-30: Emad taps the ✕ by mistake and tasks vanish) —
        deleting is a deliberate act and lives in the سجل only */
-    const aptB = t.apt ? ` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home'?'البيت':t.apt}</span>` : '';
+    const aptB = t.apt ? ` <span style="background:#eee;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:700">${t.apt==='Home' ? 'شخصي':t.apt}</span>` : '';
     const txt = `${tm ? '<b>' + tm + '</b> · ' : ''}${t.text}${aptB}${t.overdue ? ' <span style="color:#cc5f5f;font-size:11px;font-weight:700">(متأخر من ' + t.date.slice(5) + ')</span>' : ''}${ageTxt}` +
       `<span style="color:var(--text3);font-size:11px"> — ${t.by || ''}</span>` +
       ` <span onclick="event.stopPropagation();emadTaskEditUI('${t.id}')" style="cursor:pointer;font-size:11px;padding:0 4px">✏️</span>`;
@@ -2103,7 +2103,7 @@ function renderEmadPanel() {
   /* today's repairs — tapping one opens the CLOSE form, not a cosmetic tick: a repair is done when
      its cost is entered (0 allowed), and the task leaves the list because the ticket really closed */
   (EMAD.repairs || []).filter(r => r.date === todayK).forEach(r => {
-    todo += row('🔧', `شقة ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق</span>`,
+    todo += row('🔧', `بيت ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق</span>`,
       { click: `emadRepairFromTodo('${r.id}')` });
   });
 
@@ -2138,7 +2138,7 @@ function renderEmadPanel() {
     const inet = EMAD.inet || { flats: {}, last: {} };
     if (EMAD.inet) (EMAD.flats || []).forEach(f => {
       if (!inet.flats[f])
-        todo += row('⚠️', `<b>شقة ${emadFlatAr(f)} من غير باقة إنترنت مسجلة</b> — كل الشقق فيها إنترنت؛ الباقة بتتسجل من شاشة الإنترنت في The Hub`, {});
+        todo += row('⚠️', `<b>بيت ${emadFlatAr(f)} من غير باقة إنترنت مسجلة</b> — كل البيوت فيها إنترنت؛ الباقة بتتسجل من شاشة الإنترنت في The Hub`, {});
     });
     const seenNet = new Set();
     (EMAD.schedule || []).forEach(c => {
@@ -2147,9 +2147,9 @@ function renderEmadPanel() {
       if (!inet.flats[c.flat]) return;                 // already flagged above as a missing bundle
       seenNet.add(c.flat);
       if (inet.last[c.flat] === todayK)
-        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — شقة ${emadFlatAr(c.flat)}`, {});
+        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — بيت ${emadFlatAr(c.flat)}`, {});
       else
-        todo += row('📶', `<b>تسجيل جيجا الإنترنت — شقة ${emadFlatAr(c.flat)}</b> (يوم نظافة — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
+        todo += row('📶', `<b>تسجيل جيجا الإنترنت — بيت ${emadFlatAr(c.flat)}</b> (يوم نظافة — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
           { click: `emadInetPrompt('${c.flat}')` });
     });
     /* §9 corrected (Sarah 2026-08-22): the boundary is the GUEST's, not the cleaner's — a check-in
@@ -2159,9 +2159,9 @@ function renderEmadPanel() {
       if (bd !== todayK || seenNet.has(bf) || !inet.flats[bf]) return;
       seenNet.add(bf);
       if (inet.last[bf] === todayK)
-        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — شقة ${emadFlatAr(bf)}`, {});
+        todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — بيت ${emadFlatAr(bf)}`, {});
       else
-        todo += row('📶', `<b>تسجيل جيجا الإنترنت — شقة ${emadFlatAr(bf)}</b> (يوم دخول/خروج ضيف — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
+        todo += row('📶', `<b>تسجيل جيجا الإنترنت — بيت ${emadFlatAr(bf)}</b> (يوم دخول/خروج ضيف — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
           { click: `emadInetPrompt('${bf}')` });
     });
   }
@@ -2170,22 +2170,22 @@ function renderEmadPanel() {
   });
   /* 🔔 laundry ready at the shop — resolves by recording the receipt in المراجعة (كامل/جزئي) */
   (EMAD.pickups || []).forEach(p => {
-    todo += row('🧺', `<b>استلم الغسيل من المغسلة:</b> شقة ${emadFlatAr(p.apt)} — جاهز <span style="color:var(--text3);font-size:10.5px">— سجّل الاستلام في «المراجعة»</span>`);
+    todo += row('🧺', `<b>استلم الغسيل من المغسلة:</b> بيت ${emadFlatAr(p.apt)} — جاهز <span style="color:var(--text3);font-size:10.5px">— سجّل الاستلام في «المراجعة»</span>`);
   });
   (EMAD.sla || []).forEach(x => {
-    todo += row('🧺', `<b>تابع المغسلة:</b> شقة ${emadFlatAr(x.apt)} عند الغسيل من ${x.days} أيام <span style="color:#cc5f5f;font-size:11px">(أكثر من ٣ أيام)</span>`);
+    todo += row('🧺', `<b>تابع المغسلة:</b> بيت ${emadFlatAr(x.apt)} عند الغسيل من ${x.days} أيام <span style="color:#cc5f5f;font-size:11px">(أكثر من ٣ أيام)</span>`);
   });
   /* partial receipts stay here until the submission is flipped to استلام كامل in المراجعة —
      the follow-up log Sarah asked for (2026-08-02): item + comment, impossible to forget */
   (EMAD.partials || []).forEach(p => {
     const det = (p.items || []).map(x => `${x.type}${x.qty > 1 ? (x.issueQty ? ` (${x.issueQty} من ${x.qty})` : ' ×' + x.qty) : ''}${x.note ? ' — ' + x.note : ''}`).join('، ');
     const when = p.date ? ` <span style="color:var(--text3);font-size:11px">(غسيل ${p.date.slice(5).replace('-', '/')})</span>` : '';
-    todo += row('🧺', `<b>متبقي من الغسيل:</b> شقة ${emadFlatAr(p.apt)}${when}${det
+    todo += row('🧺', `<b>متبقي من الغسيل:</b> بيت ${emadFlatAr(p.apt)}${when}${det
       ? `<br><span style="font-size:12px">${det}</span> <span style="color:#cc5f5f;font-size:11px">— تابعه لحد ما يرجع</span>`
       : ` <span style="color:#cc5f5f;font-size:11px">— الأصناف غير محددة: افتحها في «المراجعة» وعلِّم الناقص ⚠️، أو لو رجعت خلاص اعمل «استلام كامل»</span>`}`);
   });
   (EMAD.payment || []).forEach(x => {
-    todo += row('💵', `<b>الدفع للمغسلة:</b> شقة ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
+    todo += row('💵', `<b>الدفع للمغسلة:</b> بيت ${emadFlatAr(x.apt)} مُسترجع بدون دفع${x.hours != null ? ` <span style="color:var(--text3);font-size:11px">(منذ ${Math.floor(x.hours/24)} يوم)</span>` : ''}`);
   });
   /* only items with NO order out are an attention item (Sarah 2026-08-04) — once ordered, there's
      nothing to do until delivery, so they leave the to-do and sit on the stock card marked مطلوب */
@@ -2209,8 +2209,8 @@ function renderEmadPanel() {
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <input id="emadTaskDate" type="date" value="${todayK}" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:112px">
       <input id="emadTaskTime" type="time" title="اختياري — يرتّب المهمة في مكانها الصحيح في اليوم" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:86px">
-      <select id="emadTaskApt" title="الشقة — أو البيت للمهام الشخصية" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:96px">
-        <option value="">— شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option><option value="Home">البيت</option>
+      <select id="emadTaskApt" title="البيت — أو «شخصي» للمهام الشخصية" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 4px;font-family:'Cairo',sans-serif;font-size:11.5px;width:96px">
+        <option value="">— بيت —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option><option value="Home">شخصي</option>
       </select>
       <span style="flex:1"></span>
       <button onclick="emadTaskAdd()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px 18px;cursor:pointer">أضف</button>
@@ -2459,7 +2459,7 @@ function openEditModal(subId) {
   let html = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">الشقة</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">البيت</div>
         <select id="editApt" class="form-select">${aptOptions}</select>
       </div>
       <div>
@@ -2566,7 +2566,7 @@ async function saveEdit() {
 
   // a submission must always carry its apartment — laundry is a per-flat cost (Sarah 2026-08-05).
   // The server refuses it too; this is just the friendlier message.
-  if (!newApt || !newApt.trim()) { showToast('⚠️ لازم تحدد الشقة'); return; }
+  if (!newApt || !newApt.trim()) { showToast('⚠️ لازم تحدد البيت'); return; }
 
   // Validate items
   for (const item of editItems) {
@@ -2758,7 +2758,7 @@ async function submitNew() {
   const apt       = document.getElementById('newApt').value;
   const submitter = document.getElementById('newSubmitter').value;
   const dateVal   = document.getElementById('newDate').value;
-  if (!apt) { showToast('⚠️ اختر الشقة'); return; }
+  if (!apt) { showToast('⚠️ اختر البيت'); return; }
   if (newItems.length === 0) { showToast('⚠️ أضف قطعة على الأقل'); return; }
 
   showToast('⏳ جاري الحفظ...');

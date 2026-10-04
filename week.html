@@ -788,12 +788,12 @@ function waLine(c){
     if(waForAmal()) return '';
     var nn=nextCheckIn(c.flat,day(c.date)), dfC=nn?Math.round((nn-day(c.date))/DAYMS):null;
     var whenTxt=dfC===0?'نفس اليوم':dfC===1?'غدا':(nn?'يوم '+DAY_AR[nn.getDay()]+' '+dm(nn):'');
-    return '• شقة '+flatAr(c.flat)+': تغيير كود الباب إلى '+c.code+(whenTxt?' — دخول ضيف '+whenTxt:'')+'\n';
+    return '• بيت '+flatAr(c.flat)+': تغيير كود الباب إلى '+c.code+(whenTxt?' — دخول ضيف '+whenTxt:'')+'\n';
   }
   var label = isStayClean(c) ? 'نظافة اثناء وجود ضيف'
             : c.type==='checkout' ? 'تنظيف خروج'
             : c.type==='revision' ? 'إعادة' : 'تنظيف إضافي';
-  var t='• شقة '+flatAr(c.flat)+': '+label+' الساعة '+hmAr(c.time);
+  var t='• بيت '+flatAr(c.flat)+': '+label+' الساعة '+hmAr(c.time);
   t+=' — النظافة: '+CLEANER_LBL[c.cleaner||'amal'];               // من ينظف — أمل / جيني / الاثنين (2026-08-03)
   if(!waForAmal()){
     if(c.type==='checkout') t+=' — كود الباب '+c.code;
@@ -823,7 +823,7 @@ function waCodeFallback(d){
       STAYS.forEach(function(s){
         if(s.flat!==f||day(s.checkIn).getTime()!==target.getTime()) return;
         if(coveringVisit(f,target)) return;
-        out+=(warn?'⚠️ ':'')+'• شقة '+flatAr(f)+': تغيير كود الباب إلى '+arrivalCode(f,target)+' — دخول ضيف '+word+'\n';
+        out+=(warn?'⚠️ ':'')+'• بيت '+flatAr(f)+': تغيير كود الباب إلى '+arrivalCode(f,target)+' — دخول ضيف '+word+'\n';
       });
     });
   }
@@ -870,7 +870,7 @@ function waSection(ws,list){
     var items=[];
     dayCleans.forEach(function(c){ items.push({ at: hm(c.time) || '99:99', line: waLine(c) }); });
     dayReps.forEach(function(r){
-      var line='• شقة '+flatAr(r.flat)+': صيانة '+r.trade+(r.time?' الساعة '+hmAr(r.time):'')+(r.what?' — '+r.what:'');
+      var line='• بيت '+flatAr(r.flat)+': صيانة '+r.trade+(r.time?' الساعة '+hmAr(r.time):'')+(r.what?' — '+r.what:'');
       if(occStayOn(r.flat,d)) line+=' — الضيف موجود';
       items.push({ at: hm(r.time) || '99:99', line: line+'\n' });
     });

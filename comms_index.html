@@ -403,7 +403,7 @@ function copyTpl(stayId,k,occ){
   // the pin needs no language and no gender, so it never triggers those prompts
   if(k==='location'){
     const pin=pinFor(st);
-    if(!pin){ toast('⚠️ مفيش لوكيشن مسجّل لشقة '+st.flat+' — كلّمي سارة'); return; }
+    if(!pin){ toast('⚠️ مفيش لوكيشن مسجّل لبيت '+st.flat+' — كلّمي سارة'); return; }
     (navigator.clipboard?navigator.clipboard.writeText(pin):Promise.reject()).then(
       ()=>toast('📍 اللوكيشن اتنسخ — الصقه في واتساب'),
       ()=>{ prompt('انسخ اللوكيشن:',pin); });
@@ -436,7 +436,7 @@ async function editTask(id){
   const tx=prompt('نص المهمة:',t.text); if(tx===null) return;
   const dt=prompt('التاريخ (YYYY-MM-DD):',t.date); if(dt===null) return;
   const tm=prompt('الساعة (HH:MM أو فاضي):',t.time||''); if(tm===null) return;
-  const ap=prompt('الشقة (8A / 17A / 17B / 28A / Zayed 2000 — أو فاضي):',t.apt||''); if(ap===null) return;
+  const ap=prompt('البيت (8A / 17A / 17B / 28A / Zayed 2000 — أو فاضي):',t.apt||''); if(ap===null) return;
   let r=null; try{ r=await api('emad_task_edit',{id,text:tx.trim(),date:dt.trim(),time:tm.trim(),apt:ap.trim()}); }catch(e){}
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
   [(D.tasks||[]).find(x=>x.id===id),(D.tasksAll||[]).find(x=>x.id===id)].forEach(x=>{ if(x){ x.text=r.text; x.date=r.date; x.time=r.time; x.apt=ap.trim(); } });
@@ -800,7 +800,7 @@ function renderRep(){
   let h='<div class="banner">🔧 الصيانة المفتوحة — عماد بيقفلها؛ افتح بلاغ جديد لو الضيف بلّغ عن عطل</div>';
   h+=(D.repairs&&D.repairs.length)?D.repairs.map(r=>`<div class="line"><b>${r.flat||r.apt||''}</b><span style="flex:1">${r.trade||''} ${r.desc||r.note||''}</span><span class="badge b-soon">${r.date||''}</span></div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
   h+=`<div class="sec-h">فتح بلاغ صيانة</div>
-    <input class="inp" id="rp-flat" placeholder="الشقة (8A / 17A / 28A / Zayed 2000 / 17B)">
+    <input class="inp" id="rp-flat" placeholder="البيت (8A / 17A / 28A / Zayed 2000 / 17B)">
     <input class="inp" id="rp-date" type="date">
     <input class="inp" id="rp-time" type="time">
     <input class="inp" id="rp-desc" placeholder="المشكلة — مثال: تسريب في الحمام">
@@ -809,7 +809,7 @@ function renderRep(){
 }
 async function openRepair(){
   const flat=document.getElementById('rp-flat').value.trim(), desc=document.getElementById('rp-desc').value.trim();
-  if(!flat||!desc){ toast('اكتب الشقة والمشكلة'); return; }
+  if(!flat||!desc){ toast('اكتب البيت والمشكلة'); return; }
   const b=document.getElementById('rp-btn'); b.disabled=true; b.textContent='⏳';
   let r=null; try{ r=await api('repair_open',{flat,desc:desc+(document.getElementById('rp-time')&&document.getElementById('rp-time').value?' — الساعة '+document.getElementById('rp-time').value:''),date:(document.getElementById('rp-date')&&document.getElementById('rp-date').value)||D.today}); }catch(e){}
   b.disabled=false; b.textContent='🔧 فتح البلاغ';
@@ -824,7 +824,7 @@ function renderTask(){
     <input class="inp" id="tk-date" type="date">
     <input class="inp" id="tk-time" type="time">
     <select class="inp" id="tk-asg"><option value="">لعماد</option><option value="malah">ليّا (داني)</option></select>
-    <select class="inp" id="tk-apt"><option value="">— من غير شقة —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option></select>
+    <select class="inp" id="tk-apt"><option value="">— من غير بيت —</option><option>8A</option><option>17A</option><option>17B</option><option>28A</option><option>Zayed 2000</option><option>VW1</option></select>
     <button class="btn btn-ok" id="tk-btn" onclick="addTask()">➕ إضافة</button>`;
   const d=document.getElementById('tk-date'); if(d&&!d.value) d.value=D.today||'';
 }
@@ -1114,7 +1114,7 @@ Safe journey!`;
 
 
 /* ==== 14c continuation (overrides): to-do home · سجل log · week-grid schedule ==== */
-const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن الشقة',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
+const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
 
 async function toggleTask(id,done){
   const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
@@ -1245,7 +1245,7 @@ function renderQueue(){
   el.innerHTML=h;
 }
 
-/* الجدول — شبكة الأسبوع: الشقق صفوف والأيام أعمدة، نظافة + صيانة + دخول/خروج الضيوف */
+/* الجدول — شبكة الأسبوع: البيوت صفوف والأيام أعمدة، نظافة + صيانة + دخول/خروج الضيوف */
 let schedOff=0;
 function schedShift(n){ schedOff+=n; renderSched(); }
 function renderSched(){
@@ -1273,7 +1273,7 @@ function renderSched(){
     <div style="flex:1;text-align:center;font-weight:900;font-size:12.5px">${days[0]} ← ${days[6]}${schedOff===0?' (الأسبوع الحالي)':''}</div>
     <button class="btn" onclick="schedShift(-1)">›</button></div>
     <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:560px;font-size:10px">
-    <tr><th style="border:1px solid var(--border);background:var(--card);padding:3px;position:sticky;right:0">الشقة</th>${days.map((d,i)=>`<th style="border:1px solid var(--border);padding:3px;background:${d===D.today?'rgba(204,95,95,.12)':'var(--card)'}">${DN[i]}<br>${d.slice(5)}</th>`).join('')}</tr>`;
+    <tr><th style="border:1px solid var(--border);background:var(--card);padding:3px;position:sticky;right:0">البيت</th>${days.map((d,i)=>`<th style="border:1px solid var(--border);padding:3px;background:${d===D.today?'rgba(204,95,95,.12)':'var(--card)'}">${DN[i]}<br>${d.slice(5)}</th>`).join('')}</tr>`;
   flats.forEach(f=>{
     h+=`<tr><td style="border:1px solid var(--border);font-weight:900;padding:3px;background:var(--card);position:sticky;right:0;white-space:nowrap">${f}</td>`;
     days.forEach(d=>{ h+=`<td style="border:1px solid var(--border);padding:2px;vertical-align:top;min-width:72px;${d===D.today?'background:rgba(204,95,95,.05)':''}">${(cell[f+'|'+d]||[]).join('')}</td>`; });
@@ -1300,7 +1300,7 @@ function renderLog(){
       tByDay[d].sort((a,b)=>String(a.time||'99:99')<String(b.time||'99:99')?-1:1).map(t=>`<div class="line" style="flex-wrap:wrap;${t.done?'opacity:.55':''}">
         <span>${t.done?'✅':(t.date>(D.today||'')?'📅':'⬜')}</span>
         <span style="flex:1;min-width:55%;${t.done?'text-decoration:line-through':''}">${t.time?`<b>${t.time}</b> · `:''}${t.text}</span>
-        ${t.apt?`<span class="badge b-soon">${t.apt==='Home'?'البيت':t.apt}</span>`:''}
+        ${t.apt?`<span class="badge b-soon">${t.apt==='Home'?'شخصي':t.apt}</span>`:''}
         <span class="badge">${t.assignee==='malah'?'داني':'عماد'}</span>
         <button class="btn" onclick="editTask('${t.id}')">✏️</button>
         <button class="btn" onclick="delTask('${t.id}')">🗑️</button>
