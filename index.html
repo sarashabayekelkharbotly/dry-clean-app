@@ -1279,26 +1279,34 @@ function renderOwnersCard(){
   h += '</div>';
   const rows = c.next || [];
   if (rows.length) {
-    /* the Hub's «Happening today» design (Sarah 2026-10-05): home with its channel dot · guest · a coloured status pill ·
-       the next action with its day under it · the door code — small enough that it all fits a phone */
-    const dot = p => { p = String(p || '').toLowerCase(); const c = p.indexOf('airbnb') > -1 ? '#e0798a' : p.indexOf('book') > -1 ? '#4a7fb5' : p ? '#6f9a76' : 'transparent';
-      return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + c + ';margin-left:3px;vertical-align:middle"></span>'; };
+    /* Sarah 2026-10-05 ("it is a mess, fix the organization and design"): four fixed columns, every cell exactly two
+       short lines (the main fact, then its detail in small grey), names cut neatly instead of wrapping, rows shaded
+       alternately — so every row is the same height and the eye can run down each column. */
+    const CH = p => { p = String(p || '').toLowerCase(); return p.indexOf('airbnb') > -1 ? ['Airbnb', '#e0798a'] : p.indexOf('book') > -1 ? ['Booking', '#4a7fb5'] : p ? ['Direct', '#6f9a76'] : ['', '#ccc']; };
     const PILL = { out: ['خروج', '#f4dede', '#a24a4a'], 'in': ['وصول', '#dce9df', '#3a7d4d'], stay: ['فيه ضيف', '#e2edf3', '#2c5468'], gap: ['فاضي', '#f3ead9', '#8a6d2f'], free: ['مفيش حجز', '#fdeaea', '#cc5f5f'] };
-    const pill = r => { const x = PILL[r.kind] || PILL.free; return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;white-space:nowrap;background:' + x[1] + ';color:' + x[2] + '">' + x[0] + '</span>'; };
-    const sub = r => { const m = String(r.state || '').match(/(\d{2}\/\d{2})/); return r.kind === 'stay' && m ? 'لحد ' + m[1] : r.kind === 'gap' && m ? 'الوصول ' + m[1] : ''; };
-    const th = 'padding:4px 3px;font-size:9px;color:var(--text3);font-weight:700;text-align:right;border-bottom:2px solid var(--border,#e8d8d8);white-space:nowrap';
-    const td = 'padding:5px 3px;font-size:10.5px;border-bottom:1px solid var(--border,#f0e4e4);vertical-align:top';
-    h += '<div class="card" style="padding:10px;margin-bottom:12px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">🏠 البيوت — اللي جاي</div>' +
-      '<table style="width:100%;border-collapse:collapse;table-layout:auto"><thead><tr>' +
-      '<th style="' + th + '">البيت</th><th style="' + th + '">الضيف</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + ';text-align:center">الكود</th></tr></thead><tbody>' +
-      rows.map(r => '<tr>' +
-        '<td style="' + td + ';font-weight:800;white-space:nowrap">' + dot(r.portal) + emadFlatAr(r.flat) + '</td>' +
-        '<td style="' + td + '"><bdi>' + esc(r.guest || '—') + '</bdi></td>' +
-        '<td style="' + td + '">' + pill(r) + (sub(r) ? '<div style="font-size:9px;color:var(--text3);margin-top:2px;white-space:nowrap">' + sub(r) + '</div>' : '') + '</td>' +
-        '<td style="' + td + '">' + esc(r.what) + (r.when ? '<div style="font-size:9.5px;color:var(--text3);font-weight:700;margin-top:1px" dir="ltr">' + esc(r.when) + '</div>' : '') + '</td>' +
-        '<td style="' + td + ';text-align:center;font-weight:800;font-family:monospace;font-size:11px;letter-spacing:.5px">' + esc(r.code || '') + '</td></tr>').join('') +
-      '</tbody></table>' +
-      '<div style="font-size:9.5px;color:var(--text3);margin-top:6px;display:flex;gap:10px">' + [['airbnb', 'Airbnb'], ['booking', 'Booking'], ['direct', 'Direct']].map(x => '<span style="white-space:nowrap">' + dot(x[0]) + x[1] + '</span>').join('') + '</div></div>';
+    const until = r => { const m = String(r.state || '').match(/(\d{2}\/\d{2})/); return m ? (r.kind === 'gap' ? 'الوصول ' : r.kind === 'stay' ? 'لحد ' : '') + m[1] : ''; };
+    const one = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    const small = 'font-size:10px;color:var(--text3);margin-top:3px;' + one;
+    const th = 'padding:6px 6px;font-size:10px;color:var(--text3);font-weight:700;text-align:right;background:var(--surface2,#fdf6f6);border-bottom:1px solid var(--border,#e8d8d8)';
+    h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:8px">🏠 البيوت — اللي جاي</div>' +
+      '<div style="border:1px solid var(--border,#e8d8d8);border-radius:10px;overflow:hidden">' +
+      '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+      '<colgroup><col style="width:21%"><col style="width:37%"><col style="width:28%"><col style="width:14%"></colgroup>' +
+      '<thead><tr><th style="' + th + '">البيت</th><th style="' + th + '">الضيف</th><th style="' + th + '">اللي جاي</th><th style="' + th + ';text-align:center">الكود</th></tr></thead><tbody>' +
+      rows.map((r, i) => {
+        const ch = CH(r.portal), pl = PILL[r.kind] || PILL.free, u = until(r);
+        const td = 'padding:8px 6px;vertical-align:middle;' + (i % 2 ? 'background:var(--surface2,#fdf6f6);' : '') + (i < rows.length - 1 ? 'border-bottom:1px solid var(--border,#f0e4e4);' : '');
+        return '<tr>' +
+          '<td style="' + td + '"><div style="font-weight:800;font-size:12.5px;' + one + '">' + emadFlatAr(r.flat) + '</div>' +
+            '<div style="' + small + '"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + ch[1] + ';margin-left:4px"></span>' + ch[0] + '</div></td>' +
+          '<td style="' + td + '"><div style="font-size:12px;font-weight:600;' + one + '"><bdi>' + esc(r.guest || '—') + '</bdi></div>' +
+            '<div style="' + small + '"><span style="display:inline-block;font-size:9.5px;font-weight:700;padding:0 6px;border-radius:8px;background:' + pl[1] + ';color:' + pl[2] + '">' + pl[0] + '</span>' + (u ? ' ' + u : '') + '</div></td>' +
+          '<td style="' + td + '"><div style="font-size:12px;' + one + '">' + esc(r.what) + '</div>' +
+            '<div style="' + small + ';font-weight:700" dir="ltr">' + esc(r.when || '') + '</div></td>' +
+          '<td style="' + td + ';text-align:center"><span style="display:inline-block;font-family:monospace;font-weight:800;font-size:12px;letter-spacing:1px;background:#fff;border:1px solid var(--border,#e8d8d8);border-radius:6px;padding:2px 4px">' + esc(r.code || '') + '</span></td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div></div>';
   }
   el.innerHTML = h;
   el.style.display = '';
