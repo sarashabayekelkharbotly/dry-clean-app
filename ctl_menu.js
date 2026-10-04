@@ -18,11 +18,11 @@
     { k: 'sched', ic: '🗓️', t: 'الجدولة', href: 'week.html' }
   ];
   var SUB = [
-    { k: 'week', t: '🗓️ الأسبوع', href: 'week.html' },
-    { k: 'repairs', t: '🔧 الصيانة', href: 'index.html#repairs', page: 'repairs' },
-    { k: 'net', t: '📶 النت', href: 'internet.html' },
-    { k: 'elec', t: '⚡ الكهرباء', href: 'index.html#elec', page: 'elec' },
-    { k: 'log', t: '📋 السجل', href: 'index.html#log', page: 'log' }
+    { k: 'week', t: 'الأسبوع', href: 'week.html' },
+    { k: 'repairs', t: 'الصيانة', href: 'index.html#repairs', page: 'repairs' },
+    { k: 'net', t: 'النت', href: 'internet.html' },
+    { k: 'elec', t: 'الكهرباء', href: 'index.html#elec', page: 'elec' },
+    { k: 'log', t: 'السجل', href: 'index.html#log', page: 'log' }
   ];
   // which top tab / sub tab a screen belongs to
   var PAGE_TOP = { home: 'home', dc: 'dc', 'new': 'dc', review: 'dc', stats: 'dc', manage: 'dc', repairs: 'sched', elec: 'sched', log: 'sched' };
