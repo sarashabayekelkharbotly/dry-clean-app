@@ -1261,16 +1261,26 @@ function renderOwnersCard(){
   h += '</div>';
   const rows = c.next || [];
   if (rows.length) {
-    const th = 'padding:7px 6px;font-size:11px;color:var(--text3);font-weight:700;text-align:right;border-bottom:2px solid var(--border,#e8d8d8);white-space:nowrap';
-    const td = 'padding:8px 6px;font-size:12.5px;border-bottom:1px solid var(--border,#f0e4e4);vertical-align:top';
-    h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px">🏠 البيوت — اللي جاي</div>' +
-      '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
-      '<th style="' + th + '">البيت</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + '">امتى</th></tr></thead><tbody>' +
-      rows.map(r => '<tr><td style="' + td + ';font-weight:800;white-space:nowrap">' + emadFlatAr(r.flat) + '</td>' +
-        '<td style="' + td + ';color:var(--text2,#555)">' + esc(r.state) + '</td>' +
-        '<td style="' + td + '">' + esc(r.what) + '</td>' +
-        '<td style="' + td + ';white-space:nowrap;font-weight:700" dir="ltr">' + esc(r.when) + '</td></tr>').join('') +
-      '</tbody></table></div>';
+    /* the Hub's «Happening today» design (Sarah 2026-10-05): home with its channel dot · guest · a coloured status pill ·
+       the next action with its day under it · the door code — small enough that it all fits a phone */
+    const dot = p => { p = String(p || '').toLowerCase(); const c = p.indexOf('airbnb') > -1 ? '#e0798a' : p.indexOf('book') > -1 ? '#4a7fb5' : p ? '#6f9a76' : 'transparent';
+      return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + c + ';margin-left:3px;vertical-align:middle"></span>'; };
+    const PILL = { out: ['خروج', '#f4dede', '#a24a4a'], 'in': ['وصول', '#dce9df', '#3a7d4d'], stay: ['فيه ضيف', '#e2edf3', '#2c5468'], gap: ['فاضي', '#f3ead9', '#8a6d2f'], free: ['مفيش حجز', '#fdeaea', '#cc5f5f'] };
+    const pill = r => { const x = PILL[r.kind] || PILL.free; return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;white-space:nowrap;background:' + x[1] + ';color:' + x[2] + '">' + x[0] + '</span>'; };
+    const sub = r => { const m = String(r.state || '').match(/(\d{2}\/\d{2})/); return r.kind === 'stay' && m ? 'لحد ' + m[1] : r.kind === 'gap' && m ? 'الوصول ' + m[1] : ''; };
+    const th = 'padding:4px 3px;font-size:9px;color:var(--text3);font-weight:700;text-align:right;border-bottom:2px solid var(--border,#e8d8d8);white-space:nowrap';
+    const td = 'padding:5px 3px;font-size:10.5px;border-bottom:1px solid var(--border,#f0e4e4);vertical-align:top';
+    h += '<div class="card" style="padding:10px;margin-bottom:12px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">🏠 البيوت — اللي جاي</div>' +
+      '<table style="width:100%;border-collapse:collapse;table-layout:auto"><thead><tr>' +
+      '<th style="' + th + '">البيت</th><th style="' + th + '">الضيف</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + ';text-align:center">الكود</th></tr></thead><tbody>' +
+      rows.map(r => '<tr>' +
+        '<td style="' + td + ';font-weight:800;white-space:nowrap">' + dot(r.portal) + emadFlatAr(r.flat) + '</td>' +
+        '<td style="' + td + '"><bdi>' + esc(r.guest || '—') + '</bdi></td>' +
+        '<td style="' + td + '">' + pill(r) + (sub(r) ? '<div style="font-size:9px;color:var(--text3);margin-top:2px;white-space:nowrap">' + sub(r) + '</div>' : '') + '</td>' +
+        '<td style="' + td + '">' + esc(r.what) + (r.when ? '<div style="font-size:9.5px;color:var(--text3);font-weight:700;margin-top:1px" dir="ltr">' + esc(r.when) + '</div>' : '') + '</td>' +
+        '<td style="' + td + ';text-align:center;font-weight:800;font-family:monospace;font-size:11px;letter-spacing:.5px">' + esc(r.code || '') + '</td></tr>').join('') +
+      '</tbody></table>' +
+      '<div style="font-size:9.5px;color:var(--text3);margin-top:6px">' + dot('airbnb') + 'Airbnb &nbsp;' + dot('booking') + 'Booking &nbsp;' + dot('direct') + 'Direct</div></div>';
   }
   el.innerHTML = h;
   el.style.display = '';
