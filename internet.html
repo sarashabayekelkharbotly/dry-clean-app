@@ -74,21 +74,33 @@ summary::-webkit-details-marker{display:none}
 .err{background:#f6e3e3;border:1px solid #e6b9b9;border-radius:10px;padding:12px;font-size:13px}
 .ov{font-size:10.5px;font-weight:700;color:#a24a4a;background:#f7e2e2;border-radius:8px;padding:4px 8px;margin-top:6px;display:inline-block}
 </style>
+<style>
+/* الكنترول's top menu — the same look and order as index.html (2026-10-04) */
+.ctl-nav{display:flex;direction:rtl;background:#fff;border-bottom:2px solid #e8d8d8;overflow-x:auto;scrollbar-width:none;position:sticky;top:0;z-index:99;max-width:980px;margin:0 auto}
+.ctl-nav::-webkit-scrollbar{display:none}
+.ctl-tab{flex:1 0 auto;min-width:56px;padding:8px 7px;text-align:center;font-size:10.5px;font-weight:700;color:#999;border-bottom:3px solid transparent;font-family:'Cairo',sans-serif;white-space:nowrap;text-decoration:none}
+.ctl-tab.active{color:#cc5f5f;border-bottom-color:#cc5f5f}
+.ctl-tab .ti{font-size:16px;display:block;margin-bottom:1px}
+</style>
 </head>
 <body>
+<nav class="ctl-nav">
+  <a class="ctl-tab" href="index.html"><span class="ti">🏠</span>الرئيسية</a>
+  <a class="ctl-tab" href="index.html#dc"><span class="ti">🧺</span>دراي كلين</a>
+  <a class="ctl-tab" href="index.html#elec"><span class="ti">⚡</span>كهرباء</a>
+  <a class="ctl-tab" href="index.html#repairs"><span class="ti">🔧</span>إصلاحات</a>
+  <a class="ctl-tab" href="index.html#log"><span class="ti">📋</span>سجل</a>
+  <a class="ctl-tab" href="inventory.html"><span class="ti">🗂️</span>المخزون</a>
+  <a class="ctl-tab" href="comms_index.html"><span class="ti">📨</span>التواصل</a>
+  <a class="ctl-tab" href="week.html"><span class="ti">🗓️</span>الأسبوع</a>
+  <a class="ctl-tab active" href="internet.html"><span class="ti">📶</span>النت</a>
+</nav>
 <div class="frame">
   <div class="topbar">
     <div class="brand"><img class="logo" src="control-logo.png" alt="الكنترول"><span class="bn">الكنترول</span><span class="bs">Internet</span></div>
     <div class="rib" id="rib"></div>
   </div>
   <div class="body"><div id="app"><div class="card"><span class="muted">Loading…</span></div></div></div>
-  <nav class="tabbar">
-    <a class="tab" href="index.html"><span class="ti">🏠</span>الكنترول</a>
-    <a class="tab" href="week.html"><span class="ti">🗓️</span>Week</a>
-    <a class="tab active" href="internet.html"><span class="ti">📶</span>Net</a>
-    <a class="tab" href="index.html#repairs"><span class="ti">🔧</span>Repairs</a>
-    <a class="tab" href="https://sarashabayekelkharbotly.github.io/owh-hub/today.html"><span class="ti">📊</span>Hub ↗</a>
-  </nav>
 </div>
 
 <script src="ctl_auth.js"></script>

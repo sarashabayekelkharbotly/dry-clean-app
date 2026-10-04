@@ -842,7 +842,8 @@ function onAuthReady() {
   const nc = document.getElementById('nav-comms');
   if (nc && (currentUser === 'sarah' || currentUser === 'khaled')) nc.style.display = '';
   if (isOwnerUser()) { ['nav-week', 'nav-net'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = ''; }); loadOwnersCard(); }
-  if (location.hash === '#repairs') setTimeout(() => showPage('repairs'), 0);   // the Week/Internet screens' 🔧 tab lands here
+  { const hp = (location.hash || '').slice(1);   // the Week/Internet screens' menu lands on the tab it names
+    if (['dc', 'elec', 'repairs', 'log'].indexOf(hp) > -1) setTimeout(() => showPage(hp), 0); }
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('newDate').valueAsDate = new Date();
   const userEl = document.getElementById('currentUserDisplay');
