@@ -71,7 +71,8 @@
       '#ctlBottom .mn a .ic{display:block;font-size:18px;line-height:1.2}' +
       '#ctlBottom .mn a.on{color:#cc5f5f;border-top-color:#cc5f5f}' +
       'body.ctl-has-bottom{padding-bottom:64px!important}' +
-      'body.ctl-has-bottom .toast,body.ctl-has-bottom #ctlNote{bottom:84px!important}';
+      'body.ctl-has-bottom .toast,body.ctl-has-bottom #ctlNote{bottom:84px!important}' +
+      'body.ctl-has-bottom .toast:not(.show){visibility:hidden}';   // a hidden message must not peek out above the bar
     document.head.appendChild(st);
   }
   var state = { top: '', sub: '' };
