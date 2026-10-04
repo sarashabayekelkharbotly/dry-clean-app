@@ -66,7 +66,7 @@
       '#ctlChrome .mn a.on{color:#cc5f5f;border-bottom-color:#cc5f5f}' +
       '#ctlChrome .sb{display:flex;gap:4px;max-width:980px;margin:0 auto;padding:6px 8px;background:#fdf6f6;overflow-x:auto;scrollbar-width:none}' +
       '#ctlChrome .sb::-webkit-scrollbar{display:none}' +
-      '#ctlChrome .sb a{flex:1 1 auto;text-align:center;padding:5px 6px;border-radius:16px;font-size:11.5px;font-weight:700;color:#6b6b6b;background:#fff;border:1px solid #e8d8d8;text-decoration:none;white-space:nowrap;cursor:pointer}' +
+      '#ctlChrome .sb a{flex:1 1 auto;text-align:center;padding:5px 3px;border-radius:16px;font-size:11px;font-weight:700;color:#6b6b6b;background:#fff;border:1px solid #e8d8d8;text-decoration:none;white-space:nowrap;cursor:pointer}' +
       '#ctlChrome .sb a.on{background:#cc5f5f;color:#fff;border-color:#cc5f5f}';
     document.head.appendChild(st);
   }
