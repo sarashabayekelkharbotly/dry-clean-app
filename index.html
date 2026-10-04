@@ -1243,19 +1243,36 @@ async function loadOwnersCard(){
   } catch (e) {}
 }
 function renderOwnersCard(){
+  /* Sarah 2026-10-04: TWO clear parts — (1) only what needs us to act, one line each; (2) a table with headings */
   const el = document.getElementById('ownersCard'); if (!el || !OWNERS_CARD) return;
-  const c = OWNERS_CARD, row = (a, b) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border,#eee);font-size:12.5px"><b>${a}</b><span style="text-align:left;color:var(--text2,#555)">${b}</span></div>`;
-  let warn = '';
-  if (c.confirmWeek) warn += `<div style="background:#fdecea;color:#b23b3b;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">📅 جدول أسبوع <span dir="ltr">${String(c.confirmWeek.week).slice(8,10)}/${String(c.confirmWeek.week).slice(5,7)}</span> لسه ماتأكدش — <a href="week.html" style="color:inherit">افتح الأسبوع</a> وابعتوا الواتساب</div>`;
-  (c.internet || []).forEach(n => { warn += `<div style="background:#fff4e0;color:#8a5a00;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">${n.text} <a href="internet.html" style="color:inherit">← النت</a></div>`; });
-  (c.overdue || []).forEach(r => { warn += `<div style="background:#fdecea;color:#b23b3b;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;font-weight:700">🔧 ${emadFlatAr(r.flat)} — ${r.trade} متأخر من <span dir="ltr">${r.date}</span>${r.what ? ' — ' + r.what : ''} <a href="#" onclick="showPage('repairs');return false" style="color:inherit">← الصيانة</a></div>`; });
-  el.innerHTML = `<div class="card" style="padding:12px;margin-bottom:12px;border:2px solid var(--primary,#cc5f5f)">
-    <div style="font-weight:800;font-size:14px;margin-bottom:8px">📌 مطلوب منكم</div>${warn}
-    ${(c.next || []).map(n => row(emadFlatAr(n.flat), `${n.action} <span style="color:var(--text3);font-size:11px">· ${n.state}</span>`)).join('')}
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <a href="week.html" style="flex:1;text-align:center;border:1px solid var(--border,#ddd);border-radius:9px;padding:8px;font-weight:700;font-size:13px;color:inherit;text-decoration:none">🗓️ الأسبوع</a>
-      <a href="internet.html" style="flex:1;text-align:center;border:1px solid var(--border,#ddd);border-radius:9px;padding:8px;font-weight:700;font-size:13px;color:inherit;text-decoration:none">📶 النت</a>
-    </div></div>`;
+  const c = OWNERS_CARD, esc = x => String(x == null ? '' : x).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const needs = c.needs || [];
+  let h = '<div class="card" style="padding:12px 12px 6px;margin-bottom:12px">';
+  h += '<div style="font-weight:800;font-size:15px;margin-bottom:8px">📌 مطلوب منكم' + (needs.length ? ' <span style="background:#cc5f5f;color:#fff;border-radius:10px;padding:0 8px;font-size:12px">' + needs.length + '</span>' : '') + '</div>';
+  if (!needs.length) h += '<div style="background:rgba(92,170,127,0.12);color:#2e7d32;border-radius:10px;padding:9px 12px;font-size:13px;font-weight:700;margin-bottom:8px">✨ مفيش حاجة مطلوبة منكم دلوقتي</div>';
+  needs.forEach(n => {
+    h += '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--border,#eee)">' +
+      '<div style="font-size:18px;line-height:1.2">' + n.ic + '</div>' +
+      '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">' + esc(n.title) + '</div>' +
+      (n.detail ? '<div style="font-size:11.5px;color:var(--text3);margin-top:1px">' + esc(n.detail) + '</div>' : '') + '</div>' +
+      (n.go ? '<a href="' + n.go + '" style="flex-shrink:0;align-self:center;font-size:11.5px;font-weight:700;color:var(--primary,#cc5f5f);text-decoration:none;border:1px solid var(--border,#e8d8d8);border-radius:8px;padding:4px 8px">' + esc(n.goText) + ' ←</a>' : '') +
+      '</div>';
+  });
+  h += '</div>';
+  const rows = c.next || [];
+  if (rows.length) {
+    const th = 'padding:7px 6px;font-size:11px;color:var(--text3);font-weight:700;text-align:right;border-bottom:2px solid var(--border,#e8d8d8);white-space:nowrap';
+    const td = 'padding:8px 6px;font-size:12.5px;border-bottom:1px solid var(--border,#f0e4e4);vertical-align:top';
+    h += '<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px">🏠 الشقق — اللي جاي</div>' +
+      '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
+      '<th style="' + th + '">الشقة</th><th style="' + th + '">الحالة</th><th style="' + th + '">اللي جاي</th><th style="' + th + '">امتى</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td style="' + td + ';font-weight:800;white-space:nowrap">' + emadFlatAr(r.flat) + '</td>' +
+        '<td style="' + td + ';color:var(--text2,#555)">' + esc(r.state) + '</td>' +
+        '<td style="' + td + '">' + esc(r.what) + '</td>' +
+        '<td style="' + td + ';white-space:nowrap;font-weight:700" dir="ltr">' + esc(r.when) + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  }
+  el.innerHTML = h;
   el.style.display = '';
 }
 const EMAD_TYPE_AR = { checkout: 'تنظيف خروج', midstay: 'نظافة اثناء وجود ضيف', weekly: 'نظافة اثناء وجود ضيف',
