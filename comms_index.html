@@ -441,7 +441,8 @@ function copyTpl(stayId,k,occ){
     return;
   }
   if(!ensureLangGender(st)) return;
-  if(k==='manual' && !guideFor(st) && st.flat!=='17B') toast(   // 17B is the long stay — it has no guide, by design'⚠️ مفيش دليل بيت لـ '+st.flat+' — الرسالة اتنسخت من غير لينك');
+  /* 17B is the long stay — it has no guide, by design */
+  if(k==='manual' && !guideFor(st) && st.flat!=='17B') toast('⚠️ مفيش دليل بيت لـ '+st.flat+' — الرسالة اتنسخت من غير لينك');
   const t=tpl(k,st,occ);
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
     ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
