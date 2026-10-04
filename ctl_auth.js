@@ -131,6 +131,7 @@ function authLogin() {
       document.getElementById('owhP').value = '';
       if (!authIsOwner()) { authNotYours(); return; }
       authHideForm();
+      if (window.CTL_MENU && window.CTL_SCREEN) CTL_MENU.init(window.CTL_SCREEN);
       if (AUTH_ON_LOGIN) AUTH_ON_LOGIN();
     })
     .catch(function () { b.disabled = false; b.textContent = 'Sign in'; m.textContent = "Couldn't reach the server — check your connection."; });

@@ -17,6 +17,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="الكنترول">
 <link rel="preconnect" href="https://geszrsrdqxwtihrqzxiu.supabase.co">
+<script src="ctl_menu.js"></script>
 <link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -782,6 +783,7 @@ function showSwitchUser() {
   }
   localStorage.removeItem(OWH_SESS_KEY);
   currentUser = null; currentUserName = null; currentUserRole = null;
+  if (window.CTL_MENU) CTL_MENU.init();   // the owners' menu leaves with the owner
   document.getElementById('loginUsername').value = '';
   document.getElementById('loginPassword').value = '';
   document.getElementById('loginError').style.display = 'none';
@@ -841,7 +843,8 @@ function onAuthReady() {
   // 📨 comms tab appears for Sarah/Khaled only (Emad's account is refused by it server-side)
   const nc = document.getElementById('nav-comms');
   if (nc && (currentUser === 'sarah' || currentUser === 'khaled')) nc.style.display = '';
-  if (isOwnerUser()) { ['nav-week', 'nav-net'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = ''; }); loadOwnersCard(); }
+  if (isOwnerUser()) loadOwnersCard();
+  if (window.CTL_MENU && CTL_MENU.init()) CTL_MENU.sync((document.querySelector('.page.active') || { id: 'page-home' }).id.slice(5));   // Sarah/Khaled's 5-tab menu (2026-10-04)
   { const hp = (location.hash || '').slice(1);   // the Week/Internet screens' menu lands on the tab it names
     if (['dc', 'elec', 'repairs', 'log'].indexOf(hp) > -1) setTimeout(() => showPage(hp), 0); }
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
@@ -3156,6 +3159,7 @@ function showPage(name) {
      the ONE 🧺 tab (a launcher, like المخزون is its own world) — so any of those pages highlights it */
   const tabOf = { home:0, dc:1, 'new':1, review:1, stats:1, manage:1, elec:2, repairs:3, log:4 };
   document.querySelectorAll('.nav-tab')[tabOf[name] !== undefined ? tabOf[name] : 0]?.classList.add('active');
+  if (window.CTL_MENU) CTL_MENU.sync(name);
   if (name === 'manage') renderManageList();
   if (name === 'elec') renderElecScreen();
   if (name === 'repairs') renderRepairsScreen();

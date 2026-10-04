@@ -332,6 +332,7 @@ body {
 .empty-text { font-size: 14px; }
 .divider { height: 1px; background: var(--border); margin: 14px 0; }
 </style>
+<script src="ctl_menu.js"></script>
 </head>
 <body>
 
@@ -2767,6 +2768,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function onAuthReady() {
+  if (window.CTL_MENU) CTL_MENU.init('inv');   // Sarah/Khaled's 5-tab menu (2026-10-04)
   const lock = document.getElementById('appLock');
   if (lock) lock.style.display = 'none';
   const u = currentUser ? currentUser.toLowerCase() : 'emad';

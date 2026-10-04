@@ -83,6 +83,7 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
 #loginError { display:none; color:var(--danger); font-size:12px; margin-bottom:8px; text-align:center; }
 .lbtn { width:100%; background:var(--primary); color:#fff; border:none; border-radius:10px; padding:10px; font-size:14px; font-weight:800; cursor:pointer; }
 </style>
+<script src="ctl_menu.js"></script>
 </head>
 <body>
 
@@ -199,6 +200,7 @@ function hideLoginScreen(){
   const el=document.getElementById('loginScreen');
   if(el){ el.style.opacity='0'; setTimeout(()=>el.style.display='none',300); }
   document.getElementById('switchUserBtn').style.display='block';
+  if(window.CTL_MENU) CTL_MENU.init('comms');   // Sarah/Khaled's 5-tab menu (2026-10-04) — Dani sees none
   if(currentUser==='sarah'||currentUser==='khaled'){
     const hb=document.getElementById('homeBtn'); if(hb) hb.style.display='';
     const bb=document.getElementById('briefBtn'); if(bb){ bb.style.display=''; bb.textContent=(new Date().getHours()>=17)?'🌙':'☀️'; }
@@ -209,6 +211,7 @@ function showSwitchUser(){
   const sid=owhSid();
   if(sid){ try{ window.fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'auth_logout',sid})}).catch(function(){}); }catch(e){} }
   localStorage.removeItem(OWH_SESS_KEY); currentUser=null;
+  if(window.CTL_MENU) CTL_MENU.init();
   document.getElementById('switchUserBtn').style.display='none';
   const el=document.getElementById('loginScreen'); el.style.opacity='1'; el.style.display='flex';
 }
