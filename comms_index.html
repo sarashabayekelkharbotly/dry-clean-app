@@ -83,6 +83,9 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
 #loginError { display:none; color:var(--danger); font-size:12px; margin-bottom:8px; text-align:center; }
 .lbtn { width:100%; background:var(--primary); color:#fff; border:none; border-radius:10px; padding:10px; font-size:14px; font-weight:800; cursor:pointer; }
 </style>
+<script>/* the shared top of every screen (ctl_menu.js, 2026-10-05) — comms' tabs become its pills; Dani gets the header + pills, no menu */
+window.CTL_PAGE = { screen: 'comms', hide: ['.hdr', '.tabs'], tools: ['#briefBtn', '#langBtn', '#tplBtn'], subFrom: { sel: '.tabs', item: '.tab', on: 'on' },
+  status: '#agePill', user: function () { showSwitchUser(); }, after: function () { loadData(); try { refreshRepairs(); } catch (e) {} } };</script>
 <script src="ctl_menu.js"></script>
 <script>
 /* FRESH PAGE (2026-10-04): GitHub Pages lets a phone keep a saved copy for 10 minutes, so a refresh right after a
@@ -123,7 +126,7 @@ body { background:var(--card); color:var(--text1); padding-bottom:80px; }   /* w
     <button class="btn" id="briefBtn" style="display:none" onclick="sendBriefNow()" title="إرسال خطة اليوم / ملخص المساء دلوقتي">☀️</button>
     <button class="btn" id="homeBtn" style="display:none" onclick="window.location.href='index.html'" title="الرجوع للكنترول">🏠</button>
     <button class="btn" id="langBtn" onclick="toggleTplLang()" title="لغة رسائل الضيوف الافتراضية">🌐 EN</button>
-    <button class="btn" onclick="openTplEditor()" title="رسائل الضيوف — عرض وتعديل">📄</button>
+    <button class="btn" id="tplBtn" onclick="openTplEditor()" title="رسائل الضيوف — عرض وتعديل">📄</button>
     <button class="btn" id="syncAllBtn" onclick="syncAll()" title="مزامنة شاملة — سموبو ← الهب ← كل الشاشات">🔄</button>
     <button class="btn" onclick="loadData(true)">↻</button>
     <button class="btn" id="switchUserBtn" style="display:none" onclick="showSwitchUser()">🚪</button>

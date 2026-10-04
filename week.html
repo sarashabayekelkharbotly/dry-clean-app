@@ -116,7 +116,8 @@ textarea.wa{width:100%;min-height:210px;direction:rtl;font-family:'Cairo',sans-s
   <div class="body"><div id="app"><div class="card"><span class="muted">Loading…</span></div></div></div>
 </div>
 
-<script>window.CTL_SCREEN = 'week';</script>
+<script>window.CTL_SCREEN = 'week';   /* the shared top of every screen (ctl_menu.js, 2026-10-05) */
+window.CTL_PAGE = { screen: 'week', auto: true, hide: ['.topbar .brand'], user: function () { logout(); }, after: function () { boot(); } };</script>
 <script src="ctl_menu.js"></script>
 <script src="ctl_auth.js"></script>
 <script>

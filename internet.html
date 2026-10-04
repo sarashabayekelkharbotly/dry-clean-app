@@ -102,7 +102,8 @@ summary::-webkit-details-marker{display:none}
   <div class="body"><div id="app"><div class="card"><span class="muted">Loading…</span></div></div></div>
 </div>
 
-<script>window.CTL_SCREEN = 'net';</script>
+<script>window.CTL_SCREEN = 'net';   /* the shared top of every screen (ctl_menu.js, 2026-10-05) */
+window.CTL_PAGE = { screen: 'net', auto: true, hide: ['.topbar .brand'], user: function () { logout(); }, after: function () { boot(); } };</script>
 <script src="ctl_menu.js"></script>
 <script src="ctl_auth.js"></script>
 <script src="net_model.js"></script>

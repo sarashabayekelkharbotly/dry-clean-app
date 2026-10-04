@@ -17,6 +17,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="الكنترول">
 <link rel="preconnect" href="https://geszrsrdqxwtihrqzxiu.supabase.co">
+<script>/* the shared top of every screen (ctl_menu.js, 2026-10-05) */
+window.CTL_PAGE = { screen: 'index', hide: ['.header', '.nav'], user: function () { showSwitchUser(); },
+  after: function () { loadAllData(true); loadEmadHome(true); } };</script>
 <script src="ctl_menu.js"></script>
 <link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -855,9 +858,9 @@ function onAuthReady() {
   const nc = document.getElementById('nav-comms');
   if (nc && (currentUser === 'sarah' || currentUser === 'khaled')) nc.style.display = '';
   if (isOwnerUser()) loadOwnersCard();
-  if (window.CTL_MENU && CTL_MENU.init()) CTL_MENU.sync((document.querySelector('.page.active') || { id: 'page-home' }).id.slice(5));   // Sarah/Khaled's 5-tab menu (2026-10-04)
+  if (window.CTL_MENU && CTL_MENU.init()) CTL_MENU.sync((document.querySelector('.page.active') || { id: 'page-home' }).id.slice(5));   // the shared top (everyone, 2026-10-05)
   { const hp = (location.hash || '').slice(1);   // the Week/Internet screens' menu lands on the tab it names
-    if (['dc', 'elec', 'repairs', 'log'].indexOf(hp) > -1) setTimeout(() => showPage(hp), 0); }
+    if (['dc', 'new', 'review', 'stats', 'manage', 'elec', 'repairs', 'log'].indexOf(hp) > -1) setTimeout(() => showPage(hp === 'dc' ? 'new' : hp), 0); }
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('ar-EG', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('newDate').valueAsDate = new Date();
   const userEl = document.getElementById('currentUserDisplay');
@@ -2388,7 +2391,7 @@ function renderHome() {
   });
   const monthCost = monthSubs.reduce((sum,s) => sum + getSubmissionTotal(s.id), 0);
 
-  let html = `<button id="dcSyncBtn" onclick="dcSyncAll()" style="width:100%;border:none;border-radius:10px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13.5px;padding:10px;cursor:pointer;margin-bottom:12px">🔄 مزامنة شاملة</button>`;
+  let html = '';   // the full sync is the header's 🔄 now (one button, every screen — 2026-10-05)
   html += renderEmadPanel();
   html += `
     <div class="stats-grid" style="margin-bottom:16px">

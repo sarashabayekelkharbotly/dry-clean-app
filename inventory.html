@@ -85,7 +85,7 @@ body {
 .nav-tab .tab-icon { font-size: 18px; display: block; margin-bottom: 1px; }
 
 /* PAGES */
-.page { display: none; padding: 16px; padding-bottom: 80px; animation: fadeIn 0.2s ease; }
+.page { display: none; padding: 16px; padding-bottom: 40px; animation: fadeIn 0.2s ease; }
 .page.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -332,6 +332,9 @@ body {
 .empty-text { font-size: 14px; }
 .divider { height: 1px; background: var(--border); margin: 14px 0; }
 </style>
+<script>/* the shared top of every screen (ctl_menu.js, 2026-10-05) — inventory's sections become its pills */
+window.CTL_PAGE = { screen: 'inv', hide: ['.header', '.nav', '.bottom-nav'], subFrom: { sel: '.nav', item: '.nav-tab', on: 'active' },
+  user: function () { openModal('user-modal'); }, after: function () { syncData(true); } };</script>
 <script src="ctl_menu.js"></script>
 <script>
 /* FRESH PAGE (2026-10-04): GitHub Pages lets a phone keep a saved copy for 10 minutes, so a refresh right after a
