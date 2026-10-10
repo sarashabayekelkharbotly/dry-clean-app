@@ -227,13 +227,19 @@ function cleanPlan(s){ var N=s.nights||0; if(N<=12||!s.checkIn)return []; var ci
    ±60 days) plus both on-screen lists. A ✎ hand-set custom counts: her code IS the arrival's plan.
    Flat + window is the whole test — only one arrival can occupy [ci−2, ci] for a flat, so a manual
    row with no stayId still belongs to it. */
+/* WIDENED (Sarah 2026-10-10, 28A: custom clean 11/10 before Anas 13/10, yet a 12/10 revision was proposed): whoever
+   cleans changes the code, so ANY cleaning visit in the window — checkout · custom · weekly · midstay — is the arrival's
+   pre-arrival visit too. A pinned visit holding another code is not (it cannot be corrected); a ✎ hand-set code is. */
 function preArrivalRow_(flat,s){
-  var ci=day(s.checkIn), from=ymd(addD(ci,-2)), upto=ymd(ci), hit=null;
+  var ci=day(s.checkIn), from=ymd(addD(ci,-2)), upto=ymd(ci), need=codeOf(ci), hit=null;
+  var pco=prevCheckOut(flat,ci), vac=pco&&ymd(pco)>from?ymd(pco):from;   // a cleaning visit covers only in the VACANCY — never a lock change on a guest still inside
   [D.cleans||[],(typeof cleans!=='undefined'&&cleans)||[],(typeof cleans2!=='undefined'&&cleans2)||[]].forEach(function(L){
     L.forEach(function(c){
       if(c.flat!==flat||c.src==='shadow'||c.on===false) return;
       if(c.date<from||c.date>upto) return;
       if(c.type==='revision'||c.type==='codechange'||(c.codeEdited&&c.type==='custom')) hit=c;
+      else if(['checkout','custom','weekly','midstay'].indexOf(c.type)>-1 && !hit && c.date>=vac &&
+              ((c.code||'')===need || c.codeEdited || !c.pinned)) hit=c;
     });
   });
   return hit;
