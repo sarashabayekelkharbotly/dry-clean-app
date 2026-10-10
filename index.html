@@ -2163,7 +2163,7 @@ function renderEmadPanel() {
     const readingAge = EMAD.meter ? Math.floor((new Date(todayK+'T12:00:00') - new Date(String(EMAD.meter.at).slice(0,10)+'T12:00:00')) / 86400000) : null;
     if (loggedToday)
       todo += row('✅', `تم تسجيل رصيد كارت 8A اليوم: <b>${EMAD.meter.balance}</b> جنيه`, {});
-    else if (clean8aToday || !EMAD.meter || readingAge > 7)
+    else if (clean8aToday || !EMAD.meter)   // a cleaning day only — nobody goes into 8A otherwise (Sarah 2026-10-10: the >7-days rule asked for a trip)
       todo += row('⚡', `<b>سجّل رصيد كارت كهرباء 8A</b>${clean8aToday ? ' أثناء التنظيف' : ''} — اضغط للتسجيل` +
         (EMAD.meter ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${EMAD.meter.balance} — منذ ${readingAge} يوم)</span>`
                     : ` <span style="color:var(--text3);font-size:11px">(لا توجد قراءات بعد — أول تسجيل)</span>`),
