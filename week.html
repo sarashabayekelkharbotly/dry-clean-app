@@ -1009,6 +1009,7 @@ function healDraftList(ws,list,savedAt){
     return c;
   });
   out=dedupeExact_(out);
+  out=dropCoveredRevisions_(out);
   var seen={}; out.forEach(function(c){ seen[ckey(c)]=1; });
   // same rule as mergeWeek: a stay booked AFTER this draft was saved cannot have been rejected
   // by it — its cleans arrive ON (Sarah 2026-08-21, the Mohannad revision that a stale draft hid)
@@ -1029,6 +1030,23 @@ function healDraftList(ws,list,savedAt){
     out.push(p); });
   out.sort(function(a,b){ return (a.date+a.flat)<(b.date+b.flat)?-1:1; });
   return out;
+}
+/* THE WIDENED RULE REACHES SAVED DRAFTS TOO (Sarah 2026-10-10: a draft saved at 16:21 still carried 28A's 12/10
+   revision after the rule changed). A draft revision is dropped when a cleaning visit (checkout · custom · weekly ·
+   midstay) sits in its arrival's window [ci−2 … ci] and in the vacancy — that visit changes the code. A pinned revision
+   or one whose code Sarah set by hand is hers and stays. */
+function dropCoveredRevisions_(list){
+  return list.filter(function(r){
+    if(r.type!=='revision'||r.pinned||r.codeEdited||r.on===false) return true;
+    var n=nextCheckIn(r.flat,day(r.date)); if(!n) return true;
+    var ci=ymd(n), from=ymd(addD(n,-2)), pco=prevCheckOut(r.flat,n), vac=pco&&ymd(pco)>from?ymd(pco):from, need=codeOf(n);
+    var cover=list.concat(D.cleans||[]).some(function(c){
+      if(c===r||c.flat!==r.flat||c.on===false||c.src==='shadow') return false;
+      if(['checkout','custom','weekly','midstay'].indexOf(c.type)<0||c.date<vac||c.date>ci) return false;
+      return (c.code||'')===need||c.codeEdited||!c.pinned;
+    });
+    return !cover;
+  });
 }
 function draftRaw(ws){        // the stored draft, or null — no judgement, the payload may not be here yet
   return api('props_get_draft',{week:ymd(ws)})
