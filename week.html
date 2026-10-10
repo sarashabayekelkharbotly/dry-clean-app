@@ -389,6 +389,11 @@ function applyBookingFacts_(list){
    re-confirm write a second row for the same day under the new label. Matching on the DATE heals
    both: old-label rows show up, and the server replaces by date so nothing can double. Two rows for
    the same day+flat+type (one per label) collapse to the LATEST confirm. */
+/* NOTHING IS A SUGGESTION (Sarah 2026-10-10: "we had agreed that nothing is a suggestion and that the schedule should be
+   prefilled"). The referee adds checkout rows on its own (by 'system') when a booking lands — they are records, but they
+   are NOT Sarah confirming the week. Counting them as a confirm made next week look decided, so its pinned weekly,
+   mid-stay and revision proposals arrived unticked. Only a person's confirm decides a week. */
+function humanRow_(c){ return String(c.by||'').toLowerCase()!=='system'; }
 function weekRows(ws){
   var a=ymd(ws), b=ymd(addD(ws,7)), best={};
   (D.cleans||[]).forEach(function(c){
@@ -439,20 +444,24 @@ function mergeWeek(ws){
      so a clean Sarah deliberately removed cannot resurrect itself — but she cannot have removed a
      clean for a booking that did not exist when she decided. Booked after the latest confirm →
      on, loud, in the message; booked before → off as ever, because its absence may be a choice. */
-  var confD=''; confirmed.forEach(function(c){ var d=String(c.confirmedAt||'').slice(0,10); if(d>confD) confD=d; });
+  var confD=''; confirmed.forEach(function(c){ if(!humanRow_(c)) return; var d=String(c.confirmedAt||'').slice(0,10); if(d>confD) confD=d; });
   applyBookingFacts_(out);                        // the booking is the referee — stale rows switch off HERE
   props.forEach(function(p){ if(seen[ckey(p)]) return;
     var cov=coveredByExisting_(p,out);
     if(cov){ out.push(shadowOf_(p,cov)); return; }
     // replacing a row the booking-change just invalidated → arrives ON, it IS the correction
     var repl=out.some(function(c){ return c.stale&&c.stayId===p.stayId&&c.type===p.type; });
-    p.src='new'; p.on=repl||!!(p.booked&&confD&&p.booked>=confD); out.push(p); });
+    p.src='new';
+    /* PREFILLED (Sarah 2026-10-10): until a PERSON has confirmed this week, everything it generates arrives ticked. After
+       a confirm: a booking's checkout / revision / code change still arrives ticked (the draft path's rule since
+       2026-09-18 — a missed pre-arrival visit is an arrival nobody lets in); only a mid-stay/weekly she removed stays off. */
+    p.on=!confD||repl||(p.type==='revision'||p.type==='codechange'||p.type==='checkout')||!!(p.booked&&p.booked>=confD); out.push(p); });
   out.sort(function(a,b){ return (a.date+a.flat)<(b.date+b.flat)?-1:1; });
   return out;
 }
 function loadWeek(){ cleans=mergeWeek(weekStart); cleans2=mergeWeek(addD(weekStart,7)); dirty=false; }
 function weekConfirmedFor(ws){ var at=null;
-  weekRows(ws).forEach(function(c){ if(c.confirmedAt && (!at || +new Date(c.confirmedAt) > +new Date(at))) at=c.confirmedAt; });
+  weekRows(ws).forEach(function(c){ if(humanRow_(c) && c.confirmedAt && (!at || +new Date(c.confirmedAt) > +new Date(at))) at=c.confirmedAt; });
   return at; }
 function weekConfirmed(){ return weekConfirmedFor(weekStart); }
 function bookedAfterConfirm(){
