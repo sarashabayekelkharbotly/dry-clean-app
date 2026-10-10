@@ -213,7 +213,8 @@ function primaryClean(list){ for(var i=0;i<list.length;i++)if(list[i].c.type==='
    spacing the mechanical rule keeps. Proposals then land exactly on the confirmed rows, so the
    phantom Thursday twins stop appearing. */
 function cleanPref(s){ var p=(D&&D.cleanPrefs)||{}; var v=p[s.id]; return (v===0||v>0)?Number(v):null; }
-function cleanPlan(s){ var N=s.nights||0; if(N<=12||!s.checkIn)return []; var ci=day(s.checkIn),plan=[],j=0;
+/* in-stay cleans for stays LONGER THAN 10 NIGHTS (Sarah 2026-10-10; was 12) */
+function cleanPlan(s){ var N=s.nights||0; if(N<=10||!s.checkIn)return []; var ci=day(s.checkIn),plan=[],j=0;
   var pin=cleanPref(s);
   if(pin!==null){
     var d0=addD(ci,4); while(d0.getDay()!==pin) d0=addD(d0,1);        // first pinned weekday ≥ ci+4
