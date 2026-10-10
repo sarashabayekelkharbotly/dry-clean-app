@@ -1339,6 +1339,7 @@ function emadTaskLine(c){
   else if (c.cleaner === 'both') t += ' — النظافة: أمل + جيني';
   if (c.type === 'checkout' && c.code) t += ` — كود الباب ${c.code}`;
   else if (c.type === 'revision' && c.code && c.code !== '0107') t += ` — تغيير كود الباب إلى ${c.code}`;
+  else if (c.codeChange && c.code) t += ` — تغيير كود الباب إلى ${c.code}`;   // a cleaning visit that changes the lock for the coming guest (2026-10-10)
   if (c.inTime && /^\d/.test(c.inTime)) t += ` — دخول ضيف الساعة ${emadHmAr(c.inTime)}`;
   return t;
 }
@@ -2350,7 +2351,7 @@ function renderEmadGrid(todayK) {
         if (!cs.length && !reps.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
         let cell = cs.map(c => {
           let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}${c.cleaner==='jinny'?' <span style="color:#8a5200">جيني</span>':(c.cleaner==='both'?' <span style="color:#8a5200">أمل+جيني</span>':'')}</div>`;
-          if (emadShowsCode(c.type) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.code}</div>`;
+          if ((emadShowsCode(c.type) || c.codeChange) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.codeChange ? '🔑 ' : ''}${c.code}</div>`;
           else t += `<div style="font-size:9.5px;color:#555">${EMAD_TYPE_AR[c.type] || c.type}</div>`;
           // the time the GUEST gave beats the assumed check-in on the cleaning row (Sarah 2026-08-18)
           const said = (EMAD.arrivals || {})[c.flat + '|' + c.date] || '';
