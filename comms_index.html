@@ -620,7 +620,7 @@ function stepRow(st,sp,state){
   const codeWarn=(sp.k==='code'&&!sp.done&&!codeIsSet(st))
     ? `<div class="step-sub" style="color:#cc5f5f;font-weight:800">⚠️ الكود ${codeFor(st)} لسه محدش غيّره على الباب — اتأكد مع عماد قبل ما تبعته</div>` : '';
   return `<div class="step ${sp.done?'done':''}">
-    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${sp.val}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
+    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${arrLabel(sp.val,st.ci)}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
     ${state==='wait'?`<span class="badge b-soon">بعد ${gateName(sp.gated)}</span>`:''}
     ${sp.done?`<button class="btn" onclick="untick('${st.id}','${encStep(sp.k)}','${sp.occ}')">↩</button>`:delBtn+copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
@@ -804,7 +804,7 @@ function renderStays(){
       <div class="stay-hd" onclick="window._open=window._open==='${st.id}'?null:'${st.id}';renderStays()">
         <div style="flex:1"><div class="stay-nm"><bdi>${st.guest}</bdi>${st.nameAr?` · <bdi style="font-weight:600;font-size:12.5px">${st.nameAr}</bdi>`:``}</div>
           ${st.bookingName?`<div class="stay-meta">🎫 الحجز باسم: <bdi>${st.bookingName}</bdi></div>`:''}
-          <div class="stay-meta">${st.flat} · ${st.ci} ← ${st.co} · ${st.nights} ليلة · ${st.portal}${st.arrivalTime?' · وصول '+st.arrivalTime:''}</div>
+          <div class="stay-meta">${st.flat} · ${st.ci} ← ${st.co} · ${st.nights} ليلة · ${st.portal}${st.arrivalTime?' · وصول '+arrLabel(st.arrivalTime+(st.arrivalDate&&st.arrivalDate!==st.ci?'|'+st.arrivalDate:''),st.ci):''}</div>
           <div class="stay-meta">${metaChips(st)}</div></div>
         ${st.phone?`<a class="wa" target="_blank" href="https://wa.me/${String(st.phone).replace(/[^0-9]/g,'')}" onclick="event.stopPropagation()">💬</a>`:''}
         ${hoB}
@@ -889,15 +889,50 @@ async function tick(stayId,k,occ){
   applyTick(stayId,k,occ,true,'');
   toast('✅ اتسجلت');
 }
-async function tickArrival(stayId,occ){
-  const v=prompt('ميعاد وصول الضيف (مثال 16:30):','15:00');
-  if(v===null) return;
-  const t=String(v).trim();
-  if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اكتب الوقت بصيغة HH:MM'); return; }
-  const r=await apiRetry('comms_tick',{stayId,step:'arrivaltime',occ,val:t,tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()});
+/* THE ARRIVAL HAS A DAY TOO (Sarah 2026-10-11: Anas booked from Tuesday but arrives 04:00 Wednesday — after midnight it
+   is the next day). Saved as "HH:mm" on the check-in day, or "HH:mm|YYYY-MM-DD" on another day (time first, so readers
+   that only want the time are unchanged). */
+const AR_DOW=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function arrParts(v,ci){ v=String(v||''); const t=v.slice(0,5), d=(v.split('|')[1]||'').slice(0,10); return { time:t, date:d||ci||'' }; }
+function arrLabel(v,ci){ const a=arrParts(v,ci); if(!a.time) return '';
+  return (a.date&&ci&&a.date!==ci ? AR_DOW[new Date(a.date+'T12:00:00').getDay()]+' '+a.date.slice(8,10)+'/'+a.date.slice(5,7)+' ' : '')+a.time; }
+function tickArrival(stayId,occ){
+  const st=D.stays.find(x=>x.id===stayId); if(!st) return;
+  const nx=new Date(st.ci+'T12:00:00'); nx.setDate(nx.getDate()+1);
+  const nk=nx.getFullYear()+'-'+String(nx.getMonth()+1).padStart(2,'0')+'-'+String(nx.getDate()).padStart(2,'0');
+  const lbl=k=>AR_DOW[new Date(k+'T12:00:00').getDay()]+' '+k.slice(8,10)+'/'+k.slice(5,7);
+  let w=document.getElementById('arrForm'); if(w) w.remove();
+  w=document.createElement('div'); w.id='arrForm';
+  w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl';
+  w.innerHTML=`<div style="background:#fff;border-radius:14px;padding:16px;width:100%;max-width:320px;font-family:Cairo,sans-serif">
+    <div style="font-weight:900;font-size:15px;margin-bottom:10px">🕒 ميعاد وصول <bdi>${firstName(st.guest)}</bdi></div>
+    <div style="font-size:12px;color:#777;margin-bottom:4px">يوم الوصول</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button type="button" id="arrD1" class="btn" style="flex:1" onclick="arrPick('${st.ci}')">${lbl(st.ci)}<br><span style="font-size:10px;color:#777">يوم الحجز</span></button>
+      <button type="button" id="arrD2" class="btn" style="flex:1" onclick="arrPick('${nk}')">${lbl(nk)}<br><span style="font-size:10px;color:#777">بعد نص الليل</span></button>
+    </div>
+    <input type="date" id="arrDate" value="${st.ci}" style="width:100%;box-sizing:border-box;padding:7px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;font-family:inherit">
+    <div style="font-size:12px;color:#777;margin-bottom:4px">الساعة</div>
+    <input type="time" id="arrTime" value="${st.arrivalTime||'15:00'}" style="width:100%;box-sizing:border-box;padding:7px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;font-family:inherit">
+    <div style="display:flex;gap:8px"><button type="button" class="btn btn-ok" style="flex:1" onclick="arrSave('${stayId}','${occ}')">✅ حفظ</button>
+      <button type="button" class="btn" style="flex:1" onclick="document.getElementById('arrForm').remove()">إلغاء</button></div></div>`;
+  document.body.appendChild(w);
+  if(st.arrivalDate) document.getElementById('arrDate').value=st.arrivalDate;
+  arrPick(document.getElementById('arrDate').value);
+}
+function arrPick(k){ const i=document.getElementById('arrDate'); if(i) i.value=k;
+  ['arrD1','arrD2'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.outline=(b.getAttribute('onclick')||'').indexOf(k)>-1?'2px solid var(--ok,#3a7d4d)':''; }); }
+async function arrSave(stayId,occ){
+  const st=D.stays.find(x=>x.id===stayId); if(!st) return;
+  const t=(document.getElementById('arrTime').value||'').trim(), d=(document.getElementById('arrDate').value||'').trim();
+  if(!/^\d{1,2}:\d{2}$/.test(t)){ toast('اختار الساعة'); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast('اختار يوم الوصول'); return; }
+  const val=d===st.ci?t:t+'|'+d;
+  document.getElementById('arrForm').remove();
+  const r=await apiRetry('comms_tick',{stayId,step:'arrivaltime',occ,val,tag:tagOf(st)});
   if(!r||r.ok!==true){ unsavedToast(); return; }
-  applyTick(stayId,'arrivaltime',occ,true,t);
-  toast('✅ الوصول '+t);
+  applyTick(stayId,'arrivaltime',occ,true,val);
+  toast('✅ الوصول '+arrLabel(val,st.ci));
 }
 async function untick(stayId,k,occ){
   k=decodeURIComponent(k);
@@ -911,7 +946,7 @@ async function untick(stayId,k,occ){
 function applyTick(stayId,k,occ,done,val){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   const sp=st.steps.find(x=>x.k===k&&String(x.occ)===String(occ)); if(!sp) return;
-  sp.done=done; sp.doneAt=done?new Date().toISOString():''; if(k==='arrivaltime'){ sp.val=done?val:''; st.arrivalTime=done?val:''; }
+  sp.done=done; sp.doneAt=done?new Date().toISOString():''; if(k==='arrivaltime'){ sp.val=done?val:''; const ap=arrParts(done?val:'',st.ci); st.arrivalTime=done?ap.time:''; st.arrivalDate=done&&ap.time?ap.date:''; }
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   renderMain();
 }
@@ -1303,7 +1338,7 @@ function renderSched(){
     (cell[f+'|'+d]=cell[f+'|'+d]||[]).push(`<div style="background:#ece0cf;border-radius:5px;padding:1px 4px;margin:1px 0">🔧 ${r.trade||''}</div>`); });
   D.stays.forEach(s=>{
     // the time the guest gave reads as a time, not as a number stuck to a name (Sarah 2026-08-18)
-    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?` <span style="white-space:nowrap">🕒 ${s.arrivalTime}</span>`:''}</div>`);
+    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?` <span style="white-space:nowrap">🕒 ${arrLabel(s.arrivalTime+(s.arrivalDate&&s.arrivalDate!==s.ci?'|'+s.arrivalDate:''),s.ci)}</span>`:''}</div>`);
     if(days.indexOf(s.co)>-1)(cell[s.flat+'|'+s.co]=cell[s.flat+'|'+s.co]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi></div>`);
   });
   const DN=['الجمعة','السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس'];
@@ -1399,7 +1434,7 @@ function renderSched(){
           if(c.code) cell+=`<div style="font-weight:900;color:var(--primary)">🔑 ${c.code}</div>`;
         });
         if(rp) cell+=`<div style="background:${C.rep};border-radius:4px;padding:0 3px;margin-top:1px">🔧 ${rp.trade||''}${rp.time&&/^\d/.test(String(rp.time))?' '+rp.time:''}</div>`;
-        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' '+sin.arrivalTime:''}</div>`;
+        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' '+arrLabel(sin.arrivalTime+(sin.arrivalDate&&sin.arrivalDate!==sin.ci?'|'+sin.arrivalDate:''),sin.ci):''}</div>`;
         h+=`<td style="border:1px solid ${C.line};padding:2px;vertical-align:middle;text-align:center;height:46px;background:${bg}">${cell}</td>`;
         di++;
       } else if(cov){

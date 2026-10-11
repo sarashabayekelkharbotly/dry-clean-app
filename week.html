@@ -182,7 +182,12 @@ function sameDayIn(flat,k){ return innStayOn(flat,k); }
    the 15:00 house default — so a real answer outranks both, and askedIn() says which it is so the
    grid can mark a confirmed time apart from a guessed one. */
 function askedIn(f,k){ return (D&&D.arrivals&&D.arrivals[f+'|'+k])||''; }
-function inTimeFor(f,k){ var a=askedIn(f,k); if(a) return hm(a);
+/* the guest's answer is "HH:mm", or "HH:mm|YYYY-MM-DD" when they walk in on another day than check-in (Anas: booked Tue,
+   arrives 04:00 Wed — Sarah 2026-10-11) → «Wed 14/10 04:00» */
+var DOW_EN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function arrLbl(a,ciK){ a=String(a||''); var t=a.slice(0,5), d=(a.split('|')[1]||'').slice(0,10);
+  return (d&&d!==ciK) ? DOW_EN[day(d).getDay()]+' '+d.slice(8,10)+'/'+d.slice(5,7)+' '+t : t; }
+function inTimeFor(f,k){ var a=askedIn(f,k); if(a) return arrLbl(a,k);
   var t=DEFAULT_IN; cleans.forEach(function(c){ if(c.flat===f&&c.date===k&&c.inTime)t=c.inTime; }); return hm(t); }
 /* THE WEEK RUNS FRIDAY → THURSDAY (Sarah 2026-08-13). The schedule is built on Thursday, so a
    Saturday-start week cut the plan in half: Thursday sat at the END of the old week and the days
@@ -630,7 +635,7 @@ function render(){
         // …and the time the guest gave, when they have given one — an arrival with no clean that day
         // used to show no time at all, which is exactly the day it matters most
         if(arrive){ var ask=askedIn(f,ymd(days[seg.di]));
-          cell+='<div class="gsub">in '+esc(short(seg.stay.guest))+(ask?' <b style="color:#3a7d4d">🕒 '+esc(hm(ask))+'</b>':'')+'</div>'+
+          cell+='<div class="gsub">in '+esc(short(seg.stay.guest))+(ask?' <b style="color:#3a7d4d">🕒 '+esc(arrLbl(ask,ymd(days[seg.di])))+'</b>':'')+'</div>'+
                 '<div class="code">'+esc(arrivalCode(f,day(seg.stay.checkIn)))+'</div>'; }
         h+='<td class="'+cls+'" colspan="'+seg.span+'">'+cell+'</td>';
       } else if(seg.kind==='clean'){
