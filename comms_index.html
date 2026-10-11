@@ -1408,9 +1408,10 @@ function renderSched(){
   const short=g=>String(g||'').trim().split(/\s+/)[0];
   const cleansAt=(f,d)=>(D.schedule||[]).filter(c=>c.flat===f&&c.date===d);
   const repAt=(f,d)=>((D.rep&&D.rep.open)||D.repairs||[]).find(r=>(r.flat||r.apt)===f&&String(r.date||'').slice(0,10)===d);
-  const stayIn=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci===d);
+  // «in» sits on the day the guest really walks in — Dani's answer can name a later day than check-in (Sarah 2026-10-11)
+  const stayIn=(f,d)=>D.stays.find(s=>s.flat===f&&(s.arrivalDate||s.ci)===d);
   const stayOut=(f,d)=>D.stays.find(s=>s.flat===f&&s.co===d);
-  const covering=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci<d&&s.co>d);
+  const covering=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci<=d&&s.co>d&&(s.arrivalDate||s.ci)!==d);
   let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <button class="btn" onclick="schedShift(1)">‹</button>
     <div style="flex:1;text-align:center;font-weight:900;font-size:12.5px">${days[0]} ← ${days[6]}${schedOff===0?' (الأسبوع الحالي)':''}</div>
@@ -1434,7 +1435,7 @@ function renderSched(){
           if(c.code) cell+=`<div style="font-weight:900;color:var(--primary)">🔑 ${c.code}</div>`;
         });
         if(rp) cell+=`<div style="background:${C.rep};border-radius:4px;padding:0 3px;margin-top:1px">🔧 ${rp.trade||''}${rp.time&&/^\d/.test(String(rp.time))?' '+rp.time:''}</div>`;
-        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' '+arrLabel(sin.arrivalTime+(sin.arrivalDate&&sin.arrivalDate!==sin.ci?'|'+sin.arrivalDate:''),sin.ci):''}</div>`;
+        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">▶ in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' 🕒 '+sin.arrivalTime:''}</div>`;
         h+=`<td style="border:1px solid ${C.line};padding:2px;vertical-align:middle;text-align:center;height:46px;background:${bg}">${cell}</td>`;
         di++;
       } else if(cov){

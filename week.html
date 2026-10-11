@@ -58,6 +58,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:11.5px;min-width:800px;
 .ct{font-weight:700;font-size:12px;line-height:1.2;color:#cc2f2f}   /* cleaning time — red */
 .ct.soft{color:var(--soft);font-weight:400}
 .code{font-family:monospace;font-weight:700;font-size:11px;color:#111}  /* lock code — black */
+.code:not(:empty)::before{content:'🔑 '}   /* the lock emoji, as on Dani's grid (Sarah 2026-10-11) */
 .gsub{font-size:9px;color:var(--soft);font-weight:700;line-height:1.3}  /* check-in/out names — grey */
 .rlbl{font-weight:700;font-size:10.5px;color:#7a5a2f;line-height:1.25}
 .chips{margin-top:2px}
@@ -187,6 +188,8 @@ function askedIn(f,k){ return (D&&D.arrivals&&D.arrivals[f+'|'+k])||''; }
 var DOW_EN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function arrLbl(a,ciK){ a=String(a||''); var t=a.slice(0,5), d=(a.split('|')[1]||'').slice(0,10);
   return (d&&d!==ciK) ? DOW_EN[day(d).getDay()]+' '+d.slice(8,10)+'/'+d.slice(5,7)+' '+t : t; }
+/* the day the guest really walks in (Dani's answer can name a later day than check-in) */
+function arrDayOf(f,ciK){ var d=(String(askedIn(f,ciK)).split('|')[1]||'').slice(0,10); return d||ciK; }
 function inTimeFor(f,k){ var a=askedIn(f,k); if(a) return arrLbl(a,k);
   var t=DEFAULT_IN; cleans.forEach(function(c){ if(c.flat===f&&c.date===k&&c.inTime)t=c.inTime; }); return hm(t); }
 /* THE WEEK RUNS FRIDAY → THURSDAY (Sarah 2026-08-13). The schedule is built on Thursday, so a
@@ -523,7 +526,9 @@ function buildRow(f,days){
   while(d<7){
     var t=ty[d];
     if(t.t==='stay'){
-      var span=1; while(d+span<7 && ty[d+span].t==='stay' && ty[d+span].stay===t.stay) span++;
+      // the block breaks on the day the guest really arrives when that is after check-in (Anas: booked Tue, walks in Wed 04:00)
+      var ciK=ymd(day(t.stay.checkIn)), arK=arrDayOf(f,ciK);
+      var span=1; while(d+span<7 && ty[d+span].t==='stay' && ty[d+span].stay===t.stay && !(arK!==ciK && ymd(days[d+span])===arK)) span++;
       segs.push({kind:'stay',stay:t.stay,di:d,span:span}); d+=span;
     } else if(t.t==='clean'){ segs.push({kind:'clean',di:d,out:t.out,inn:t.inn,list:t.list,rep:t.rep}); d++; }
     else if(t.t==='repair'){ segs.push({kind:'repair',di:d,rep:t.rep}); d++; }
@@ -637,6 +642,9 @@ function render(){
         if(arrive){ var ask=askedIn(f,ymd(days[seg.di]));
           cell+='<div class="gsub">in '+esc(short(seg.stay.guest))+(ask?' <b style="color:#3a7d4d">🕒 '+esc(arrLbl(ask,ymd(days[seg.di])))+'</b>':'')+'</div>'+
                 '<div class="code">'+esc(arrivalCode(f,day(seg.stay.checkIn)))+'</div>'; }
+        var sciK=ymd(day(seg.stay.checkIn)), sarK=arrDayOf(f,sciK);
+        if(!arrive && sarK!==sciK && ymd(days[seg.di])===sarK)
+          cell+='<div class="gsub"><b style="color:#3a7d4d">▶ in '+esc(short(seg.stay.guest))+' 🕒 '+esc(String(askedIn(f,sciK)).slice(0,5))+'</b></div>';
         h+='<td class="'+cls+'" colspan="'+seg.span+'">'+cell+'</td>';
       } else if(seg.kind==='clean'){
         var actives=seg.list.filter(function(x){return x.c.on;});

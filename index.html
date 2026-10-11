@@ -2317,8 +2317,9 @@ function renderEmadGrid(todayK) {
   const base = new Date(todayK + 'T12:00:00');
   // the week runs FRIDAY → THURSDAY, same as the Hub's schedule (Sarah 2026-08-13)
   const sat = new Date(base); sat.setDate(sat.getDate() - ((sat.getDay() + 2) % 7));   // this week's Friday
-  const flats = EMAD_FLAT_ORDER.filter(f => sched.some(c => c.flat === f))
-    .concat([...new Set(sched.map(c => c.flat))].filter(f => EMAD_FLAT_ORDER.indexOf(f) < 0));
+  const moves = EMAD.moves || [];   // guests in/out on their real day (Sarah 2026-10-11 — like Dani's grid)
+  const flats = EMAD_FLAT_ORDER.filter(f => sched.some(c => c.flat === f) || moves.some(m => m.flat === f))
+    .concat([...new Set(sched.map(c => c.flat).concat(moves.map(m => m.flat)))].filter(f => EMAD_FLAT_ORDER.indexOf(f) < 0));
   let h = `<div class="section-title">🗓️ جدول النظافة (من الجدول المؤكد)</div>`;
 
   {
@@ -2330,7 +2331,7 @@ function renderEmadGrid(todayK) {
     const range = `${days[0].getDate()}/${days[0].getMonth()+1} — ${days[6].getDate()}/${days[6].getMonth()+1}`;
     const navBtn = (dir, txt, enabled) =>
       `<button onclick="emadWeekNav(${dir})" ${enabled ? '' : 'disabled'} style="border:1px solid var(--border,#ddd);border-radius:8px;background:${enabled ? '#fff' : '#f5f5f5'};font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;padding:5px 10px;cursor:${enabled ? 'pointer' : 'default'};opacity:${enabled ? 1 : .4}">${txt}</button>`;
-    const hasWork = sched.some(c => keys.indexOf(c.date) > -1) || (EMAD.repairs || []).some(r => keys.indexOf(r.date) > -1);
+    const hasWork = sched.some(c => keys.indexOf(c.date) > -1) || (EMAD.repairs || []).some(r => keys.indexOf(r.date) > -1) || moves.some(m => keys.indexOf(m.date) > -1);
 
     h += `<div class="card" style="margin-bottom:10px;padding:8px;overflow-x:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
@@ -2348,22 +2349,23 @@ function renderEmadGrid(todayK) {
       keys.forEach((k, i) => {
         const cs = sched.filter(c => c.flat === f && c.date === k).sort((a,b) => emadTimeKey(a) < emadTimeKey(b) ? -1 : 1);
         const reps = (EMAD.repairs || []).filter(r => r.flat === f && r.date === k);
-        if (!cs.length && !reps.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
-        let cell = cs.map(c => {
+        const mIn = moves.filter(m => m.flat === f && m.date === k && m.kind === 'in'), mOut = moves.filter(m => m.flat === f && m.date === k && m.kind === 'out');
+        if (!cs.length && !reps.length && !mIn.length && !mOut.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
+        let cell = mOut.map(m => `<div style="font-size:9px;color:#a24a4a;font-weight:800">◀ خروج <bdi>${m.guest}</bdi></div>`).join('');
+        cell += cs.map(c => {
           let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}${c.cleaner==='jinny'?' <span style="color:#8a5200">جيني</span>':(c.cleaner==='both'?' <span style="color:#8a5200">أمل+جيني</span>':'')}</div>`;
-          if ((emadShowsCode(c.type) || c.codeChange) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">${c.codeChange ? '🔑 ' : ''}${c.code}</div>`;
+          if ((emadShowsCode(c.type) || c.codeChange) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">🔑 ${c.code}</div>`;
           else t += `<div style="font-size:9.5px;color:#555">${EMAD_TYPE_AR[c.type] || c.type}</div>`;
-          // the time the GUEST gave beats the assumed check-in on the cleaning row (Sarah 2026-08-18)
-          const said = (EMAD.arrivals || {})[c.flat + '|' + c.date] || '';
-          if (said) t += `<div style="font-size:9px;color:#2e7d32;font-weight:800">دخول ${said} ✓</div>`;
-          else if (c.inTime && /^\d/.test(c.inTime)) t += `<div style="font-size:9px;color:#555">دخول ${c.inTime}</div>`;
           return t;
         }).join('<div style="height:2px"></div>');
+        // ▶ the guest walks in — on the day they really arrive; the time the GUEST gave (✓) beats the assumed one (Sarah 2026-08-18)
+        cell += mIn.map(m => { const guess = (cs.find(c => c.inTime && /^\d/.test(c.inTime)) || {}).inTime || '';
+          return `<div style="font-size:9px;color:#2e7d32;font-weight:800">▶ دخول <bdi>${m.guest}</bdi> ${m.time ? m.time + ' ✓' : guess}</div>`; }).join('');
         if (reps.length) cell += (cs.length ? '<div style="height:2px"></div>' : '') + reps.map(r =>
           `<div style="font-size:9.5px;font-weight:700;color:#6a5636">🔧 ${r.trade}${r.time && /^\d/.test(r.time) ? '<br>'+r.time : ''}</div>`).join('');
         // a repair-only day wears the Hub's repair colour; a mixed day keeps the cleaning colour;
         // TWO cleanings in one day (جيني ثم أمل) wear their own loud colour, matching the Hub grid
-        const bg = cs.length > 1 ? '#ffd58f' : (cs.length ? (EMAD_CELL_BG[cs[0].type] || '#f5dede') : '#ece0cf');
+        const bg = cs.length > 1 ? '#ffd58f' : (cs.length ? (EMAD_CELL_BG[cs[0].type] || '#f5dede') : (reps.length ? '#ece0cf' : (mIn.length ? '#e4efe1' : '#fff')));
         h += `<td style="border:1px solid #ecdede;padding:2px 3px;text-align:center;background:${bg}${keys[i]===todayK?';outline:2px solid var(--primary,#cc5f5f);outline-offset:-2px':''}">${cell}</td>`;
       });
       h += `</tr>`;
@@ -2374,6 +2376,7 @@ function renderEmadGrid(todayK) {
         &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#d6e2f2;border:1px solid #ecdede;vertical-align:middle"></span> نظافة اثناء وجود ضيف
         &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#ecdcf0;border:1px solid #ecdede;vertical-align:middle"></span> إعادة / تغيير كود
         &nbsp;<span style="display:inline-block;width:9px;height:9px;background:#ece0cf;border:1px solid #ecdede;vertical-align:middle"></span> صيانة
+        · ▶ دخول · ◀ خروج · 🔑 كود الباب
       </div></div>`;
   }
   return h;
