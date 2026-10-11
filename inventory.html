@@ -583,6 +583,9 @@ window.addEventListener('load',function(){
   <button class="nav-tab" id="nav-recon" style="display:none" onclick="showPage('recon',this);loadRecon()">
     <span class="tab-icon">🧮</span>مطابقة
   </button>
+  <button class="nav-tab" id="nav-review" style="display:none" onclick="showPage('review',this);loadReview()">
+    <span class="tab-icon">🧾</span>مراجعة الطلبات
+  </button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -611,6 +614,11 @@ window.addEventListener('load',function(){
 <!-- ORDERS -->
 <div class="page" id="page-orders">
   <div id="orders-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+</div>
+
+<!-- ORDERS REVIEW (Sarah/Khaled) -->
+<div class="page" id="page-review">
+  <div id="review-content"><div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
 </div>
 
 <!-- RECONCILIATION (Sarah/Khaled) -->
@@ -724,6 +732,9 @@ window.addEventListener('load',function(){
     <div class="modal-handle"></div>
     <div class="modal-title">🛒 ما الذي اشتريته؟</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:14px">الكميات محسوبة تلقائياً — عدّل أي صنف أو اجعله صفراً لتخطيه</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12.5px;font-weight:700">🏪 من فين؟</span>
+      <input id="order-shop" list="order-shops" placeholder="Amazon، كارفور…" style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;font-family:'Cairo',sans-serif;font-size:13px">
+      <datalist id="order-shops"><option value="Amazon"><option value="Carrefour"><option value="Talabat"><option value="Breadfast"></datalist></div>
     <div id="order-modal-body"></div>
     <button class="btn btn-primary" id="order-confirm-btn" onclick="confirmOrder()" style="margin-top:4px">✅ تأكيد الشراء</button>
     <button class="btn btn-outline" style="margin-top:8px" onclick="closeModal('order-modal')">إلغاء</button>
@@ -928,7 +939,7 @@ function agoText(ts) {
 // ─────────────────────────────────────────────
 async function api(action, extra = {}) {
   // a save is only made on fresh numbers — never on a screen that couldn't reach the server
-  if (!dataFresh && !/^inv_get_|^inv_recon$|^auth_/.test(action)) throw new Error('not fresh');
+  if (!dataFresh && !/^inv_get_|^inv_recon$|^inv_baskets$|^auth_/.test(action)) throw new Error('not fresh');
   return apiWithRetry(action, extra, 1);
 }
 
@@ -1109,7 +1120,8 @@ async function syncData(silent = false) {
   dataFresh = syncOk;
   hideSplash();
   if (syncOk) { const sg = document.getElementById('summary-stats'); if (sg) sg.style.visibility = ''; renderAll();
-    if (document.getElementById('page-recon') && document.getElementById('page-recon').classList.contains('active')) loadRecon(); }
+    if (document.getElementById('page-recon') && document.getElementById('page-recon').classList.contains('active')) loadRecon();
+    if (document.getElementById('page-review') && document.getElementById('page-review').classList.contains('active')) loadReview(); }
   else renderOffline();
   setFreshness(syncOk ? 'live' : 'offline');
   if (!silent) toast(syncOk ? '✅ تم التحديث' : '⚠️ تعذر الاتصال');
@@ -2390,6 +2402,79 @@ function warnDuplicateIds() {
           '\nده بيحصل لما صف يتعمله نسخ-لصق في الشيت — امسحوا المكرر وسجلوا الصنف الجديد من التطبيق نفسه.');
 }
 
+
+/* 🧾 مراجعة الطلبات (Sarah 2026-10-11 — the half-delivered Amazon order). One card per order (the lines placed
+   together). Every card adds up: مطلوب = اتسلم + ماوصلش + في الطريق. «ماوصلش» is the refund to expect; the refund that
+   really came back is typed in and the difference shows. Sarah/Khaled only; the server builds every figure. */
+let reviewData = null, reviewFilter = 'all', reviewOpen = {};
+async function loadReview() {
+  const el = document.getElementById('review-content'); if (!el) return;
+  if (!reviewData) el.innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+  let r = null; try { r = await api('inv_baskets'); } catch(e) { r = null; }
+  if (!r || r.ok === false) { el.innerHTML = '<div class="empty"><div class="empty-text">❌ ' + ((r && r.error) || 'مش قادر أوصل للسيرفر') + '</div></div>'; return; }
+  reviewData = r; renderReview();
+}
+function rvMoney(x) { if (x == null || x === '') return '—'; const v = Math.round(Number(x) * 100) / 100; return v.toLocaleString('en-US'); }
+function rvEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function reviewSetFilter(f) { reviewFilter = f; renderReview(); }
+function reviewToggle(i) { reviewOpen[i] = !reviewOpen[i]; renderReview(); }
+function renderReview() {
+  const el = document.getElementById('review-content'); if (!el || !reviewData) return;
+  const all = reviewData.baskets || [];
+  const list = all.filter(b => reviewFilter === 'all' || (reviewFilter === 'short' ? b.notDelivered > 0 : b.status === 'open'));
+  const chip = (k, t, n) => `<button onclick="reviewSetFilter('${k}')" style="border:1px solid ${reviewFilter===k?'var(--primary)':'var(--border)'};background:${reviewFilter===k?'var(--primary)':'#fff'};color:${reviewFilter===k?'#fff':'var(--text2)'};border-radius:16px;padding:4px 12px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${t} (${n})</button>`;
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${chip('all','الكل',all.length)}${chip('short','فيها حاجات ماوصلتش',all.filter(b=>b.notDelivered>0).length)}${chip('open','لسه في الطريق',all.filter(b=>b.status==='open').length)}</div>
+    <datalist id="rv-shops">${(reviewData.shops||[]).map(s=>'<option value="'+rvEsc(s)+'">').join('')}</datalist>`;
+  if (!list.length) h += '<div class="empty"><div class="empty-icon">🧾</div><div class="empty-text">مفيش طلبات هنا</div></div>';
+  list.slice(0, 60).forEach(b => {
+    const i = all.indexOf(b), open = !!reviewOpen[i];
+    const badge = b.status === 'open' ? '<span class="badge badge-transit">🚚 في الطريق</span>' : (b.status === 'short' ? '<span class="badge" style="background:#fdecea;color:#c62828">⚠️ ماوصلش كله</span>' : '<span class="badge badge-ok">✅ وصل كله</span>');
+    const cell = (lbl, v, col) => `<td style="padding:4px 2px;text-align:center"><div style="font-size:10px;color:var(--text3)">${lbl}</div><div style="font-weight:900;font-size:13px;${col?'color:'+col:''}">${rvMoney(v)}</div></td>`;
+    const diff = b.refund == null ? null : Math.round((Number(b.refund) - b.notDelivered) * 100) / 100;
+    h += `<div class="nawaqes-card" style="padding:10px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <div><div style="font-weight:900;font-size:13.5px">${fmtDate(b.at)}</div>
+          <div style="font-size:11px;color:var(--text3)">طلب ${rvEsc(b.by)} · ${b.lines.length} صنف</div></div>
+        ${badge}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px">
+        <span style="color:var(--text3)">🏪 المحل</span>
+        <input list="rv-shops" value="${rvEsc(b.shop)}" placeholder="مش متسجل" onchange="reviewSave(${i},{shop:this.value})"
+          style="flex:1;min-width:0;border:1.5px solid var(--border);border-radius:8px;padding:3px 8px;font-family:'Cairo',sans-serif;font-size:12.5px"></div>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;background:#faf6f6;border-radius:8px"><tr>
+        ${cell('مطلوب', b.ordered)}<td style="color:var(--text3)">=</td>${cell('اتسلم', b.received, '#2e7d32')}<td style="color:var(--text3)">+</td>${cell('ماوصلش', b.notDelivered, b.notDelivered>0?'#c62828':'')}<td style="color:var(--text3)">+</td>${cell('في الطريق', b.onTheWay, b.onTheWay>0?'#b07d1e':'')}
+      </tr></table>
+      ${b.unpriced ? `<div style="font-size:10.5px;color:#b07d1e;margin-top:4px">⚠️ ${b.unpriced} صنف من غير سعر — مش داخل في المجموع</div>` : ''}
+      ${b.notDelivered > 0 ? `<div style="margin-top:8px;font-size:12px;border-top:1px dashed var(--border);padding-top:8px">
+        <div style="display:flex;justify-content:space-between"><span>💸 المفروض يرجع (اللي ماوصلش)</span><b>${rvMoney(b.notDelivered)} ج</b></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span style="flex:1">رجع فعلاً</span>
+          <input type="number" step="0.01" min="0" value="${b.refund==null?'':b.refund}" placeholder="—" onchange="reviewSave(${i},{refund:this.value})"
+            style="width:100px;border:1.5px solid var(--border);border-radius:8px;padding:3px 8px;font-family:'Cairo',sans-serif;font-size:13px;text-align:center"> ج</div>
+        ${diff == null ? '<div style="font-size:11px;color:var(--text3);margin-top:4px">لسه ماتسجلش اللي رجع</div>'
+          : `<div style="display:flex;justify-content:space-between;margin-top:4px;font-weight:800;color:${Math.abs(diff)<0.01?'#2e7d32':'#c62828'}"><span>${Math.abs(diff)<0.01?'✅ رجع بالظبط':(diff<0?'⚠️ ناقص يرجع':'ℹ️ رجع زيادة')}</span><span>${Math.abs(diff)<0.01?'':rvMoney(Math.abs(diff))+' ج'}</span></div>`}
+        <input value="${rvEsc(b.refundNote)}" placeholder="ملاحظة (مثلاً: الشحن ماترجعش)" onchange="reviewSave(${i},{note:this.value})"
+          style="width:100%;box-sizing:border-box;margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:'Cairo',sans-serif;font-size:11.5px"></div>` : ''}
+      <button onclick="reviewToggle(${i})" style="margin-top:8px;width:100%;background:none;border:1px solid var(--border);border-radius:8px;padding:4px;font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer">${open?'▲ إخفاء الأصناف':'▼ الأصناف'}</button>
+      ${open ? `<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:11.5px">
+        <tr style="color:var(--text3);font-size:10.5px"><th style="text-align:right;padding:3px">الصنف</th><th>طُلب</th><th>اتسلم</th><th>السعر</th><th>مطلوب</th><th>اتسلم</th><th>ماوصلش</th><th>في الطريق</th></tr>
+        ${b.lines.map(l => `<tr style="border-top:1px solid var(--border);${l.status==='cancelled'?'color:#c62828':''}">
+          <td style="padding:3px;text-align:right">${rvEsc(l.name)}${l.status==='cancelled'?' <span style="font-size:10px">(اتلغى)</span>':''}</td>
+          <td style="text-align:center">${l.qty}</td><td style="text-align:center">${l.status==='received'?l.qtyRec:'—'}</td><td style="text-align:center">${l.price?rvMoney(l.price):'—'}</td>
+          <td style="text-align:center">${rvMoney(l.ordered)}</td><td style="text-align:center">${l.received?rvMoney(l.received):''}</td>
+          <td style="text-align:center">${l.notDelivered?rvMoney(l.notDelivered):''}</td><td style="text-align:center">${l.onTheWay?rvMoney(l.onTheWay):''}</td></tr>`).join('')}
+        <tr style="border-top:2px solid var(--text2);font-weight:900"><td style="padding:3px;text-align:right">المجموع</td><td></td><td></td><td></td>
+          <td style="text-align:center">${rvMoney(b.ordered)}</td><td style="text-align:center">${rvMoney(b.received)}</td><td style="text-align:center">${rvMoney(b.notDelivered)}</td><td style="text-align:center">${rvMoney(b.onTheWay)}</td></tr>
+      </table>` : ''}
+    </div>`;
+  });
+  el.innerHTML = h;
+}
+async function reviewSave(i, f) {
+  const b = reviewData && reviewData.baskets[i]; if (!b) return;
+  let r = null; try { r = await api('inv_basket_set', Object.assign({ key: b.key }, f)); } catch(e) { r = null; }
+  if (!r || r.ok === false) { toast('❌ ماتحفظش — ' + ((r && r.error) || 'جرّب تاني')); return; }
+  toast('✅ اتحفظ'); loadReview();
+}
+
 // ─────────────────────────────────────────────
 // ORDER FLOW
 // ─────────────────────────────────────────────
@@ -2491,7 +2576,8 @@ async function confirmOrder() {
   // that timed out silently abandoned the rest. If the new endpoint isn't deployed yet, fall
   // back to per-item writes, each isolated so one failure cannot take the others with it.
   try {
-    const r = await api('inv_add_orders', { orders: newOrders });
+    const shopEl = document.getElementById('order-shop');
+    const r = await api('inv_add_orders', { orders: newOrders, shop: shopEl ? shopEl.value.trim() : '' });
     if (!r || r.ok === false) throw new Error((r && r.error) || 'bulk failed');
     saved = newOrders.slice();
   } catch (eBulk) {
@@ -2502,8 +2588,7 @@ async function confirmOrder() {
   }
   saved.forEach(ord => {
     orders.push(ord);                                     // only once the sheet has it
-    const itemIdx = items.findIndex(i => String(i.id) === String(ord.itemId));
-    if (itemIdx !== -1) items[itemIdx].lastPrice = ord.unitPrice;
+    // the item's price is NOT touched — it is the last RECEIVED price, set by the server on receipt (Sarah 2026-10-11)
   });
 
   if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الشراء'; }
@@ -2806,6 +2891,8 @@ function onAuthReady() {
   try { localStorage.removeItem(CACHE_KEY); } catch(e) {}       // the old saved copy is never shown again
   const nr = document.getElementById('nav-recon');               // 🧮 reconciliation: Sarah/Khaled only
   if (nr && (u === 'sarah' || u === 'khaled')) nr.style.display = '';
+  const nv = document.getElementById('nav-review');             // 🧾 orders review: Sarah/Khaled only
+  if (nv && (u === 'sarah' || u === 'khaled')) nv.style.display = '';
   setInterval(() => { if (document.visibilityState === 'visible' && currentUser && !syncing) syncData(true); }, 60000);   // fresh every minute while open
   {
     try {
