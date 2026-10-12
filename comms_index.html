@@ -694,7 +694,9 @@ async function pseudoTick(stayId, step, val, msg, snap){
   if(!r||r.ok!==true){ unsavedToast(); return false; }
   if(st){
     const now=new Date().toISOString().slice(0,10);
-    if(step==='handover') st.handover={done:true,by:currentUserName,at:now,note:val||''};
+    if(step==='handover'){ st.handover={done:true,by:currentUserName,at:now,note:val||''};
+      // the handover note sits in 📝 ملاحظات too (the server sends it there from now on — Sarah 2026-10-13)
+      if(String(val||'').trim()) st.notes=[{at:now,by:currentUserName,text:'🤝 عند التسليم: '+String(val).trim(),occ:''}].concat(st.notes||[]); }
     else if(step==='group') st.group={done:val!=='invited',by:currentUserName,at:now,invited:val==='invited'};
     else if(step==='lang') st.lang=val||'';
     else if(step==='requests') st.requests=val||'';
