@@ -810,7 +810,7 @@ function renderStays(){
         ${hoB}
         ${undone?`<span class="badge b-due">${undone}</span>`:'<span class="badge b-ok">✓</span>'}
       </div>
-      ${open?stayExtra(st)+st.steps.slice().sort((a,b)=>((a.dueD||'')+' '+(a.dueT||''))<((b.dueD||'')+' '+(b.dueT||''))?-1:1).map(sp=>stepRow(st,sp,stepState(st,sp))).join(''):''}
+      ${open?stayExtra(st)+ladderOrder(st.steps).map(sp=>stepRow(st,sp,stepState(st,sp))).join(''):''}
     </div>`;
   }).join('');
 }
@@ -893,6 +893,12 @@ async function tick(stayId,k,occ){
    is the next day). Saved as "HH:mm" on the check-in day, or "HH:mm|YYYY-MM-DD" on another day (time first, so readers
    that only want the time are unchanged). */
 const AR_DOW=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+/* the ladder in the engine's order, by due date: a step with no date yet (gated — the guide waits for the documents)
+   keeps its place after the step before it, and equal dates keep the engine's order — so «طلب المستندات» and
+   «استلام المستندات» are always the first two (Sarah 2026-10-12). The old sort put undated steps on top and
+   shuffled same-day steps. */
+function ladderOrder(steps){ let last=''; return (steps||[]).map((sp,i)=>{ const k=sp.dueD?(sp.dueD+' '+(sp.dueT||'')):last; last=k; return {sp,k,i}; })
+  .sort((a,b)=>a.k<b.k?-1:a.k>b.k?1:a.i-b.i).map(x=>x.sp); }
 function arrParts(v,ci){ v=String(v||''); const t=v.slice(0,5), d=(v.split('|')[1]||'').slice(0,10); return { time:t, date:d||ci||'' }; }
 function arrLabel(v,ci){ const a=arrParts(v,ci); if(!a.time) return '';
   return (a.date&&ci&&a.date!==ci ? AR_DOW[new Date(a.date+'T12:00:00').getDay()]+' '+a.date.slice(8,10)+'/'+a.date.slice(5,7)+' ' : '')+a.time; }
