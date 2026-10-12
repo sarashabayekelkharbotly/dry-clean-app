@@ -2410,7 +2410,16 @@ function warnDuplicateIds() {
 /* 🧾 مراجعة الطلبات (Sarah 2026-10-11 — the half-delivered Amazon order). One card per order (the lines placed
    together). Every card adds up: مطلوب = اتسلم + ماوصلش + في الطريق. «ماوصلش» is the refund to expect; the refund that
    really came back is typed in and the difference shows. Sarah/Khaled only; the server builds every figure. */
-let reviewData = null, reviewFilter = 'all', reviewOpen = {}, reviewEdit = '';
+let reviewData = null, reviewFilter = 'all', reviewOpen = {}, reviewEdit = '', reviewMergeFrom = -1;
+/* 🔗 merge (Sarah 2026-10-13): «دمج» on one order, then «ادمج هنا» on the order it joins */
+function reviewMergeStart(i) { reviewMergeFrom = reviewMergeFrom === i ? -1 : i; renderReview(); }
+async function reviewMergeInto(j) {
+  const a = reviewData && reviewData.baskets[reviewMergeFrom], b = reviewData && reviewData.baskets[j]; if (!a || !b) return;
+  if (!confirm('دمج طلب ' + fmtDate(a.at) + ' (' + a.lines.length + ' صنف) في طلب ' + fmtDate(b.at) + '؟\nكل الأصناف هتبقى طلب واحد، والمحل والفلوس اللي رجعت هيتجمعوا.')) return;
+  let r = null; try { r = await api('inv_basket_merge', { from: a.key, into: b.key }); } catch(e) { r = null; }
+  if (!r || r.ok === false) { toast('❌ مااتدمجش — ' + ((r && r.error) || 'جرّب تاني')); return; }
+  reviewMergeFrom = -1; reviewOpen = {}; toast('🔗 اتدمجوا (' + r.moved + ' صنف)'); loadReview();
+}
 async function loadReview() {
   const el = document.getElementById('review-content'); if (!el) return;
   if (!reviewData) el.innerHTML = '<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>';
@@ -2428,6 +2437,7 @@ function renderReview() {
   const list = all.filter(b => reviewFilter === 'all' || (reviewFilter === 'short' ? b.notDelivered > 0 : b.status === 'open'));
   const chip = (k, t, n) => `<button onclick="reviewSetFilter('${k}')" style="border:1px solid ${reviewFilter===k?'var(--primary)':'var(--border)'};background:${reviewFilter===k?'var(--primary)':'#fff'};color:${reviewFilter===k?'#fff':'var(--text2)'};border-radius:16px;padding:4px 12px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${t} (${n})</button>`;
   let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${chip('all','الكل',all.length)}${chip('short','فيها حاجات ماوصلتش',all.filter(b=>b.notDelivered>0).length)}${chip('open','لسه في الطريق',all.filter(b=>b.status==='open').length)}</div>
+    ${reviewMergeFrom > -1 && all[reviewMergeFrom] ? `<div style="background:#ece3f7;border:1px solid #c9b3e6;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:12.5px;font-weight:700">🔗 اختاري الطلب اللي طلب ${fmtDate(all[reviewMergeFrom].at)} هيندمج فيه — دوسي «⬅️ ادمج هنا» عليه <button onclick="reviewMergeStart(${reviewMergeFrom})" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:1px 8px;margin-inline-start:6px;cursor:pointer">إلغاء</button></div>` : ''}
     <datalist id="rv-shops">${(reviewData.shops||[]).map(s=>'<option value="'+rvEsc(s)+'">').join('')}</datalist>`;
   if (!list.length) h += '<div class="empty"><div class="empty-icon">🧾</div><div class="empty-text">مفيش طلبات هنا</div></div>';
   list.slice(0, 60).forEach(b => {
@@ -2439,7 +2449,7 @@ function renderReview() {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <div><div style="font-weight:900;font-size:13.5px">${fmtDate(b.at)}</div>
           <div style="font-size:11px;color:var(--text3)">طلب ${rvEsc(b.by)} · ${b.lines.length} صنف</div></div>
-        ${badge}</div>
+        <div style="display:flex;gap:4px;align-items:center">${badge}${reviewMergeFrom === -1 ? `<button onclick="reviewMergeStart(${i})" title="دمج الطلب ده في طلب تاني" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 8px;font-family:'Cairo',sans-serif;font-size:11px;cursor:pointer">🔗 دمج</button>` : (reviewMergeFrom === i ? `<span class="badge" style="background:#ece3f7;color:#6b4e9e">🔗 هيتدمج</span>` : `<button onclick="reviewMergeInto(${i})" style="border:none;background:#6b4e9e;color:#fff;border-radius:8px;padding:3px 10px;font-family:'Cairo',sans-serif;font-size:11.5px;font-weight:800;cursor:pointer">⬅️ ادمج هنا</button>`)}</div></div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px">
         <span style="color:var(--text3)">🏪 المحل</span>
         <input list="rv-shops" value="${rvEsc(b.shop)}" placeholder="مش متسجل" onchange="reviewSave(${i},{shop:this.value})"
