@@ -522,11 +522,13 @@ async function editCustomStep(stayId,lbEnc){
 async function editNote(stayId,occ){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   const n=(st.notes||[]).find(x=>String(x.occ)===String(occ)); if(!n) return;
-  const v=prompt('📝 عدّل الملاحظة (سيبها فاضية علشان تتشال):',n.text); if(v===null) return;
+  const HO='🤝 عند التسليم: ', isHO=String(occ)==='handover';   // the handover note: edited without its label
+  const v=prompt('📝 عدّل الملاحظة (سيبها فاضية علشان تتشال):',isHO?n.text.replace(HO,''):n.text); if(v===null) return;
   const r=await apiRetry('comms_note_edit',{stayId,occ,text:String(v).trim()});
   if(!r||r.ok!==true){ unsavedToast(); return; }
   if(r.deleted) st.notes=st.notes.filter(x=>String(x.occ)!==String(occ));
-  else n.text=String(v).trim();
+  else n.text=(isHO?HO:'')+String(v).trim();
+  if(isHO&&st.handover) st.handover.note=String(v).trim();
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   renderMain(); toast(r.deleted?'🗑️ اتشالت الملاحظة':'✏️ اتعدلت');
 }
@@ -696,7 +698,7 @@ async function pseudoTick(stayId, step, val, msg, snap){
     const now=new Date().toISOString().slice(0,10);
     if(step==='handover'){ st.handover={done:true,by:currentUserName,at:now,note:val||''};
       // the handover note sits in 📝 ملاحظات too (the server sends it there from now on — Sarah 2026-10-13)
-      if(String(val||'').trim()) st.notes=[{at:now,by:currentUserName,text:'🤝 عند التسليم: '+String(val).trim(),occ:''}].concat(st.notes||[]); }
+      if(String(val||'').trim()) st.notes=[{at:now,by:currentUserName,text:'🤝 عند التسليم: '+String(val).trim(),occ:'handover'}].concat(st.notes||[]); }
     else if(step==='group') st.group={done:val!=='invited',by:currentUserName,at:now,invited:val==='invited'};
     else if(step==='lang') st.lang=val||'';
     else if(step==='requests') st.requests=val||'';
