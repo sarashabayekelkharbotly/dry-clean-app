@@ -251,7 +251,7 @@ function preArrivalRow_(flat,s){
       if(c.date<from||c.date>upto) return;
       if(c.type==='revision'||c.type==='codechange'||(c.codeEdited&&c.type==='custom')) hit=c;
       else if(['checkout','custom','weekly','midstay'].indexOf(c.type)>-1 && !hit && c.date>=vac &&
-              ((c.code||'')===need || c.codeEdited || !c.pinned)) hit=c;
+              ((c.code||'')===need || c.codeEdited || c.date>=todayK())) hit=c;   // a PAST visit with another code is not cover (Fergani 12/10, 2026-10-13)
     });
   });
   return hit;
@@ -1085,7 +1085,7 @@ function dropCoveredRevisions_(list){
     var cover=list.concat(D.cleans||[]).some(function(c){
       if(c===r||c.flat!==r.flat||c.on===false||c.src==='shadow') return false;
       if(['checkout','custom','weekly','midstay'].indexOf(c.type)<0||c.date<vac||c.date>ci) return false;
-      return true;   // any cleaning visit in the vacancy changes the code — hand-placed ones too (2026-10-13)
+      return (c.code||'')===need||c.codeEdited||c.date>=todayK();   // a future visit's code follows the arrival; a past one only covers if it carried it
     });
     return !cover;
   });
