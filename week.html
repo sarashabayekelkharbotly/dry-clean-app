@@ -385,7 +385,7 @@ function applyBookingFacts_(list){
     if(!c.stayId||c.src==='shadow') return;
     var st=findStay_(c.stayId);
     if(!st){ if(c.on){ c.on=false; c.stale='الحجز اتلغى'; changed.push(c); } return; }
-    if((c.type==='checkout'||c.type==='revision'||c.type==='codechange') && !validFor_(c,st) && c.on){
+    if((c.type==='checkout'||c.type==='revision'||c.type==='codechange') && !c.pinned && !validFor_(c,st) && c.on){
       c.on=false;
       c.stale=(c.type==='checkout')
         ? 'الضيف بيمشي '+ymd(day(st.checkOut))+' — الميعاد ده بقى غلط'
@@ -705,7 +705,7 @@ function render(){
        '<td><select onchange="edit('+idx+',\'type\',this.value)">'+TYPES.map(function(t){return '<option'+(t===c.type?' selected':'')+'>'+t+'</option>';}).join('')+'</select>'+(c.src==='new'?' <span class="badge b-warn">new</span>':'')+
        (c.src==='shadow'?' <span class="badge" style="background:#eee;color:#888" title="الاقتراح الآلي — عندك نسخة معدّلة يوم '+esc(c.shadowOf||'')+'. شغّليه لو الآلي أصح">آلي</span>':'')+
        (c.stale?' <span class="badge" style="background:#f6dede;color:#a24a4a" title="'+esc(c.stale)+'">⚠️ اتغيّر الحجز</span>':'')+
-       (c.pinned?' <span class="badge" style="background:#ece3f7;color:#6b4e9e;cursor:pointer" title="You moved this — the system will not change it back on a booking update. Tap to release it to the system." onclick="unpinRow('+idx+')">📌 pinned</span>':'')+'</td>'+
+       (c.pinned?' <span class="badge" style="background:#ece3f7;color:#6b4e9e;cursor:pointer" title="Yours — no rule drops it. If its booking changes it follows the booking (cancelled → removed, dates moved → moved) and you get an alert. Tap to hand it back to the system." onclick="unpinRow('+idx+')">📌 pinned</span>':'')+'</td>'+
        '<td><input type="time" value="'+hm(c.time)+'" onchange="edit('+idx+',\'time\',this.value)"></td>'+
        '<td><select onchange="edit('+idx+',\'cleaner\',this.value)"'+((c.cleaner||'amal')!=='amal'?' style="border-color:#b8860b;font-weight:700"':'')+'>'+
          CLEANERS.map(function(cl){return '<option value="'+cl+'"'+(cl===(c.cleaner||'amal')?' selected':'')+'>'+CLEANER_LBL[cl]+'</option>';}).join('')+'</select></td>'+
@@ -802,6 +802,18 @@ function edit(i,field,v){
   }
   dirty=true; render();
 }
+/* the booking a hand-added clean belongs to: a checkout → the guest leaving that day; a mid-stay / weekly / extra clean →
+   the guest staying that day; a revision / code change → the next arrival. That link is what lets a booking change
+   move or remove it (and tell Sarah). */
+function stayForClean_(f,d,ty){
+  var k=d, best=null;
+  (STAYS||[]).forEach(function(s){ if(s.flat!==f||s.cancelled) return; var ci=ymd(day(s.checkIn)), co=ymd(day(s.checkOut));
+    if(ty==='checkout'){ if(co===k||ymd(addD(day(co),1))===k) best=best||{ id:(s.ids&&s.ids.length?s.ids[s.ids.length-1]:s.id), checkIn:s.checkIn }; return; }   // a chain checks out on its LAST booking
+    if(ty==='revision'||ty==='codechange'){ if(ci>=k&&(!best||ci<ymd(day(best.checkIn)))) best=s; return; }
+    if(ci<=k&&k<co) best=s; });
+  if(!best&&ty==='custom') return stayForClean_(f,d,'revision');
+  return best;
+}
 function addClean(){
   var f=document.getElementById('addFlat').value, d=document.getElementById('addDay').value,
       ty=document.getElementById('addType').value, t=document.getElementById('addTime').value;
@@ -812,11 +824,12 @@ function addClean(){
   var dup=cleans.filter(function(c){ return c.date===d&&c.flat===f&&c.type===ty&&c.on; }).length;
   if(dup && !confirm(f+' already has a '+ty+' on '+d+' — add a second one?')) return;
   var inn=(ty==='checkout')?sameDayIn(f,d):null, inTime='';
+  var anchor=inn||stayForClean_(f,d,ty);
   if(inn){ inTime=prompt('Same-day check-in ('+(inn.guest||'guest')+') — what time does the guest arrive?',DEFAULT_IN)||DEFAULT_IN; }
   /* A CLEAN SARAH ADDS IS HERS (2026-10-13: «the rule was not to suggest cleans, not to delete or refuse cleans I schedule
      myself» — a 28A clean on 13/10 would not stick). Pinned from birth: the redundancy rules, the one-visit-per-arrival
      guard and the referee never drop or move it; at most they flag it. */
-  cleans.push({ date:d, flat:f, type:ty, time:t, code:doorCode(f,day(d)), inTime:inTime, stayId:inn?inn.id:'', on:true, src:'manual', pinned:true, cleaner:'amal' });
+  cleans.push({ date:d, flat:f, type:ty, time:t, code:doorCode(f,day(d)), inTime:inTime, stayId:anchor?anchor.id:'', on:true, src:'manual', pinned:true, cleaner:'amal' });
   cleans.sort(function(a,b){ return (a.date+a.flat)<(b.date+b.flat)?-1:1; });
   dirty=true; render();
 }
@@ -1072,7 +1085,7 @@ function dropCoveredRevisions_(list){
     var cover=list.concat(D.cleans||[]).some(function(c){
       if(c===r||c.flat!==r.flat||c.on===false||c.src==='shadow') return false;
       if(['checkout','custom','weekly','midstay'].indexOf(c.type)<0||c.date<vac||c.date>ci) return false;
-      return (c.code||'')===need||c.codeEdited||!c.pinned;
+      return true;   // any cleaning visit in the vacancy changes the code — hand-placed ones too (2026-10-13)
     });
     return !cover;
   });
