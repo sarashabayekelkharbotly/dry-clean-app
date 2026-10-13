@@ -135,7 +135,7 @@ function dm(d){ return d.getDate()+'/'+(d.getMonth()+1); }
 function addD(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function hm(t){ return (t||'').toString().slice(0,5); }
 function short(s){ return (s||'').toString().trim().split(' ')[0]; }
-function isLive(s){ var st=(s.status||'').toLowerCase(); return st.indexOf('cancel')<0 && st.indexOf('block')<0; }
+function isLive(s){ var st=(s.status||'').toLowerCase(); return st.indexOf('cancel')<0 && st.indexOf('block')<0 && st!=='pending'; }   // a VRBO request waiting for its payout is not booked (2026-10-13)
 function esc(s){ return (s||'').toString().replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
 function airbnbFlats(){ return D.meta.flatsOrder.filter(function(f){ return D.targets.byFlat[f]; }); }
 function longLets(){ return (D.flats||[]).filter(function(f){ return f.isLongLet; }).map(function(f){ return f.id; }); }
