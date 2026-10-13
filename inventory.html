@@ -670,7 +670,7 @@ window.addEventListener('load',function(){
     <div class="modal-title">➕ إضافة صنف جديد</div>
     <div class="form-group"><label class="form-label">الاسم بالعربية</label><input class="form-input" id="n-ar" type="text" placeholder="مثال: مناديل حمام"></div>
     <div class="form-group"><label class="form-label">الاسم بالإنجليزية (اختياري)</label><input class="form-input" id="n-en" type="text"></div>
-    <div class="form-group"><label class="form-label">البراند (اختياري)</label><input class="form-input" id="n-brand" type="text"></div>
+    <div class="form-group"><label class="form-label">🛒 المنتج اللي بنشتريه بالظبط (اختياري) — مثلاً «Fine Deal Kitchen Towel 2-ply · 6 rolls»</label><input class="form-input" id="n-brand" type="text"></div>
     <div class="form-group"><label class="form-label">الفئة</label>
       <select class="form-select" id="n-cat">
         <option value="cleaning">🧹 منظفات</option>
@@ -699,7 +699,7 @@ window.addEventListener('load',function(){
     <input type="hidden" id="edit-id">
     <div class="form-group"><label class="form-label">الاسم بالعربية</label><input class="form-input" id="edit-ar" type="text"></div>
     <div class="form-group"><label class="form-label">الاسم بالإنجليزية (اختياري)</label><input class="form-input" id="edit-en" type="text"></div>
-    <div class="form-group"><label class="form-label">البراند (اختياري)</label><input class="form-input" id="edit-brand" type="text"></div>
+    <div class="form-group"><label class="form-label">🛒 المنتج اللي بنشتريه بالظبط (اختياري) — مثلاً «Fine Deal Kitchen Towel 2-ply · 6 rolls»</label><input class="form-input" id="edit-brand" type="text"></div>
     <div class="form-group"><label class="form-label">الإيموجي</label><input class="form-input" id="edit-emoji" type="text" placeholder="اكتبي أو اختاري إيموجي ↓"><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button type="button" onclick="document.getElementById('edit-emoji').value='🍪'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🍪</button><button type="button" onclick="document.getElementById('edit-emoji').value='🍫'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🍫</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧁'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧁</button><button type="button" onclick="document.getElementById('edit-emoji').value='🍬'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🍬</button><button type="button" onclick="document.getElementById('edit-emoji').value='☕'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">☕</button><button type="button" onclick="document.getElementById('edit-emoji').value='🍵'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🍵</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧃'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧃</button><button type="button" onclick="document.getElementById('edit-emoji').value='💧'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">💧</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧂'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧂</button><button type="button" onclick="document.getElementById('edit-emoji').value='🫒'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🫒</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧴'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧴</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧼'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧼</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧽'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧽</button><button type="button" onclick="document.getElementById('edit-emoji').value='🧻'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🧻</button><button type="button" onclick="document.getElementById('edit-emoji').value='🗑️'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🗑️</button><button type="button" onclick="document.getElementById('edit-emoji').value='🔋'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🔋</button><button type="button" onclick="document.getElementById('edit-emoji').value='🕯️'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">🕯️</button><button type="button" onclick="document.getElementById('edit-emoji').value='📦'" style="border:1px solid var(--border);background:#fff;border-radius:8px;padding:2px 6px;font-size:18px;cursor:pointer">📦</button></div></div>
     <div class="form-group"><label class="form-label">الفئة</label>
       <select class="form-select" id="edit-cat">
@@ -2517,8 +2517,9 @@ function openOrderModal() {
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0">${it.emoji}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700">${it.ar}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">ينقص ${g} — حالي ${it.cur} / ثابت ${it.par}</div>
+          <div style="font-size:14px;font-weight:700">${it.ar}${it.en?` <span style="font-size:11px;font-weight:400;color:var(--text3)" dir="ltr">${it.en}</span>`:''}</div>
+          ${it.brand?`<div style="font-size:11px;color:#6b4e9e;font-weight:700;margin-top:2px" dir="auto">🛒 ${it.brand}</div>`:''}
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">ينقص ${g} — حالي ${it.cur} / ثابت ${it.par}${it.lastPrice?` · آخر سعر ${it.lastPrice} ج`:''}</div>
         </div>
         <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
           <button class="qty-btn" onclick="orderQtyAdj(${it.id},-1)">−</button>
@@ -2589,6 +2590,19 @@ async function confirmOrder() {
   /* twin-order guard (2026-08-27, the double معطر جو: ordered 22/8 AND 23/8, both later "received"
      while one delivery came): an item that already has an open order is named before saving — a
      second order becomes a deliberate choice, not a forgotten first one */
+  /* 💲 PRICE CHECK (Sarah 2026-10-13: kitchen paper at ~10 entered twice as table napkins at ~27 — 27/7 and 9/10). A line
+     whose price is far from this item's own last received price but close to ANOTHER item's is probably that item. */
+  const priceWarn = [];
+  newOrders.forEach(o => {
+    const p = Number(o.unitPrice) || 0; if (!(p > 0)) return;
+    const own = items.find(i => String(i.id) === String(o.itemId)), ownP = own ? Number(own.lastPrice) || 0 : 0;
+    if (ownP > 0 && Math.abs(p - ownP) / ownP <= 0.4) return;                        // in line with its own price
+    const near = items.filter(i => String(i.id) !== String(o.itemId) && Number(i.lastPrice) > 0 && Math.abs(p - Number(i.lastPrice)) / Number(i.lastPrice) <= 0.15)
+      .sort((a, b) => Math.abs(p - a.lastPrice) - Math.abs(p - b.lastPrice));
+    if (ownP > 0 || near.length) priceWarn.push('• «' + o.itemName + '» بسعر ' + p + ' ج' + (ownP > 0 ? ' — آخر سعر ليه ' + ownP + ' ج' : '') +
+      (near.length ? '\n   السعر ده قريب من «' + near[0].ar + '» (' + near[0].lastPrice + ' ج) — متأكدة إنه مش ده؟' : ''));
+  });
+  if (priceWarn.length && !confirm('💲 راجعي الأسعار دي قبل الحفظ:\n' + priceWarn.join('\n') + '\n\nOK = الأسعار صح، احفظ · Cancel = ارجعي عدّلي')) return;
   const twins = newOrders.filter(o => orders.some(x =>
     String(x.itemId) === String(o.itemId) && x.status !== 'received' && x.status !== 'cancelled'));
   if (twins.length && !confirm('⚠️ في طلبات مفتوحة بالفعل لنفس الصنف:\n' +
@@ -2647,10 +2661,12 @@ function openReceiveModal(orderId) {
         <div class="nawaqes-emoji">${it?.emoji||'📦'}</div>
         <div class="nawaqes-info">
           <div class="nawaqes-name">${ord.itemName}</div>
+          ${it&&it.brand?`<div class="nawaqes-meta" style="color:#6b4e9e;font-weight:700" dir="auto">🛒 ${it.brand}</div>`:''}
           <div class="nawaqes-meta">طُلب ${ord.qtyRequested} — ${ord.orderedBy} — ${fmtDateShort(ord.orderedAt)}</div>
         </div>
       </div>
-    </div>`;
+    </div>
+    <div style="font-size:11.5px;color:var(--text3);margin-top:6px">لو اللي وصل منتج تاني غير ده، ماتستلمش — قول لسارة/خالد</div>`;
   document.getElementById('recv-qty').value = ord.qtyRequested;
   openModal('receive-modal');
 }
