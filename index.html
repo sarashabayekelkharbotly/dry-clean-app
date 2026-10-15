@@ -1263,6 +1263,13 @@ async function loadOwnersCard(){
     if (r && r.ok) { OWNERS_CARD = r; renderOwnersCard(); }
   } catch (e) {}
 }
+async function ownerTaskDone(key, btn){
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  let r = null; try { r = await callScript({ action: 'owner_task_done', key }); } catch (e) {}
+  if (!r || r.ok === false) { if (btn) { btn.disabled = false; btn.textContent = '✅ تم'; } showToast('⚠️ ماتسجلتش — جربي تاني', true); return; }
+  showToast('✅ اتقفلت — اتسجل مين وإمتى');
+  loadOwnersCard();
+}
 function renderOwnersCard(){
   /* Sarah 2026-10-04: TWO clear parts — (1) only what needs us to act, one line each; (2) a table with headings */
   const el = document.getElementById('ownersCard'); if (!el || !OWNERS_CARD) return;
@@ -1277,6 +1284,8 @@ function renderOwnersCard(){
       '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">' + esc(n.title) + '</div>' +
       (n.detail ? '<div style="font-size:11.5px;color:var(--text3);margin-top:1px">' + esc(n.detail) + '</div>' : '') + '</div>' +
       (n.go ? '<a href="' + n.go + '" style="flex-shrink:0;align-self:center;font-size:11.5px;font-weight:700;color:var(--primary,#cc5f5f);text-decoration:none;border:1px solid var(--border,#e8d8d8);border-radius:8px;padding:4px 8px">' + esc(n.goText) + ' ←</a>' : '') +
+      /* 📌 an owner task (2026-10-15): «✅ تم» closes it — the engine records who and when */
+      (n.ownerTask ? '<button data-k="' + esc(n.ownerTask) + '" onclick="ownerTaskDone(this.dataset.k, this)" style="flex-shrink:0;align-self:center;font-family:Cairo,sans-serif;font-size:12px;font-weight:800;color:#fff;background:#3a7d4d;border:none;border-radius:8px;padding:5px 10px;cursor:pointer">✅ تم</button>' : '') +
       '</div>';
   });
   h += '</div>';
