@@ -836,7 +836,19 @@ function addClean(){
 
 /* ---------- WhatsApp: two-week, bold, no blank lines; in-stay clean = نظافة اثناء وجود ضيف (once);
    code only on check-out; same-day arrival appends دخول ضيف ---------- */
-function isStayClean(c){ return c.type==='midstay'||c.type==='weekly'||(c.type==='custom'&&occStayOn(c.flat,day(c.date))); }
+/* A custom clean is "in-stay" only when a guest is ALREADY inside (Sarah 2026-10-15, 28A 24/10: a 09:00 clean before Mina walks in
+   at 15:00 was worded «نظافة اثناء وجود ضيف» and lost its «دخول ضيف»). On the guest's own check-in day it is in-stay only if
+   it is timed at/after their arrival. */
+function arrHmOn(f,k){ var a=String(askedIn(f,k)||''), d=(a.split('|')[1]||'').slice(0,10);
+  if(a&&d&&d!==k) return '';                                    // the guest said another day
+  return a?a.slice(0,5):hm(DEFAULT_IN); }
+function isStayClean(c){
+  if(c.type==='midstay'||c.type==='weekly') return true;
+  if(c.type!=='custom') return false;
+  var o=occStayOn(c.flat,day(c.date)); if(!o) return false;
+  if(ymd(day(o.checkIn))!==c.date) return true;                 // the guest was already in this morning
+  var arr=arrHmOn(c.flat,c.date); return !!(arr&&hm(c.time)&&hm(c.time)>=arr);
+}
 /* TWO AUDIENCES, ONE SCHEDULE (Sarah 2026-08-21: "i have to always manually delete from the screen
    the lockcode and the repairs because they are not shared with Amal"). عماد gets everything —
    codes, code-change trips, repairs. أمل gets the cleaning schedule alone: what, where, when, who
@@ -871,7 +883,9 @@ function waLine(c){
     else if(!isStayClean(c)){ var n=nextCheckIn(c.flat,day(c.date));
           if(n&&(n-day(c.date))/DAYMS<=2) t+=' — تغيير كود الباب إلى '+c.code; }
   }
-  if(c.inTime) t+=' — دخول ضيف الساعة '+hmAr(c.inTime);
+  /* the same-day arrival rides on ANY visit before it — not only a checkout (Sarah 2026-10-15) */
+  var inT=c.inTime||(!isStayClean(c)&&sameDayIn(c.flat,c.date)?arrHmOn(c.flat,c.date):'');
+  if(inT) t+=' — دخول ضيف الساعة '+hmAr(inT);
   return t+'\n';
 }
 /* §5.5 safety net: an arrival TOMORROW with no ON visit in the 2 days before it means nobody is
