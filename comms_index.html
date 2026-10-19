@@ -429,6 +429,16 @@ const FLAT_GUIDE={
   'Zayed 2000':'https://stay.ourwelcomehome.com/z2000-znqs5jbr/'
 };
 function guideFor(st){ const u=st&&FLAT_GUIDE[st.flat]; return u ? (tplLang(st)==='ar' ? u+'ar/' : u) : ''; }
+/* 🗺️ THE SHEIKH ZAYED AREA GUIDE (Sarah 2026-10-19) — sent with step 9 «settled in», never with the house manual (one link per message).
+   One guide per compound: 8A, 17A and 28A share Karma's; English at the root, Arabic under /ar/ (the 🌐 rule). 17B: none — no guests here. */
+const FLAT_AREA_GUIDE={
+  '8A':'https://stay.ourwelcomehome.com/zayed-karma-fpfxvvqz/',
+  '17A':'https://stay.ourwelcomehome.com/zayed-karma-fpfxvvqz/',
+  '28A':'https://stay.ourwelcomehome.com/zayed-karma-fpfxvvqz/',
+  'Zayed 2000':'https://stay.ourwelcomehome.com/zayed-z2000-6a8n33ef/',
+  'VW1':'https://stay.ourwelcomehome.com/zayed-vw-8gskf9vr/'
+};
+function areaGuideFor(st){ const u=st&&FLAT_AREA_GUIDE[st.flat]; return u ? (tplLang(st)==='ar' ? u+'ar/' : u) : ''; }
 function copyTpl(stayId,k,occ){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   // the pin needs no language and no gender, so it never triggers those prompts
@@ -1045,7 +1055,10 @@ function tplAR(k, st, occ){
     case 'code': return `${greetAR()} ${n}! الوصول بكرة 🎉 الدخول متاح من الساعة ٣ عصراً. كود الباب هو:
 ${codeFor(st)}
 رحلة سعيدة — من فضلك ${G('ابعت','ابعتي','ابعتوا')} لنا رسالة وأنت في الطريق حتى نتأكد أن كل شيء جاهز للوصول.`;
-    case 'settled': return `${greetAR()} ${n}! نحب نطمن ان كل شئ تمام وعند ${G('توقعاتك','توقعاتك','توقعاتكم')}؟ لو في أي شيء أحنا موجودين للمساعدة. إقامة سعيدة! 😊`;
+    case 'settled': { const ag=areaGuideFor(st);
+      return `${greetAR()} ${n}! نحب نطمن ان كل شئ تمام وعند ${G('توقعاتك','توقعاتك','توقعاتكم')}؟ لو في أي شيء أحنا موجودين للمساعدة.\n`+
+        (ag?`وعلشان ${G('تستفيد','تستفيدي','تستفيدوا')} بإقامت${G('ك','كِ','كم')} لأقصى درجة، بنبعت ${G('لك','لكِ','لكم')} كمان دليلنا الشامل للشيخ زايد بتوصياتنا: أماكن الأكل، ونزهات للاستكشاف والمرح، وأماكن للأطفال، والاحتياجات اليومية القريبة من البيت 🗺️\n${ag}\n`:'')+
+        `إقامة سعيدة! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetAR()} ${n}! نطمئن عليك في منتصف الإقامة — كيف كل شيء معك؟ لو تحتاج أي شيء نحن هنا. 😊`; return `${greetAR()} ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
     case 'checkout': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة غداً قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
 ✅ ${G('أغلق','أغلقي','أغلقوا')} كل النوافذ والبلكونات
@@ -1124,7 +1137,7 @@ function renderTplEditor(){
       <textarea id="tplText" oninput="tplEdPreview()" style="width:100%;min-height:42vh;font-family:inherit;font-size:15px;line-height:1.8;border:1px solid #e6d8d8;border-radius:10px;padding:10px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}">${ea(row.text)}</textarea>
       <div style="font-size:12px;color:#8a7d7d;line-height:1.8;margin:8px 0">
         <b>الرموز:</b> {تحية}/{greeting} صباح أو مساء الخير حسب الساعة وقت النسخ · {اسم}/{name} اسم الضيف · {كود}/{code} كود الباب ·
-        [للراجل|للست|للجروب] صيغة حسب ⚥ · سطر يبدأ {لو مش زايد} بيتشال لزايد 2000 · {لو الأوراق لسه} يظهر فقط لو الجوازات ما اتطلبتش
+        [للراجل|للست|للجروب] صيغة حسب ⚥ · سطر يبدأ {لو مش زايد} بيتشال لزايد 2000 · {دليل المنطقة}/{area guide} لينك دليل الشيخ زايد للبيت (سطر لوحده) — وسطر يبدأ {لو في دليل} يظهر بس لو للبيت دليل · {لو الأوراق لسه} يظهر فقط لو الجوازات ما اتطلبتش
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:11px">معاينة كأنها لضيف:</span>
         <button class="btn" onclick="tplEdG('m')">راجل</button><button class="btn" onclick="tplEdG('f')">ست</button><button class="btn" onclick="tplEdG('g')">جروب</button></div>
@@ -1149,8 +1162,10 @@ function renderTpl(text, st){
   t=t.split('\n').filter(line=>{
     if(line.indexOf('{لو مش زايد}')>-1) return st.flat!=='Zayed 2000';
     if(line.indexOf('{لو الأوراق لسه}')>-1) return !asked;
+    if(line.indexOf('{لو في دليل}')>-1||line.indexOf('{دليل المنطقة}')>-1||line.indexOf('{area guide}')>-1) return !!areaGuideFor(st);   // no guide → no guide lines, never a broken link
     return true;
-  }).map(line=>line.replace('{لو مش زايد}','').replace('{لو الأوراق لسه}','')).join('\n');
+  }).map(line=>line.replace('{لو مش زايد}','').replace('{لو الأوراق لسه}','').replace('{لو في دليل}','')).join('\n');
+  t=t.replace(/\{دليل المنطقة\}|\{area guide\}/g,areaGuideFor(st));
   t=t.replace(/\[([^\[\]|\n]*)\|([^\[\]|\n]*)\|([^\[\]|\n]*)\]/g,(m,a,b,c)=>[a,b,c][gi]);
   return t;
 }
@@ -1185,7 +1200,10 @@ function tplBase(k, st, occ){
     case 'code': return `${greetEN()} ${n}! Your check-in is tomorrow 🎉 Check-in is anytime from 3:00 PM. Your door code is:
 ${codeFor(st)}
 Safe travels — please message us on your way so we make sure everything is ready for your arrival.`;
-    case 'settled': return `${greetEN()} ${n}! I hope you've settled in nicely — is everything meeting your expectations? If there's anything at all, we're right here to help. Enjoy your stay! 😊`;
+    case 'settled': { const ag=areaGuideFor(st);
+      return `${greetEN()} ${n}! I hope you've settled in nicely — is everything meeting your expectations? If there's anything at all, we're right here to help.\n`+
+        (ag?`To make the most of your stay, we're also sending you our comprehensive Sheikh Zayed guide with our recommendations: where to eat, days out to explore and have fun, things for children, and the everyday essentials near the home 🗺️\n${ag}\n`:'')+
+        `Enjoy your stay! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetEN()} ${n}! Just checking in halfway through your stay — how is everything going? If there is anything you need, we are right here. 😊`; return `${greetEN()} ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
     case 'checkout': return `${greetEN()} ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is tomorrow by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
 ✅ Close & lock all windows and balconies
