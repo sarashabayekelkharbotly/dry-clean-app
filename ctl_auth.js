@@ -19,7 +19,8 @@ var FN_MAP = {
   props_get_all: 'ops_get_all', props_confirm_multi: 'ops_confirm_multi', props_save_draft: 'ops_save_draft',
   props_get_draft: 'ops_get_draft', props_clean_pref: 'ops_clean_pref', props_phone_bills: 'ops_phone_bills',
   props_set_phone_bill: 'ops_set_phone_bill', props_add_reading: 'ops_add_reading', props_set_bundle: 'ops_set_bundle',
-  props_del_bundle: 'ops_del_bundle', props_net_precharge: 'ops_net_precharge', props_open_repair: 'ops_open_repair',
+  props_del_bundle: 'ops_del_bundle', props_net_precharge: 'ops_net_precharge',
+  props_phone_pay: 'ops_phone_pay', props_phone_precharge: 'ops_phone_precharge', props_phone_del: 'ops_phone_del', props_open_repair: 'ops_open_repair',
   props_edit_repair: 'ops_edit_repair', props_delete_repair: 'ops_delete_repair'
 };
 var READS = { ops_get_all: 1, ops_get_draft: 1, ops_phone_bills: 1, repairs_all: 1, owners_card: 1 };

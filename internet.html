@@ -105,7 +105,7 @@ summary::-webkit-details-marker{display:none}
 <script>window.CTL_SCREEN = 'net';   /* the shared top of every screen (ctl_menu.js, 2026-10-05) */
 window.CTL_PAGE = { screen: 'net', auto: true, hide: ['.topbar .brand'], user: function () { logout(); }, after: function () { boot(); } };</script>
 <script src="ctl_menu.js?v=f6b34889"></script>
-<script src="ctl_auth.js?v=33466b00"></script>
+<script src="ctl_auth.js?v=2a3c8bd9"></script>
 <script src="net_model.js?v=bdcbdd15"></script>
 <script>
 /* CONFIG (ENDPOINT + session) lives in ctl_auth.js — الكنترول's engine (Switch C, 2026-10-03) */
@@ -421,8 +421,8 @@ function render(){
     h+='</div>';
   });
   /* 📞 landline — all four quarterly deadlines in one place, editable (Sarah 2026-08-04) */
-  h+='<div class="card"><h3>📞 Landline — quarterly renewals<span class="rt">reminders: 2 days before + due day</span></h3><div id="phones"><span class="muted">Loading…</span></div>'+
-     '<div class="foot">Dates auto-advance 3 months after each due day. Payment = a WeShare cash entry (TV/Phone/Internet) — the P&amp;L keeps its monthly accrual, so editing the price here only changes the reminder, not the books.</div></div>';
+  h+='<div class="card"><h3>📞 Landline — quarterly renewals<span class="rt">reminders: 2 days before · due day · every day while overdue</span></h3><div id="phones"><span class="muted">Loading…</span></div>'+
+     '<div class="foot">Record each payment below: it settles the quarter now due, moves the due date 3 months on, and books the cash paid as a pending WeShare card (TV/Phone/Internet). «From WE balance» books no cash — the pre-charge already did; the landline\'s WE balance is its own, not the internet\'s. Until a payment is recorded the due date stays and the reminder comes every day. The P&amp;L keeps its monthly accrual, so the price here only sets the default amount and the reminder.</div></div>';
   h+='<div class="card"><div class="foot">Remaining GB is <b>read off the WE app</b> — never a GB-used subtraction. Pace = GB per <b>occupied</b> day (the current guest\'s measured rate carries across renewals; vacant days burn only the idle trickle). <b>WeShare captures the cash</b> (a new recharge → pending row, payer editable at confirm) and <b>the P&amp;L captures the bundle price</b> via the sync mirror — never both. One day before projected depletion, the الكنترول bot messages Sarah &amp; Khaled.</div></div>';
   document.getElementById('app').innerHTML=h;
   renderPhones();
@@ -446,13 +446,62 @@ function renderPhones(){
             :'<span class="muted">'+days+'d</span>';
     h+='<tr'+(i?' style="border-top:1px solid var(--line)"':'')+'>'+
        '<td style="padding:4px 6px 4px 0;font-weight:700;white-space:nowrap">'+esc(b.line)+'</td>'+
-       '<td style="padding:4px 6px;text-align:right;white-space:nowrap">'+chip+'</td>'+
+       '<td style="padding:4px 6px;text-align:right;white-space:nowrap">'+chip+(b.last?'<div class="muted" style="font-size:10.5px">'+(b.last.kind==='pay'?'paid '+esc(b.last.paidOn)+(b.last.mode==='balance'?' · from balance':''):'pre-charged '+esc(b.last.paidOn)+' · '+b.last.cash)+'</div>':'')+'</td>'+
        '<td style="padding:4px 6px"><input type="date" id="phd'+i+'" value="'+esc(b.due)+'" onchange="PH_DIRTY[\''+i+'\']=1" style="font-family:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:7px;padding:3px 5px"></td>'+
        '<td style="padding:4px 0;white-space:nowrap"><input type="number" id="php'+i+'" value="'+b.price+'" step="0.1" onchange="PH_DIRTY[\''+i+'\']=1" style="width:60px;font-family:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:7px;padding:3px 5px;text-align:right"> <span class="muted">EGP</span></td>'+
        '</tr>';
   });
   h+='</table><div class="btnrow" style="margin-top:6px"><button class="btn sec" onclick="savePhones()">save changed</button><span class="msg" id="phmsg"></span></div>';
+  /* 📞 record a payment (Sarah 2026-10-19) — the internet form's layout, without quota or readings */
+  var p0=PHONES[0]||{};
+  h+='<div class="frm" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
+     '<div><label>Line</label><select id="pl_line" onchange="phFill()">'+PHONES.map(function(b){ return '<option>'+esc(b.line)+'</option>'; }).join('')+'</select></div>'+
+     '<div><label>Amount (EGP)</label><input type="number" step="0.1" id="pl_amt" value="'+(p0.price!=null?p0.price:'')+'"></div>'+
+     '<div><label>Paid on</label><input type="date" id="pl_date" value="'+ymd(new Date())+'"></div>'+
+     '<div class="full" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
+     '<label style="margin:0">Paid how?</label>'+
+     '<label style="font-weight:400"><input type="radio" name="pl_pay" value="recharge" checked onchange="phTgl()"> new recharge</label>'+
+     '<label style="font-weight:400"><input type="radio" name="pl_pay" value="balance" onchange="phTgl()"> from WE balance</label>'+
+     '<input type="number" step="0.1" id="pl_cash" placeholder="cash EGP (blank = amount)" style="width:160px" title="cash actually paid — may exceed the bill; the excess stays as the line\'s WE balance"></div>'+
+     '<div style="align-self:end"><button class="btn sec" onclick="phPay()">Record payment</button></div>'+
+     '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">'+
+     '<button class="btn sec" onclick="phPre()" title="cash put on the line\'s WE balance ahead — WeShare card only">💳 Pre-charge (cash ahead)</button>'+
+     '<button class="btn sec" style="color:#cc5f5f" onclick="phDel()" title="undo the latest landline entry of this line — its due date and pending cash card go back">🗑 Delete latest entry</button>'+
+     '</div><div class="full"><span class="msg" id="plmsg"></span></div></div>';
   el.innerHTML=h;
+}
+function phLine(){ var l=document.getElementById('pl_line').value; return PHONES.filter(function(b){ return b.line===l; })[0]||null; }
+function phFill(){ var b=phLine(); if(b) document.getElementById('pl_amt').value=b.price; }
+function phTgl(){ document.getElementById('pl_cash').disabled=(document.querySelector('input[name="pl_pay"]:checked').value==='balance'); }
+function phDone(j,ok){ if(j&&j.bills) PHONES=j.bills; renderPhones(); setTimeout(function(){ var m=document.getElementById('plmsg'); if(m) m.textContent=ok; },50); }
+function phPay(){
+  var b=phLine(); if(!b) return; var mode=document.querySelector('input[name="pl_pay"]:checked').value;
+  var amt=document.getElementById('pl_amt').value, cash=mode==='recharge'?document.getElementById('pl_cash').value:'', on=document.getElementById('pl_date').value;
+  if(!confirm('Record the '+b.line+' landline payment for the quarter due '+b.due+'?\n\n'+(amt||b.price)+' EGP · paid '+on+' · '+(mode==='balance'?'from WE balance (no cash card)':'new recharge — '+(cash||amt||b.price)+' EGP cash → WeShare pending')+'\n\nThe due date moves to the next quarter.')) return;
+  document.getElementById('plmsg').textContent='saving…';
+  api('props_phone_pay',{line:b.line,amount:amt,paidOn:on,payMode:mode,cashAmount:cash,user:(ME&&ME.user)||''}).then(function(j){
+    if(!j||!j.ok) throw new Error(j&&j.error||'bad'); var r=j.result||{};
+    phDone(j, r.duplicate?'already recorded ✓ — this quarter was paid':'recorded ✓ — next due '+r.nextDue+(r.weshare?' · cash → WeShare pending (confirm payer there)':' · no cash card (from balance)'));
+  }).catch(function(e){ document.getElementById('plmsg').textContent='failed: '+(e.message||e); });
+}
+function phPre(){
+  var b=phLine(); if(!b) return;
+  var a=prompt('Cash put on the '+b.line+' landline WE balance ahead (EGP).\n\nRecorded as a pending WeShare card (confirm the payer there). When the bill is paid from it, pick «from WE balance» so the cash is not counted twice.','');
+  if(a===null) return; a=parseFloat(String(a).replace(/[^\d.]/g,'')); if(!(a>0)){ alert('enter an amount'); return; }
+  document.getElementById('plmsg').textContent='saving…';
+  api('props_phone_precharge',{line:b.line,amount:a,user:(ME&&ME.user)||''}).then(function(j){
+    if(!j||!j.ok) throw new Error(j&&j.error||'bad'); phDone(j,(j.result&&j.result.duplicate)?'already recorded today ✓':'recorded ✓ — pending cash card in WeShare; pay the bill «from WE balance»');
+  }).catch(function(e){ document.getElementById('plmsg').textContent='failed: '+(e.message||e); });
+}
+function phDel(){
+  var b=phLine(); if(!b) return; var L=b.last;
+  if(!L){ alert('no landline entries for '+b.line); return; }
+  if(!confirm('Delete the LATEST landline entry for '+b.line+'?\n\n'+(L.kind==='pay'?'payment '+L.paidOn+' · '+L.amount+' EGP'+(L.mode==='balance'?' · from balance':''):'pre-charge '+L.paidOn+' · '+L.cash+' EGP')+(L.kind==='pay'?'\n\nThe due date goes back to the quarter it settled.':'')+'\nIts pending WeShare cash card (if any) is deleted too.')) return;
+  document.getElementById('plmsg').textContent='deleting…';
+  api('props_phone_del',{line:b.line,user:(ME&&ME.user)||''}).then(function(j){
+    if(!j||!j.ok) throw new Error(j&&j.error||'bad'); var r=j.result||{};
+    phDone(j, r.deleted?('deleted ✓'+(r.restoredDue?' — due date back to '+r.restoredDue:'')+(r.weshare==='deleted'?' — pending cash card removed':(r.weshare==='confirmed'?' — ⚠ its cash card is already confirmed; review it in WeShare':''))):(r.error||'not found'));
+  }).catch(function(e){ document.getElementById('plmsg').textContent='failed: '+(e.message||e); });
 }
 var PH_DIRTY={};
 function savePhones(){
