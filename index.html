@@ -1337,7 +1337,7 @@ function emadHmAr(t){
   const H = +m[1], M = +m[2]; let h12 = H % 12; if(h12 === 0) h12 = 12;
   return h12 + (M ? ':' + ('0'+M).slice(-2) : '') + ' ' + emadPartOfDay(H);
 }
-function emadFlatAr(f){ return f === 'Zayed 2000' ? 'زايد 2000' : f; }
+function emadFlatAr(f){ return f === 'Zayed 2000' ? 'زايد 2000' : f === 'VW1' ? 'ڤيليدج ويست ١' : f; }
 function emadTaskLine(c){
   // no hardcoded «غدا» — since 2026-08-16 the trip can sit ON the arrival day itself, and this line
   // said "tomorrow" about a guest already walking in; the lock-code task carries the exact timing
