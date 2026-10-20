@@ -435,7 +435,7 @@ window.addEventListener('load',function(){
 
 <!-- ===================== ELECTRICITY (8A prepaid card) ===================== -->
 <div class="page" id="page-elec">
-  <div class="section-title">⚡ كهرباء 8A — الكارت المدفوع مقدماً</div>
+  <div class="section-title">⚡ الكهرباء — الكارت المدفوع مقدماً</div>
   <div id="elecContent">
     <div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>
   </div>
@@ -1668,8 +1668,9 @@ async function clogAmend(date, flat, type, sched, field, cur){
 }
 
 // ⚡ quick entry for the 8A card balance — the raw number as the meter shows it
-async function emadMeterPrompt(){
-  const v = prompt('رصيد كارت كهرباء 8A بالجنيه (الرقم كما يظهر على العداد):');
+async function emadMeterPrompt(flat){
+  flat = flat === 'VW1' ? 'VW1' : '8A';
+  const v = prompt('رصيد كارت كهرباء ' + emadFlatAr(flat) + ' بالجنيه (الرقم كما يظهر على العداد):');
   if (v === null) return;
   const b = parseFloat(String(v).replace(/[^\d.]/g, ''));
   if (isNaN(b) || b < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
@@ -1678,10 +1679,11 @@ async function emadMeterPrompt(){
   const av = prompt('لو حطيت الكارت في العداد، اكتب الرصيد بعد الشحن — سيبها فاضية لو ماحطتش:', '');
   const af = (av === null || String(av).trim() === '') ? '' : String(av).replace(/[^\d.]/g, '');
   try {
-    const r = await callScript({ action: 'meter_log', balance: b, after: af });
+    const r = await callScript({ action: 'meter_log', flat: flat, balance: b, after: af });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast(r.note ? 'ℹ️ ' + r.note : '✅ تم تسجيل القراءة');
-    ELEC = null;                                      // the electricity screen recomputes next open
+    if (flat === ELEC_FLAT) ELEC = null;              // the electricity screen recomputes next open
+    try { localStorage.removeItem(flat === '8A' ? 'elecCache' : 'elecCache_' + flat); } catch(e) {}
     loadEmadHome();                                   // the home task flips to ✅ on its own
     if (document.getElementById('page-elec')?.classList.contains('active')) renderElecScreen(true);
   } catch(e) { alert('لم يتم الحفظ — تحقق من الإنترنت وحاول مرة أخرى'); }
@@ -1695,7 +1697,7 @@ async function cardRechargeSave(force) {
   const p = document.getElementById('cardPayer')?.value || 'Khaled';
   if (!a) { showToast('اكتب مبلغ الشحنة'); return; }
   let r = null;
-  try { r = await callScript({ action: 'card_recharge', amount: a, payer: p, force: force ? 1 : '' }, { retries: 0, timeout: 30000 }); } catch(e) {}
+  try { r = await callScript({ action: 'card_recharge', flat: ELEC_FLAT, amount: a, payer: p, force: force ? 1 : '' }, { retries: 0, timeout: 30000 }); } catch(e) {}
   if (r && r.already) {
     if (confirm('في شحنة بنفس المبلغ متسجلة بنفس التاريخ خلاص.\n\nدي شحنة تانية جديدة فعلاً؟')) return cardRechargeSave(true);
     return;
@@ -1935,6 +1937,10 @@ async function repairCloseSave(id){
 // Recharges are read-only here (they are logged in WeShare when paid, as always).
 // ============================================================
 let ELEC = null, ELEC_EDIT = null;                     // ELEC_EDIT = the reading being corrected
+/* the prepaid-card homes (2026-10-20: + VW1, the same card as 8A) — one screen, a switch on top; each home its own cache */
+let ELEC_FLAT = '8A';
+function elecCK(){ return ELEC_FLAT === '8A' ? 'elecCache' : 'elecCache_' + ELEC_FLAT; }
+function elecPick(f){ if (f === ELEC_FLAT) return; ELEC_FLAT = f; ELEC = null; ELEC_EDIT = null; renderElecScreen(); }
 
 async function elecRefresh(){ ELEC = null; ELEC_EDIT = null; await renderElecScreen(true); loadEmadHome(); }
 function elecEditStart(i){ ELEC_EDIT = ELEC.readings[i]; renderElecScreen(); }
@@ -1945,8 +1951,8 @@ async function elecSave(){
   if (isNaN(b) || b < 0) { showToast('❌ أدخل رقم الرصيد'); return; }
   try {
     const r = ELEC_EDIT
-      ? await callScript({ action: 'meter_edit', row: ELEC_EDIT.row, at: ELEC_EDIT.at, balance: b, date: d })
-      : await callScript({ action: 'meter_log', balance: b, date: d,
+      ? await callScript({ action: 'meter_edit', flat: ELEC_FLAT, row: ELEC_EDIT.row, at: ELEC_EDIT.at, balance: b, date: d })
+      : await callScript({ action: 'meter_log', flat: ELEC_FLAT, balance: b, date: d,
           after: (document.getElementById('elecAfter') || {}).value || '' });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast(r.note ? 'ℹ️ ' + r.note : (ELEC_EDIT ? '✅ تم التعديل' : '✅ تم تسجيل القراءة'));
@@ -1957,7 +1963,7 @@ async function elecDelete(i){
   const r0 = ELEC.readings[i];
   if (!confirm(`حذف قراءة ${String(r0.at).slice(0,10)} (${r0.bal} ج)؟`)) return;
   try {
-    const r = await callScript({ action: 'meter_delete', row: r0.row, at: r0.at });
+    const r = await callScript({ action: 'meter_delete', flat: ELEC_FLAT, row: r0.row, at: r0.at });
     if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
     showToast('✅ تم الحذف');
     await elecRefresh();
@@ -1970,18 +1976,20 @@ async function renderElecScreen(force){
      full server round-trip. Same pattern as the home now: paint the last known figures instantly
      from localStorage, fetch in the background, repaint when the fresh data lands. The spinner
      only appears when there is nothing cached at all. */
-  if (!ELEC && !force) { try { const c = JSON.parse(localStorage.getItem('elecCache') || 'null'); if (c && c.ok) ELEC = c; } catch(e) {} }
+  if (!ELEC && !force) { try { const c = JSON.parse(localStorage.getItem(elecCK()) || 'null'); if (c && c.ok) ELEC = c; } catch(e) {} }
   if (!ELEC || force) {
     el.innerHTML = `<div class="loading"><div class="spinner"></div><span>جاري التحميل...</span></div>`;
     try {
-      const r = await callScript({ action: 'meter_screen', force: force ? 1 : 0 });
+      const want = ELEC_FLAT, r = await callScript({ action: 'meter_screen', flat: want, force: force ? 1 : 0 });
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'failed');
+      if (want !== ELEC_FLAT) return;                 // switched home while it loaded
       r._ts = Date.now(); ELEC = r;
-      try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
+      try { localStorage.setItem(elecCK(), JSON.stringify(r)); } catch(e) {}
     } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">تعذر التحميل — حاول مرة أخرى</div></div>`; return; }
   } else {
-    callScript({ action: 'meter_screen' }).then(r => {
-      if (r && r.ok) { r._ts = Date.now(); ELEC = r; try { localStorage.setItem('elecCache', JSON.stringify(r)); } catch(e) {}
+    const want = ELEC_FLAT;
+    callScript({ action: 'meter_screen', flat: want }).then(r => {
+      if (r && r.ok && want === ELEC_FLAT && (r.flat || '8A') === want) { r._ts = Date.now(); ELEC = r; try { localStorage.setItem(elecCK(), JSON.stringify(r)); } catch(e) {}
         renderElecBody();
       }
     }).catch(()=>{});
@@ -2003,7 +2011,8 @@ function renderElecBody(){
      والتقدير جنبها وبس (سارة 2026-08-12) */
   const stCol = { low:'#cc5f5f', stale:'#c9a24b', soon:'#c9a24b', cardempty:'#c9a24b', ok:'#5caa7f', none:'#8a7a7d' }[E.status || 'none'] || '#8a7a7d';
   const stIcon = { low:'🔴', stale:'🕐', soon:'🟡', cardempty:'💳', ok:'🟢', none:'⚪' }[E.status || 'none'] || '⚪';
-  let h = staleNote + (E.statusText ? `<div class="card" style="padding:10px 12px;margin-bottom:12px;border-right:4px solid ${stCol}">
+  const pickB = (f) => `<button onclick="elecPick('${f}')" style="flex:1;border:${f === ELEC_FLAT ? 'none' : '1px solid var(--border,#ddd)'};border-radius:8px;background:${f === ELEC_FLAT ? 'var(--primary,#cc5f5f)' : 'none'};color:${f === ELEC_FLAT ? '#fff' : 'inherit'};font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px;cursor:pointer">${emadFlatAr(f)}</button>`;
+  let h = `<div style="display:flex;gap:6px;margin-bottom:10px">${pickB('8A')}${pickB('VW1')}</div>` + staleNote + (E.statusText ? `<div class="card" style="padding:10px 12px;margin-bottom:12px;border-right:4px solid ${stCol}">
       <div style="font-size:13px;font-weight:900;color:${stCol}">${stIcon} ${E.statusText}</div>
     </div>` : '') + `
     <div class="stats-grid" style="margin-bottom:12px">
@@ -2028,7 +2037,7 @@ function renderElecBody(){
         </select>
         <button onclick="cardRechargeSave()" style="flex-shrink:0;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 12px;cursor:pointer">💳 سجّل الشحن</button>
       </div>
-      <div style="font-size:10.5px;color:var(--text3);margin-top:4px">الشحنة بتتقيد في وي شير تلقائيًا (Studio Electricity، مقسومة بينكم) — <b>متسجلوهاش في وي شير تاني</b></div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px">${ELEC_FLAT === 'VW1' ? 'الشحنة بتتقيد في وي شير تلقائيًا (Airbnb Monthly، تكلفة ' + emadFlatAr('VW1') + ' — مستنية تأكيد خالد)' : 'الشحنة بتتقيد في وي شير تلقائيًا (Studio Electricity، مقسومة بينكم)'} — <b>متسجلوهاش في وي شير تاني</b></div>
     </div>` : ''}
     <div class="card" style="padding:10px 12px;margin-bottom:14px">
       <div style="font-weight:800;font-size:12.5px;margin-bottom:6px" id="elecFormTitle">${ELEC_EDIT ? '✏️ تعديل قراءة' : '⚡ قراءة جديدة'}</div>
@@ -2177,6 +2186,14 @@ function renderEmadPanel() {
         (EMAD.meter ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${EMAD.meter.balance} — منذ ${readingAge} يوم)</span>`
                     : ` <span style="color:var(--text3);font-size:11px">(لا توجد قراءات بعد — أول تسجيل)</span>`),
         { click: 'emadMeterPrompt()' });
+  }
+  {   // ⚡ VW1's card (2026-10-20) — a cleaning day only, like 8A; no «first reading» nag on other days
+    const mv = (EMAD.meters || {}).VW1, loggedV = mv && String(mv.at || '').slice(0, 10) === todayK;
+    const cleanVwToday = (EMAD.schedule || []).some(c => c.flat === 'VW1' && c.date === todayK && ['checkout','midstay','weekly','revision','custom'].includes(c.type));
+    if (loggedV) todo += row('✅', `تم تسجيل رصيد كارت ${emadFlatAr('VW1')} اليوم: <b>${mv.balance}</b> جنيه`, {});
+    else if (cleanVwToday) todo += row('⚡', `<b>سجّل رصيد كارت كهرباء ${emadFlatAr('VW1')}</b> أثناء التنظيف — اضغط للتسجيل` +
+        (mv ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${mv.balance})</span>` : ` <span style="color:var(--text3);font-size:11px">(أول تسجيل)</span>`),
+        { click: "emadMeterPrompt('VW1')" });
   }
   /* 📶 §9 (Sarah 2026-08-07, corrected same day) — the router's remaining GB at guest boundaries.
      This task is for SARAH AND KHALED, not Emad: he has no access to the internet portal, so the
