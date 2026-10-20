@@ -479,7 +479,7 @@ async function editTask(id){
   const tx=prompt('نص المهمة:',t.text); if(tx===null) return;
   const dt=prompt('التاريخ (YYYY-MM-DD):',t.date); if(dt===null) return;
   const tm=prompt('الساعة (HH:MM أو فاضي):',t.time||''); if(tm===null) return;
-  const ap=prompt('البيت (8A / 17A / 17B / 28A / Zayed 2000 — أو فاضي):',t.apt||''); if(ap===null) return;
+  const ap=prompt('البيت (8A / 17A / 17B / 28A / Zayed 2000 / VW1 — أو فاضي):',t.apt||''); if(ap===null) return;
   let r=null; try{ r=await api('emad_task_edit',{id,text:tx.trim(),date:dt.trim(),time:tm.trim(),apt:ap.trim()}); }catch(e){}
   if(!r||!r.ok){ toast('❌ لم يتم — '+((r&&r.error)||'حاول مرة أخرى')); return; }
   [(D.tasks||[]).find(x=>x.id===id),(D.tasksAll||[]).find(x=>x.id===id)].forEach(x=>{ if(x){ x.text=r.text; x.date=r.date; x.time=r.time; x.apt=ap.trim(); } });
@@ -847,7 +847,7 @@ function renderRep(){
   let h='<div class="banner">🔧 الصيانة المفتوحة — عماد بيقفلها؛ افتح بلاغ جديد لو الضيف بلّغ عن عطل</div>';
   h+=(D.repairs&&D.repairs.length)?D.repairs.map(r=>`<div class="line"><b>${r.flat||r.apt||''}</b><span style="flex:1">${r.trade||''} ${r.desc||r.note||''}</span><span class="badge b-soon">${r.date||''}</span></div>`).join(''):'<div class="card">لا صيانة مفتوحة ✨</div>';
   h+=`<div class="sec-h">فتح بلاغ صيانة</div>
-    <input class="inp" id="rp-flat" placeholder="البيت (8A / 17A / 28A / Zayed 2000 / 17B)">
+    <input class="inp" id="rp-flat" placeholder="البيت (8A / 17A / 28A / Zayed 2000 / 17B / VW1)">
     <input class="inp" id="rp-date" type="date">
     <input class="inp" id="rp-time" type="time">
     <input class="inp" id="rp-desc" placeholder="المشكلة — مثال: تسريب في الحمام">
