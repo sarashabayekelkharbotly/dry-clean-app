@@ -983,7 +983,7 @@ function applyTick(stayId,k,occ,done,val){
 function greetEN(){ return new Date().getHours()<12 ? 'Good morning' : 'Good evening'; }
 /* WHEN, AT THE MOMENT OF COPYING (Sarah 2026-10-24: Mina got «your check-in is tomorrow» on his check-in day). today / tomorrow / the
    date are worked out when 📋 is pressed, not when the step was due; a registered arrival time becomes the gate line — self check-in,
-   nobody meets the guest, but the compound gate is told (no gate at Zayed 2000). */
+   nobody meets the guest, but the compound gate is told (every home has a gate; Zayed 2000 just has no gate card). */
 const EN_DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], EN_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const AR_MON=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 function nowK(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -994,8 +994,8 @@ function whenAR(k,formal){ const d=daysFromNow(k); if(d<=0) return formal?'ال�
 function timeEN(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return ((h%12)||12)+':'+m[2]+' '+(h<12?'AM':'PM'); }
 function timeAR(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return arNum(((h%12)||12)+(m[2]!=='00'?':'+m[2]:''))+' '+(h<12?'صباحاً':h<15?'ظهراً':h<18?'عصراً':'مساءً'); }
 function lateInDay(st){ return daysFromNow(st.ci)<=0 && new Date().getHours()>=15; }
-function gateEN(st){ if(st.flat==='Zayed 2000'||!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenEN(st.arrivalDate):''; return ` We've informed the compound gate of your arrival${on} at ${timeEN(st.arrivalTime)}.`; }
-function gateAR(st,G){ if(st.flat==='Zayed 2000'||!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenAR(st.arrivalDate):''; return ` بلّغنا أمن البوابة بوصول${G('ك','ك','كم')}${on} الساعة ${timeAR(st.arrivalTime)}.`; }
+function gateEN(st){ if(!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenEN(st.arrivalDate):''; return ` We've informed the compound gate of your arrival${on} at ${timeEN(st.arrivalTime)}.`; }
+function gateAR(st,G){ if(!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenAR(st.arrivalDate):''; return ` بلّغنا أمن البوابة بوصول${G('ك','ك','كم')}${on} الساعة ${timeAR(st.arrivalTime)}.`; }
 function greetAR(){ return new Date().getHours()<12 ? 'صباح الخير' : 'مساء الخير'; }
 /* THE GUEST'S NAME IN ARABIC LETTERS inside Arabic messages (Sarah 2026-08-20) — «صباح الخير
    Mohamed» reads broken and bidi-scrambles; «صباح الخير محمد» reads like a person wrote it.
