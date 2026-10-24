@@ -981,6 +981,21 @@ function applyTick(stayId,k,occ,done,val){
 /* THE GREETING FOLLOWS THE CLOCK AT COPY TIME (Sarah 2026-08-20) — a message copied at 9am says
    صباح الخير / Good morning, one copied at 9pm says مساء الخير / Good evening. Noon is the line. */
 function greetEN(){ return new Date().getHours()<12 ? 'Good morning' : 'Good evening'; }
+/* WHEN, AT THE MOMENT OF COPYING (Sarah 2026-10-24: Mina got «your check-in is tomorrow» on his check-in day). today / tomorrow / the
+   date are worked out when 📋 is pressed, not when the step was due; a registered arrival time becomes the gate line — self check-in,
+   nobody meets the guest, but the compound gate is told (no gate at Zayed 2000). */
+const EN_DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], EN_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const AR_MON=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+function nowK(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function daysFromNow(k){ return k ? Math.round((new Date(k+'T12:00:00')-new Date(nowK()+'T12:00:00'))/86400000) : 1; }
+function arNum(x){ return String(x).replace(/\d/g,c=>'٠١٢٣٤٥٦٧٨٩'[c]); }
+function whenEN(k){ const d=daysFromNow(k); if(d<=0) return 'today'; if(d===1) return 'tomorrow'; const x=new Date(k+'T12:00:00'); return 'on '+EN_DOW[x.getDay()]+' '+x.getDate()+' '+EN_MON[x.getMonth()]; }
+function whenAR(k,formal){ const d=daysFromNow(k); if(d<=0) return formal?'اليوم':'النهارده'; if(d===1) return formal?'غداً':'بكرة'; const x=new Date(k+'T12:00:00'); return 'يوم '+AR_DOW[x.getDay()]+' '+arNum(x.getDate())+' '+AR_MON[x.getMonth()]; }
+function timeEN(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return ((h%12)||12)+':'+m[2]+' '+(h<12?'AM':'PM'); }
+function timeAR(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return arNum(((h%12)||12)+(m[2]!=='00'?':'+m[2]:''))+' '+(h<12?'صباحاً':h<15?'ظهراً':h<18?'عصراً':'مساءً'); }
+function lateInDay(st){ return daysFromNow(st.ci)<=0 && new Date().getHours()>=15; }
+function gateEN(st){ if(st.flat==='Zayed 2000'||!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenEN(st.arrivalDate):''; return ` We've informed the compound gate of your arrival${on} at ${timeEN(st.arrivalTime)}.`; }
+function gateAR(st,G){ if(st.flat==='Zayed 2000'||!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenAR(st.arrivalDate):''; return ` بلّغنا أمن البوابة بوصول${G('ك','ك','كم')}${on} الساعة ${timeAR(st.arrivalTime)}.`; }
 function greetAR(){ return new Date().getHours()<12 ? 'صباح الخير' : 'مساء الخير'; }
 /* THE GUEST'S NAME IN ARABIC LETTERS inside Arabic messages (Sarah 2026-08-20) — «صباح الخير
    Mohamed» reads broken and bidi-scrambles; «صباح الخير محمد» reads like a person wrote it.
@@ -1053,7 +1068,7 @@ function tplAR(k, st, occ){
     case 'location': return pinFor(st);
     case 'manual': return `${malahIntroAR(st,G)}${greetAR()} ${n}! هذا دليل البيت 🏠 ${G('خذ','خذي','خذوا')} دقائق ${G('واطّلع','واطّلعي','واطّلعوا')} عليه من فضلك — هيسهّل الإقامة كثيراً. ${G('ستجد','ستجدين','ستجدون')} فيه: تعليمات الدخول، وأماكن كل شيء في البيت (المكواة، أدوات المطبخ، وغيرها)، وطريقة تشغيل الأجهزة (التكييف، الغسالة، التلفزيون)، وما حولك من محلات البقالة وتطبيقات التوصيل وأماكننا المفضلة القريبة. أي شيء غير واضح ${G('اسألني','اسأليني','اسألوني')} هنا!`;
     case 'arrival': case 'arrivalask': return `${greetAR()} ${n}! نجهّز البيت لإقامتك — متوقع ${G('تصل','تصلي','تصلوا')} الساعة كم؟ حتى يكون كل شيء جاهزاً قبل الوصول.`;
-    case 'code': return `${greetAR()} ${n}! الوصول بكرة 🎉 الدخول متاح من الساعة ٣ عصراً. كود الباب هو:
+    case 'code': return `${greetAR()} ${n}! الوصول ${whenAR(st.ci)} 🎉 ${lateInDay(st)?`البيت جاهز — ${G('تقدر تدخل','تقدري تدخلي','تقدروا تدخلوا')} في أي وقت ${G('توصل','توصلي','توصلوا')} فيه.`:'الدخول متاح من الساعة ٣ عصراً.'}${gateAR(st,G)} كود الباب هو:
 ${codeFor(st)}
 رحلة سعيدة — من فضلك ${G('ابعت','ابعتي','ابعتوا')} لنا رسالة وأنت في الطريق حتى نتأكد أن كل شيء جاهز للوصول.`;
     case 'settled': { const ag=areaGuideFor(st);
@@ -1061,7 +1076,7 @@ ${codeFor(st)}
         (ag?`وعلشان ${G('تستفيد','تستفيدي','تستفيدوا')} بإقامت${G('ك','كِ','كم')} لأقصى درجة، بنبعت ${G('لك','لكِ','لكم')} كمان دليلنا الشامل للشيخ زايد بتوصياتنا: أماكن الأكل، ونزهات للاستكشاف والمرح، وأماكن للأطفال، والاحتياجات اليومية القريبة من البيت 🗺️\n${ag}\n`:'')+
         `إقامة سعيدة! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetAR()} ${n}! نطمئن عليك في منتصف الإقامة — كيف كل شيء معك؟ لو تحتاج أي شيء نحن هنا. 😊`; return `${greetAR()} ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
-    case 'checkout': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة غداً قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
+    case 'checkout': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة ${whenAR(st.co,true)} قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
 ✅ ${G('أغلق','أغلقي','أغلقوا')} كل النوافذ والبلكونات
 ✅ ${G('اجمع','اجمعي','اجمعوا')} القمامة في المكان المخصص
 ✅ ${G('أطفئ','أطفئي','أطفئوا')} التكييفات والتلفزيونات
@@ -1198,7 +1213,7 @@ function tplBase(k, st, occ){
     case 'location': return pinFor(st);
     case 'manual': return `${malahIntroEN(st)}${greetEN()} ${n}! Here is our house manual 🏠 Please take a few minutes to go through it — it will make your stay much smoother. Inside you'll find: the check-in instructions, where everything is in the home (ironing board, utensils, extras), how the devices work (A/C, washing machine, TV), and what's around you — groceries, delivery apps, and our favorite places nearby. Anything unclear, just ask me here!`;
     case 'arrival': case 'arrivalask': return `${greetEN()} ${n}! We're preparing the home for your stay — what time do you expect to arrive? We'll make sure everything is set before you get there.`;
-    case 'code': return `${greetEN()} ${n}! Your check-in is tomorrow 🎉 Check-in is anytime from 3:00 PM. Your door code is:
+    case 'code': return `${greetEN()} ${n}! Your check-in is ${whenEN(st.ci)} 🎉 ${lateInDay(st)?'The home is ready for you — you can check in whenever you arrive.':'Check-in is anytime from 3:00 PM.'}${gateEN(st)} Your door code is:
 ${codeFor(st)}
 Safe travels — please message us on your way so we make sure everything is ready for your arrival.`;
     case 'settled': { const ag=areaGuideFor(st);
@@ -1206,7 +1221,7 @@ Safe travels — please message us on your way so we make sure everything is rea
         (ag?`To make the most of your stay, we're also sending you our comprehensive Sheikh Zayed guide with our recommendations: where to eat, days out to explore and have fun, things for children, and the everyday essentials near the home 🗺️\n${ag}\n`:'')+
         `Enjoy your stay! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetEN()} ${n}! Just checking in halfway through your stay — how is everything going? If there is anything you need, we are right here. 😊`; return `${greetEN()} ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
-    case 'checkout': return `${greetEN()} ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is tomorrow by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
+    case 'checkout': return `${greetEN()} ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is ${whenEN(st.co)} by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
 ✅ Close & lock all windows and balconies
 ✅ Gather the trash & place it in the dedicated takeout area
 ✅ Switch off all ACs & TVs
