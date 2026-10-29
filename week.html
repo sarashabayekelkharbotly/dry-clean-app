@@ -1169,7 +1169,10 @@ function confirmWeek(){
   msg('collecting the weeks…');
   var C=defaultWeek(), mandatory=addD(C,7);
   var tops=(ymd(weekStart)>ymd(mandatory))?weekStart:mandatory;
-  var targets=[]; for(var w=C; ymd(w)<=ymd(tops); w=addD(w,7)) targets.push(w);
+  /* the week ON SCREEN goes too while it still has today or later in it (Sarah 2026-10-29: on Thursday the planning week is tomorrow's,
+     so her lock change for TODAY in the current week was never sent — and its unsent draft kept blocking the WhatsApp copy) */
+  var first=(ymd(weekStart)<ymd(C)&&ymd(addD(weekStart,6))>=todayK())?weekStart:C;
+  var targets=[]; for(var w=first; ymd(w)<=ymd(tops); w=addD(w,7)) targets.push(w);
   // resolve each week's rows: the viewed grid, its on-screen neighbour, or that week's saved draft
   Promise.all(targets.map(function(w){
     if(ymd(w)===ymd(weekStart)) return Promise.resolve({w:w, rows:cleans, src:'live'});
