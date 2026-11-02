@@ -620,7 +620,7 @@ function stepRow(st,sp,state){
      the grey sub-line they read as the same row twice (Sarah 2026-08-12, Iman's 85 nights). The
      occurrence date now sits in the label itself, and the sub-line carries both dates. */
   const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
-  const dt=dueTxt(st,sp);
+  const dt=(sp.k==='checkout'&&st.lateCo?`🕑 خروج متأخر ${st.lateCo} — النظافة ${coTimes(st).clean} · `:'')+dueTxt(st,sp);
   const sub=(sp.occ&&sp.occ!=='mid')
     ? `النظافة يوم ${sp.occ}${sp.k==='midstay'?' الساعة '+(cleanTimeOf(st,sp.occ)||'12:00'):''}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${sp.k==='midstay'?(isFirstClean(st,sp.occ)?' · أول نظافة: العرض كامل':' · تأكيد الميعاد'):''}${dt?` · ${dt}`:''}`
     : dt;
@@ -647,20 +647,10 @@ function metaChips(st){
 }
 function stayExtra(st){
   const ho=st.handover||{}, gr=st.group||{};
-  let h='<div class="step" style="border-top:1px solid var(--border)">';
-  h+=`<div class="step-lb">🤝 التسليم لداني<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع سارة/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
-  /* ↩ تراجع — لازم يكون ممكن نلغي علامة اتحطت بالغلط (أو من الـbackfill) لحد ما الحاجة
-     تتعمل فعلاً (Sarah 2026-08-11) */
-  h+=ho.done?`<span class="badge b-ok">مع داني</span><button class="btn" onclick="undoFlag('${st.id}','handover')">↩</button>`
-            :`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
-  h+='</div><div class="step">';
-  h+=`<div class="step-lb">💬 جروب الواتساب (بداني جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
-  h+=gr.done?`<span class="badge b-ok">✓</span><button class="btn" onclick="undoFlag('${st.id}','group')">↩</button>`
-    :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
-  /* the text gets the FULL row and the buttons live underneath — five buttons beside the text was
-     squishing طلبات into a one-word column (Sarah 2026-08-30) */
-  h+='</div><div class="step" style="flex-direction:column;align-items:stretch">';
-  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · ⚥ <b>${st.gender||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b></div>
+  /* THE GUEST'S DETAILS FIRST (Sarah 2026-11-02): language, ⚥, names, requests and a late check-out decide what every 📋
+     message below says — so they sit at the very top of the card, before the first template is ever copied. */
+  let h='<div class="step" style="border-top:1px solid var(--border);flex-direction:column;align-items:stretch">';
+  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · ⚥ <b>${st.gender||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b>${st.lateCo?` · 🕑 خروج متأخر — <b style="color:#a0346b">${st.lateCo}</b>`:''}</div>
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">
         <button class="btn" onclick="setupUI('${st.id}')">⚙️ بيانات الضيف</button>
         <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>
@@ -683,11 +673,23 @@ function stayExtra(st){
         </select></label>
       <label style="font-size:10.5px;grid-column:1/3">📌 طلبات خاصة
         <input id="su_req_${st.id}" value="${ea(st.requests)}" style="width:100%"></label>
+      <label style="font-size:10.5px;grid-column:1/3">🕑 خروج متأخر متوافق عليه (يوم ${ea(st.co)}) — الساعة، أو فاضي = 12:00 العادي
+        <input id="su_lco_${st.id}" type="time" value="${ea(st.lateCo)}" style="width:100%"></label>
       <div style="grid-column:1/3;display:flex;gap:6px;justify-content:flex-end">
         <button class="btn" onclick="setupUI('${st.id}')">إلغاء</button>
         <button class="btn btn-ok" id="su_save_${st.id}" onclick="setupSave('${st.id}')">💾 حفظ الكل</button>
       </div></div>`;
   }
+  h+='</div><div class="step">';
+  h+=`<div class="step-lb">🤝 التسليم لداني<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع سارة/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
+  /* ↩ تراجع — لازم يكون ممكن نلغي علامة اتحطت بالغلط (أو من الـbackfill) لحد ما الحاجة
+     تتعمل فعلاً (Sarah 2026-08-11) */
+  h+=ho.done?`<span class="badge b-ok">مع داني</span><button class="btn" onclick="undoFlag('${st.id}','handover')">↩</button>`
+            :`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
+  h+='</div><div class="step">';
+  h+=`<div class="step-lb">💬 جروب الواتساب (بداني جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
+  h+=gr.done?`<span class="badge b-ok">✓</span><button class="btn" onclick="undoFlag('${st.id}','group')">↩</button>`
+    :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
   h+='</div>';
   h+=`<div class="step" style="flex-direction:column;align-items:stretch">
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
@@ -763,12 +765,15 @@ async function setupSave(stayId){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   const gv=id=>{const el=document.getElementById(id);return el?String(el.value).trim():null;};
   const en=gv(`su_en_${stayId}`), ar=gv(`su_ar_${stayId}`), lang=gv(`su_lang_${stayId}`),
-        g=gv(`su_g_${stayId}`), req=gv(`su_req_${stayId}`);
+        g=gv(`su_g_${stayId}`), req=gv(`su_req_${stayId}`), lco=gv(`su_lco_${stayId}`);
   const items=[];
   if(en!==null&&ar!==null&&(en!==(st.guest||'')||ar!==(st.nameAr||''))) items.push({step:'names',val:en+'|'+ar});
   if(lang!==null&&lang!==(st.lang||'')) items.push({step:'lang',val:lang});
   if(g!==null&&g!==(st.gender||'')) items.push({step:'gender',val:g});
   if(req!==null&&req!==(st.requests||'')) items.push({step:'requests',val:req});
+  if(lco!==null){ const v=lco.slice(0,5);
+    if(v&&!/^\d{2}:\d{2}$/.test(v)){ toast('🕑 اكتب الساعة HH:MM'); return; }
+    const nv=v==='12:00'?'':v; if(nv!==(st.lateCo||'')) items.push({step:'latecheckout',val:nv}); }
   if(!items.length){ SETUP_OPEN=null; renderMain(); toast('لا تغيير'); return; }
   const btn=document.getElementById(`su_save_${stayId}`); if(btn){ btn.disabled=true; btn.textContent='⏳ بيحفظ…'; }
   const r=await apiRetry('comms_tick_batch',{stayId,items,tag:tagOf(st)},15000);   // 4 ticks in one request — one tick's 6.5s budget starved it
@@ -786,6 +791,7 @@ async function setupSave(stayId){
     else if(it.step==='lang') st.lang=it.val;
     else if(it.step==='gender') st.gender=it.val;
     else if(it.step==='requests') st.requests=it.val;
+    else if(it.step==='latecheckout') st.lateCo=it.val;
   });
   try{ localStorage.setItem(CK,JSON.stringify({D,ts:lastTs})); }catch(e){}
   SETUP_OPEN=null; renderMain();
@@ -1077,7 +1083,7 @@ ${codeFor(st)}
         (ag?`وعلشان ${G('تستفيد','تستفيدي','تستفيدوا')} بإقامت${G('ك','كِ','كم')} لأقصى درجة، بنبعت ${G('لك','لكِ','لكم')} كمان دليلنا الشامل للشيخ زايد بتوصياتنا: أماكن الأكل، ونزهات للاستكشاف والمرح، وأماكن للأطفال، والاحتياجات اليومية القريبة من البيت 🗺️\n${ag}\n`:'')+
         `إقامة سعيدة! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetAR()} ${n}! نطمئن عليك في منتصف الإقامة — كيف كل شيء معك؟ لو تحتاج أي شيء نحن هنا. 😊`; return `${greetAR()} ${n}! نحب نقدّم ${G('لك','لك','لكم')} تنظيفاً كاملاً للبيت — خدمة مقدَّمة مجانية منّا خلال الإقامة — ${occ&&occ!=='mid'?'يوم '+occ+' ':''}🧹 مع تغيير الملايات والفوط. يستغرق عادةً ساعتين إلى ثلاث ساعات، وفريق النظافة عندنا موثوق تماماً ومعنا من سنوات طويلة، فلو ${G('حابب تخرج','حابة تخرجي','حابين تخرجوا')} أثناء التنظيف فالبيت في أيدٍ أمينة. أي وقت يناسبكم؟ وكيف الإقامة معنا حتى الآن؟`;
-    case 'checkout': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة ${whenAR(st.co,true)} قبل الساعة ١٢:٠٠. فريق النظافة موعده عادةً ١٢:١٥، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
+    case 'checkout': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا و${G('شعرت','شعرتي','شعرتوا')} أنك في بيتك 🏠 تذكير بأن المغادرة ${whenAR(st.co,true)} قبل الساعة ${arNum(coTimes(st).co)}. فريق النظافة موعده ${arNum(coTimes(st).clean)}، فمن فضلك ${G('أخبرنا','أخبرينا','أخبرونا')} عند المغادرة حتى لا نزعجكم. قبل المغادرة:
 ✅ ${G('أغلق','أغلقي','أغلقوا')} كل النوافذ والبلكونات
 ✅ ${G('اجمع','اجمعي','اجمعوا')} القمامة في المكان المخصص
 ✅ ${G('أطفئ','أطفئي','أطفئوا')} التكييفات والتلفزيونات
@@ -1154,7 +1160,7 @@ function renderTplEditor(){
       <b style="margin-inline-start:8px">${row.label} · ${TPL_ED.lang==='ar'?'عربي':'EN'}</b></div>
       <textarea id="tplText" oninput="tplEdPreview()" style="width:100%;min-height:42vh;font-family:inherit;font-size:15px;line-height:1.8;border:1px solid #e6d8d8;border-radius:10px;padding:10px;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}">${ea(row.text)}</textarea>
       <div style="font-size:12px;color:#8a7d7d;line-height:1.8;margin:8px 0">
-        <b>الرموز:</b> {تحية}/{greeting} صباح أو مساء الخير حسب الساعة وقت النسخ · {يوم النظافة}/{clean day} و{ساعة النظافة}/{clean time} من الجدول · سطر يبدأ {لو في ميعاد}/{if time} يظهر لو النظافة متجدولة بساعة، و{لو مفيش ميعاد}/{if no time} لو لسه · {اسم}/{name} اسم الضيف · {كود}/{code} كود الباب ·
+        <b>الرموز:</b> {تحية}/{greeting} صباح أو مساء الخير حسب الساعة وقت النسخ · {يوم النظافة}/{clean day} و{ساعة النظافة}/{clean time} من الجدول · {ساعة الخروج}/{checkout time} و{ساعة نظافة الخروج}/{checkout clean time} = 12:00 و12:15، أو الخروج المتأخر و+15 دقيقة · سطر يبدأ {لو في ميعاد}/{if time} يظهر لو النظافة متجدولة بساعة، و{لو مفيش ميعاد}/{if no time} لو لسه · {اسم}/{name} اسم الضيف · {كود}/{code} كود الباب ·
         [للراجل|للست|للجروب] صيغة حسب ⚥ · سطر يبدأ {لو مش زايد} بيتشال لزايد 2000 · {دليل المنطقة}/{area guide} لينك دليل الشيخ زايد للبيت (سطر لوحده) — وسطر يبدأ {لو في دليل} يظهر بس لو للبيت دليل · {لو الأوراق لسه} يظهر فقط لو الجوازات ما اتطلبتش
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:11px">معاينة كأنها لضيف:</span>
@@ -1187,7 +1193,8 @@ function renderTpl(text, st, cl){
     return true;
   }).map(line=>line.replace('{لو مش زايد}','').replace('{لو الأوراق لسه}','').replace('{لو في دليل}','')
     .replace('{لو في ميعاد}','').replace('{if time}','').replace('{لو مفيش ميعاد}','').replace('{if no time}','')).join('\n');
-  t=t.replace(/\{يوم النظافة\}|\{clean day\}/g,cl?cl.day:'').replace(/\{ساعة النظافة\}|\{clean time\}/g,cl?cl.time:'');
+  t=t.replace(/\{ساعة الخروج\}|\{checkout time\}/g,coTimes(st).co).replace(/\{ساعة نظافة الخروج\}|\{checkout clean time\}/g,coTimes(st).clean);
+  t=t.replace(/\{يوم النظافة\}|\{clean day\}/g,cl&&cl.day?cl.day:'').replace(/\{ساعة النظافة\}|\{clean time\}/g,cl?cl.time:'');
   t=t.replace(/\{دليل المنطقة\}|\{area guide\}/g,areaGuideFor(st));
   t=t.replace(/\[([^\[\]|\n]*)\|([^\[\]|\n]*)\|([^\[\]|\n]*)\]/g,(m,a,b,c)=>[a,b,c][gi]);
   return t;
@@ -1195,6 +1202,12 @@ function renderTpl(text, st, cl){
 /* THE CLEANING MESSAGES (Sarah 2026-11-02: Dani typed «3/11 at 12 pm» by hand after the clean had moved to 2 pm). The day and the
    time now come from the schedule at the moment of 📋 — nobody types them. The stay's FIRST clean gets the full offer (what the
    visit is, how long, the team) and suggests the scheduled time; every LATER clean gets a short confirmation, no explaining again. */
+/* the check-out times (Sarah 2026-11-02): an approved late check-out moves both — the cleaners always 15 minutes after */
+function coTimes(st){
+  const co=/^\d{2}:\d{2}$/.test(String(st.lateCo||''))?st.lateCo:'12:00';
+  const m=Number(co.slice(0,2))*60+Number(co.slice(3,5))+15;
+  return { co, clean: String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0') };
+}
 function cleanTimeOf(st,occ){
   const c=(D.schedule||[]).find(c=>c.flat===st.flat&&c.date===occ&&(c.type==='midstay'||c.type==='weekly'));
   return c&&/^\d{1,2}:\d{2}/.test(String(c.time)) ? String(c.time).slice(0,5).padStart(5,'0') : '';
@@ -1221,7 +1234,7 @@ function sheetTpl(k, st, occ){
   const later = k==='midstay' && occ!=='mid' && !isFirstClean(st,occ);
   const key = k==='midstay' ? (occ==='mid'?'midstay':(later?'cleanconfirm':'midclean')) : (k==='arrival'?'arrivalask':k);
   const row=(D.templates||[]).find(x=>x.key===key&&x.lang===lang);
-  const cl = k==='midstay' ? cleanInfo(st,occ) : null;
+  const cl = k==='midstay' ? cleanInfo(st,occ) : k==='checkout' ? coTimes(st) : null;
   if(key==='cleanconfirm'&&!(row&&row.text&&row.text.trim())) return renderTpl(CLEANCONFIRM_FALLBACK[lang]||CLEANCONFIRM_FALLBACK.en, st, cl);
   return (row&&row.text&&row.text.trim()) ? renderTpl(row.text, st, cl) : null;
 }
@@ -1255,7 +1268,7 @@ Safe travels — please message us on your way so we make sure everything is rea
         (ag?`To make the most of your stay, we're also sending you our comprehensive Sheikh Zayed guide with our recommendations: where to eat, days out to explore and have fun, things for children, and the everyday essentials near the home 🗺️\n${ag}\n`:'')+
         `Enjoy your stay! 😊`; }
     case 'midstay': if(occ==='mid') return `${greetEN()} ${n}! Just checking in halfway through your stay — how is everything going? If there is anything you need, we are right here. 😊`; return `${greetEN()} ${n}! We would like to offer you a complimentary cleaning of the home${occ&&occ!=='mid'?' on '+occ:''} 🧹 — we'll also change the bedsheets and towels. It usually takes 2–3 hours. Our cleaning team is completely trustworthy and has been with us for many years, so if you'd like to head out during the cleaning, the home is in safe hands. What time would suit you? And how is everything going with your stay so far?`;
-    case 'checkout': return `${greetEN()} ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is ${whenEN(st.co)} by 12:00. Our cleaning team is usually scheduled for 12:15, so please let us know when you check out to avoid any disturbance. Before leaving, please:
+    case 'checkout': return `${greetEN()} ${n}! We hope you've enjoyed your stay with us and felt at home 🏠 Just a reminder that your check-out is ${whenEN(st.co)} by ${coTimes(st).co}. Our cleaning team is scheduled for ${coTimes(st).clean}, so please let us know when you check out to avoid any disturbance. Before leaving, please:
 ✅ Close & lock all windows and balconies
 ✅ Gather the trash & place it in the dedicated takeout area
 ✅ Switch off all ACs & TVs
