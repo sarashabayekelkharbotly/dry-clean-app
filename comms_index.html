@@ -454,10 +454,10 @@ function copyTpl(stayId,k,occ){
   if(!ensureLangGender(st)) return;
   /* 17B is the long stay — it has no guide, by design */
   if(k==='manual' && !guideFor(st) && st.flat!=='17B') toast('⚠️ مفيش دليل بيت لـ '+st.flat+' — الرسالة اتنسخت من غير لينك');
-  if(k==='midstay'&&occ!=='mid'&&!isFirstClean(st,occ)&&!cleanTimeOf(st,occ)){ toast('⚠️ نظافة '+occ+' لسه مالهاش ساعة في الجدول — كلّمي سارة قبل التأكيد'); return; }
+  const unsched = k==='midstay'&&occ!=='mid'&&!cleanTimeOf(st,occ);
   const t=tpl(k,st,occ);
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(
-    ()=>toast('📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
+    ()=>toast(unsched?'📋 اتنسخت — ⚠️ النظافة دي لسه مش في الجدول: اليوم متوقع والساعة ١٢ الافتراضية':'📋 اتنسخت ('+(tplLang(st)==='ar'?'عربي':'EN')+') — الصقها في واتساب'),
     ()=>{ prompt('انسخ الرسالة:',t); });
 }
 /* ☀️/🌙 إرسال الملخص دلوقتي — نفس الدوال اللي الـtriggers بتشغّلها، فاللي بتبعتيه بإيدك
@@ -622,7 +622,7 @@ function stepRow(st,sp,state){
   const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
   const dt=dueTxt(st,sp);
   const sub=(sp.occ&&sp.occ!=='mid')
-    ? `النظافة يوم ${sp.occ}${(tm=>tm?' الساعة '+tm:'')(sp.k==='midstay'?cleanTimeOf(st,sp.occ):'')}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${sp.k==='midstay'?(isFirstClean(st,sp.occ)?' · أول نظافة: العرض كامل':' · تأكيد الميعاد'):''}${dt?` · ${dt}`:''}`
+    ? `النظافة يوم ${sp.occ}${sp.k==='midstay'?' الساعة '+(cleanTimeOf(st,sp.occ)||'12:00'):''}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${sp.k==='midstay'?(isFirstClean(st,sp.occ)?' · أول نظافة: العرض كامل':' · تأكيد الميعاد'):''}${dt?` · ${dt}`:''}`
     : dt;
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
   // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
@@ -1205,7 +1205,7 @@ function isFirstClean(st,occ){
 }
 function cleanInfo(st,occ){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(occ||''))) return null;
-  const x=new Date(occ+'T12:00:00'), tm=cleanTimeOf(st,occ), ar=tplLang(st)==='ar';
+  const x=new Date(occ+'T12:00:00'), tm=cleanTimeOf(st,occ)||'12:00', ar=tplLang(st)==='ar';   // not scheduled yet → the default 12:00 — the guest is never asked for a time
   const h=Number(tm.slice(0,2)), m=tm.slice(3,5), h12=(h%12)||12;
   const day= ar ? AR_DOW[x.getDay()]+' '+arNum(x.getDate())+' '+AR_MON[x.getMonth()] : EN_DOW[x.getDay()]+' '+x.getDate()+' '+EN_MON[x.getMonth()];
   const time= !tm ? '' : ar ? arNum(h12+(m!=='00'?':'+m:''))+' '+(h<12?'الصبح':h<15?'الظهر':h<18?'العصر':'بالليل')
