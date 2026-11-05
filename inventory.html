@@ -1251,6 +1251,7 @@ function renderCountGate() {
   const base = 'display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:700;';
   const btnCss = `border:1px solid var(--border);background:white;border-radius:8px;padding:4px 10px;font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer`;
   if (isReadonly()) {   // sarah / khaled — the keyholders
+    setTimeout(() => { const g = document.getElementById('countgate-bar'); if (g && !document.getElementById('stkBtn')) g.insertAdjacentHTML('beforeend', '<button id="stkBtn" onclick="openStockHome()" style="width:100%;margin:0 0 10px;padding:8px;border:1px solid var(--border);border-radius:12px;background:white;font-family:Cairo,sans-serif;font-size:12.5px;font-weight:800;cursor:pointer">📦 تجهيز بيت جديد (أصناف من المخزن لبيت + غسيل التجهيز)</button>'); }, 0);
     if (countGateOpen())
       el.innerHTML = countExtraHtml() + `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)"><span style="flex:1">📐 ${countKindText()} — مفتوح لعماد${countProgressText()}</span><button id="gate-btn" onclick="${countMode === 'correction' ? 'toggleCountGate()' : 'closeCountNow()'}" style="${btnCss}">قفل الجرد</button></div>`;
     else if (countGateFuture())
@@ -1269,6 +1270,50 @@ function renderCountGate() {
 /* Scheduling is an EVENT with a trail: the server telegrams all three and drops a task dated
    the جرد day in Emad's to-do; the gate opens that whole day and shuts itself at midnight.
    Cancelling withdraws the not-yet-done task. Save-then-toast — state moves only on server ok. */
+/* 📦 STOCKING A NEW HOME (Sarah 2026-11-05, VW1) — Sarah/Khaled. The items leave the shelf as a transfer (not usage); their value moves from
+   the shared supplies cost onto that home. The home's prep wash (no guest) is ticked here so it does not take a share of the pool. */
+let STK = null;
+async function openStockHome(flat) {
+  if (!isReadonly()) return;
+  let r = null; try { r = await api('inv_stock_home_info', { flat: flat || (STK && STK.flat) || 'VW1' }); } catch(e) { r = null; }
+  if (!r || r.ok !== true) { toast('❌ ' + ((r && r.error) || 'تحقق من الإنترنت')); return; }
+  STK = { flat: r.flat, flats: r.flats, subs: r.subs, qty: (STK && STK.flat === r.flat) ? STK.qty : {}, batch: (STK && STK.batch) || ('stk' + Date.now().toString(36)) };
+  renderStockHome();
+}
+function stkTotal() { let t = 0; items.forEach(it => { const q = +STK.qty[it.id] || 0; if (q > 0) t += q * (+it.lastPrice || 0); }); return t; }
+function renderStockHome() {
+  let el = document.getElementById('stkOverlay');
+  if (!el) { el = document.createElement('div'); el.id = 'stkOverlay'; el.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:900;overflow:auto'; document.body.appendChild(el); }
+  const act = items.filter(it => it.active !== false && (+it.cur || 0) > 0).sort((a, b) => String(a.ar).localeCompare(String(b.ar), 'ar'));
+  let h = '<div style="max-width:640px;margin:0 auto;padding:14px 14px 60px" dir="rtl">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">📦 تجهيز بيت جديد</b><button onclick="closeStockHome()" style="border:1px solid var(--border);background:white;border-radius:8px;padding:4px 10px;cursor:pointer">✕</button></div>';
+  h += '<div style="font-size:12px;color:var(--text2);margin:6px 0 10px">الأصناف بتطلع من المخزن للبيت ده (مش استهلاك). قيمتها بآخر سعر استلام بتتشال من التكلفة المشتركة وتتحسب على البيت.</div>';
+  h += '<label style="font-size:13px;font-weight:700">البيت: <select onchange="STK.qty={};openStockHome(this.value)" style="font-family:Cairo,sans-serif;font-size:13px">' +
+       STK.flats.map(f => '<option' + (f === STK.flat ? ' selected' : '') + '>' + f + '</option>').join('') + '</select></label>';
+  h += '<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:13px"><tr style="color:var(--text3);font-size:11px"><th style="text-align:right">الصنف</th><th>في المخزن</th><th>السعر</th><th>للبيت</th></tr>';
+  act.forEach(it => { const pr = +it.lastPrice || 0;
+    h += '<tr style="border-top:1px solid var(--border)"><td style="padding:4px">' + (it.emoji || '') + ' ' + it.ar + '</td><td style="text-align:center">' + it.cur + '</td><td style="text-align:center">' + (pr ? pr.toFixed(2) : '—') + '</td>' +
+         '<td style="text-align:center"><input type="number" min="0" max="' + it.cur + '" step="1" value="' + (STK.qty[it.id] || '') + '" oninput="STK.qty[\'' + it.id + '\']=+this.value||0;document.getElementById(\'stkTot\').textContent=Math.round(stkTotal()).toLocaleString(\'en-US\')" style="width:56px;text-align:center;font-family:Cairo,sans-serif"></td></tr>'; });
+  h += '</table>';
+  h += '<div style="margin:10px 0;font-weight:800">القيمة: <span id="stkTot">' + Math.round(stkTotal()).toLocaleString('en-US') + '</span> ج</div>';
+  h += '<div style="margin-top:14px;font-weight:800;font-size:13px">🧺 غسيل التجهيز (من غير ضيف)</div><div style="font-size:11.5px;color:var(--text2);margin-bottom:4px">علّمي غسلة التجهيز — تكلفتها على البيت، بس ماتاخدش نصيب من التكلفة المشتركة.</div>';
+  h += STK.subs.length ? STK.subs.map(x => '<label style="display:block;font-size:13px;padding:3px 0"><input type="checkbox" class="stkPrep" value="' + x.id + '"' + (x.prep ? ' checked' : '') + '> ' + x.at + ' · ' + x.status + ' <span style="color:var(--text3)">(' + x.id + ')</span></label>').join('')
+                       : '<div style="font-size:12px;color:var(--text3)">مفيش غسيل متسجل للبيت ده لسه — ارجعي هنا بعد ما يتسجل.</div>';
+  h += '<button id="stkSave" onclick="saveStockHome()" style="width:100%;margin-top:16px;padding:12px;border:none;border-radius:12px;background:var(--ok);color:white;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;cursor:pointer">💾 حفظ</button></div>';
+  el.innerHTML = h;
+}
+function closeStockHome() { const el = document.getElementById('stkOverlay'); if (el) el.remove(); }
+async function saveStockHome() {
+  const lines = Object.keys(STK.qty).filter(k => STK.qty[k] > 0).map(k => ({ itemId: k, qty: STK.qty[k] }));
+  const prep = Array.from(document.querySelectorAll('.stkPrep')).filter(c => c.checked).map(c => c.value);
+  if (lines.length && !confirm('تطلع ' + lines.length + ' صنف من المخزن لبيت ' + STK.flat + ' بقيمة ~' + Math.round(stkTotal()).toLocaleString('en-US') + ' ج؟')) return;
+  const b = document.getElementById('stkSave'); if (b) { b.disabled = true; b.textContent = '⏳'; }
+  let r = null; try { r = await api('inv_stock_home', { flat: STK.flat, lines, prep, batchId: STK.batch }); } catch(e) { r = null; }
+  if (!r || r.ok !== true) { if (b) { b.disabled = false; b.textContent = '💾 حفظ'; } toast('❌ ' + ((r && r.error) || 'ماتحفظش — جرّب تاني (مش هيتكرر)')); return; }
+  const bad = (r.moved || []).filter(x => x.error);
+  toast(r.already ? '✅ اتسجل قبل كده' : ('✅ ' + (lines.length ? 'اتنقل للبيت بقيمة ' + Math.round(r.total || 0).toLocaleString('en-US') + ' ج' : 'اتحفظ') + (bad.length ? ' — ⚠️ ماتنقلش: ' + bad.map(x => x.name).join('، ') : '') + ((r.unpriced || []).length ? ' — من غير سعر: ' + r.unpriced.join('، ') : '')));
+  STK = null; closeStockHome(); syncData(true);
+}
 async function toggleCountGate() {
   if (!isReadonly()) return;
   const active = countGateOpen() || countGateFuture();
@@ -2814,7 +2859,7 @@ let reconMonth = todayYmd().slice(0, 7), reconMode = 'qty', reconData = null, re
 const RECON_FIRST = '2026-06';
 const LINE_AR = { consume: 'استهلاك', consume_repeat: 'تكرار (مش محسوب)', purchase: 'استلام', purchase_repeat: 'استلام مكرر (مش محسوب)',
   adjust: 'تراجع', adjust_repeat: 'تراجع مكرر (مش محسوب)', correction: 'جرد — فرق', count: 'جرد — مطابق', system_repair: 'تصحيح نظام',
-  count_usage: 'جرد — استهلاك ماتسجلش', close_correction: 'جرد إقفال — تصحيح' };
+  count_usage: 'جرد — استهلاك ماتسجلش', close_correction: 'جرد إقفال — تصحيح', transfer: '📦 اتنقل لبيت (تجهيز)' };
 function reconShift(n) {
   const d = new Date(reconMonth + '-15T12:00:00'); d.setMonth(d.getMonth() + n);
   const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
