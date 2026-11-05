@@ -1298,7 +1298,10 @@ async function toggleCountGate() {
     return;
   }
   countFixDay = r.day || ''; countFixKind = r.kind || 'correction';
-  saveCache(); renderAll();
+  /* the banner names the kind from countMode — set it now, not at the next sync (Sarah 2026-11-05: she chose 1 and it said «جرد تصحيح») */
+  if (!active && countFixDay === todayYmd() && !countMode) countMode = countFixKind === 'usage' ? 'usage' : 'correction';
+  if (active && (countMode === 'usage' || countMode === 'correction')) countMode = '';
+  saveCache(); renderAll(); syncData(true);
   toast(active ? '📐 الجرد اتلغى' : (countFixDay === todayYmd() ? '📐 الجرد مفتوح النهارده — عماد وصله تلجرام ومهمة' : '📐 اتجدول يوم ' + countFixDay + ' — عماد وصله تلجرام ومهمة'));
 }
 
