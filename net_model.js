@@ -27,7 +27,7 @@
   }
   function lastReading(flat, sinceDt){
     var r=null; (D.internet.readings||[]).forEach(function(x){ if(x.flat!==flat)return; var d=pdt(x.at); if(!d)return;
-      if(sinceDt&&d<sinceDt)return; if(!r||d>pdt(r.at))r=x; }); return r;
+      if(sinceDt&&d<=sinceDt)return; if(!r||d>pdt(r.at))r=x; }); return r;
   }
   function curStay(flat, dt){
     var cur=null; STAYS.forEach(function(s){ if(s.flat!==flat)return;
@@ -49,8 +49,11 @@
       bs.forEach(function(x,bi){
         var ceN=bs[bi+1]?bs[bi+1].cs:null;
         var reads=(D.internet.readings||[]).filter(function(r){ var t=pdt(r.at);
-            return r.flat===f&&t&&t>=x.cs&&(!ceN||t<ceN); })
+            return r.flat===f&&t&&t>x.cs&&(!ceN||t<=ceN); })
           .map(function(r){return {t:pdt(r.at),rem:r.remaining};}).sort(function(a,z){return a.t-z.t;});
+        /* A BUNDLE'S READINGS = after its own start, up to AND INCLUDING the next one's (Sarah 2026-11-05: Daria, 17A, used 74 + 200 GB
+           and the pace showed neither — the «0 left» typed the same minute the new bundle starts was counted in the NEW bundle, so
+           the old one never reached zero). KEEP IN STEP with netCandidates in engine_elcontrol.ts. */
         var pts=[{t:x.cs,rem:x.b.quota}].concat(reads);
         /* THE HOUSE CLOCK (Sarah 2026-08-07): a stay occupies 15:00 check-in day → 12:00 check-out
            day; each interval is sliced at those boundaries and every slice charged to whoever
