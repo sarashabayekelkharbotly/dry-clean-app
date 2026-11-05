@@ -858,7 +858,7 @@ let pendingReceiveOrderId = null;
 let pendingConsumeItemId = null;
 /* 📐 gate (Sarah 2026-08-10): جرد corrections are closed by default; Sarah/Khaled SCHEDULE a
    جرد day — open all that day, shut at midnight. Server enforces; this only decides what to draw. */
-let countFixDay = '';
+let countFixDay = '', countFixKind = 'correction';
 function todayYmd() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function countGateOpen() { return !!countFixDay && countFixDay === todayYmd(); }
 function countGateFuture() { return !!countFixDay && countFixDay > todayYmd(); }
@@ -890,7 +890,7 @@ function loadCache() {
     snapshots = c.snapshots || {};
     categoriesList = c.categoriesList || [];
     applyCategories(categoriesList);
-    countFixDay = c.countFixDay || countFixDay || '';
+    countFixDay = c.countFixDay || countFixDay || ''; countFixKind = c.countFixKind || countFixKind;
     lastSyncTs = c.ts || 0;
     return true;
   } catch(e) { console.error('loadCache', e); return false; }
@@ -1087,7 +1087,7 @@ async function syncData(silent = false) {
     events = res.events || [];
     if (snapRes && snapRes.ok) snapshots = snapRes.snapshots || {};
     if (res.categories && res.categories.length) categoriesList = res.categories;
-    countFixDay = res.countFixDay || '';
+    countFixDay = res.countFixDay || ''; countFixKind = res.countFixKind || 'correction';
     countProgress = res.countProgress || null;
     countMode = res.countMode || ''; invCloseInfo = res.invClose || null; monthConfirm = res.monthConfirm || null; usageRows = res.usage || [];
     applyCategories(categoriesList);
@@ -1254,14 +1254,14 @@ function renderCountGate() {
     if (countGateOpen())
       el.innerHTML = countExtraHtml() + `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)"><span style="flex:1">📐 ${countKindText()} — مفتوح لعماد${countProgressText()}</span><button id="gate-btn" onclick="${countMode === 'correction' ? 'toggleCountGate()' : 'closeCountNow()'}" style="${btnCss}">قفل الجرد</button></div>`;
     else if (countGateFuture())
-      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)"><span style="flex:1">📐 جرد متجدول يوم ${countFixDay}</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">إلغاء / تغيير</button></div>`;
+      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)"><span style="flex:1">📐 ${countFixKind === 'usage' ? 'جرد استهلاك' : 'جرد تصحيح'} متجدول يوم ${countFixDay}</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">إلغاء / تغيير</button></div>`;
     else
       el.innerHTML = `<div style="${base}background:var(--bg);color:var(--text2)"><span style="flex:1">📐 الجرد مقفول</span><button id="gate-btn" onclick="toggleCountGate()" style="${btnCss}">تحديد يوم جرد لعماد</button></div>`;
   } else {
     if (countGateOpen())
       el.innerHTML = countExtraHtml() + `<div style="${base}background:rgba(92,170,127,0.12);color:var(--ok)">📐 ${countKindText()} — عدّ كل صنف وسجّله بزرار 📐 (حتى لو مطابق)${countProgressText()}</div>`;
     else if (countGateFuture())
-      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)">📐 جرد متجدول يوم ${countFixDay}</div>`;
+      el.innerHTML = `<div style="${base}background:rgba(66,133,244,0.08);color:var(--blue)">📐 ${countFixKind === 'usage' ? 'جرد استهلاك' : 'جرد'} متجدول يوم ${countFixDay}</div>`;
     else el.innerHTML = '';
   }
 }
@@ -1272,11 +1272,16 @@ function renderCountGate() {
 async function toggleCountGate() {
   if (!isReadonly()) return;
   const active = countGateOpen() || countGateFuture();
-  let day = '';
+  let day = '', kind = 'correction';
   if (active) {
     if (!confirm(countGateOpen() ? 'قفل الجرد الآن؟' : `إلغاء الجرد المتجدول يوم ${countFixDay}؟\n(لو عايزة يوم تاني: ألغي وبعدين حددي من جديد)`)) return;
   } else {
-    const v = prompt('📐 يوم الجرد لعماد (YYYY-MM-DD):\nهيوصله تلجرام ومهمة في التودو، والجرد يفتح اليوم ده كله ويقفل آخره لوحده.', todayYmd());
+    /* the kind first (Sarah 2026-11-05): a consumption count books what is missing as USAGE, like the Tuesday count */
+    const kv = prompt('📐 نوع الجرد:\n1 = جرد استهلاك (زي الأسبوعي) — الناقص بيتسجل استهلاك\n2 = جرد تصحيح — الفرق بيتسجل غلطة/تصحيح', '1');
+    if (kv === null) return;
+    if (['1', '2', '١', '٢'].indexOf(String(kv).trim()) < 0) { toast('اكتبي 1 أو 2'); return; }
+    kind = ['1', '١'].indexOf(String(kv).trim()) > -1 ? 'usage' : 'correction';
+    const v = prompt('📐 يوم ' + (kind === 'usage' ? 'جرد الاستهلاك' : 'جرد التصحيح') + ' لعماد (YYYY-MM-DD):\nهيوصله تلجرام ومهمة في التودو.' + (kind === 'usage' ? ' الجرد بيفضل مفتوح لحد ما يخلص.' : ' الجرد يفتح اليوم ده كله ويقفل آخره لوحده.'), todayYmd());
     if (v === null) return;
     day = String(v).trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { toast('التاريخ لازم يكون بالشكل YYYY-MM-DD'); return; }
@@ -1285,14 +1290,14 @@ async function toggleCountGate() {
   const btn = document.getElementById('gate-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
   let r = null;
-  try { r = await api('inv_count_gate', active ? { on: false } : { on: true, day }); } catch(e) { r = null; }
+  try { r = await api('inv_count_gate', active ? { on: false } : { on: true, day, kind }); } catch(e) { r = null; }
   if (!r || r.ok !== true) {
     if (btn) btn.disabled = false;
     renderCountGate();
     toast('❌ لم يتم — ' + ((r && r.error) || 'تحقق من الإنترنت وحاول مرة أخرى'));
     return;
   }
-  countFixDay = r.day || '';
+  countFixDay = r.day || ''; countFixKind = r.kind || 'correction';
   saveCache(); renderAll();
   toast(active ? '📐 الجرد اتلغى' : (countFixDay === todayYmd() ? '📐 الجرد مفتوح النهارده — عماد وصله تلجرام ومهمة' : '📐 اتجدول يوم ' + countFixDay + ' — عماد وصله تلجرام ومهمة'));
 }
