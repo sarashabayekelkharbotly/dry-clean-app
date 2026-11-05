@@ -2482,7 +2482,7 @@ function renderReview() {
           <td style="padding:3px;text-align:right">${rvEsc(l.name)}</td>
           <td style="text-align:center"><input type="number" id="rvq" value="${l.qty}" min="0" step="0.01" style="width:44px;border:1.5px solid var(--primary);border-radius:6px;padding:2px 4px;font-family:'Cairo',sans-serif;font-size:12px;text-align:center"></td><td style="text-align:center">${l.status==='received'?l.qtyRec:'—'}</td><td style="text-align:center"><input type="number" id="rvp" value="${l.price||''}" min="0" step="0.01" style="width:58px;border:1.5px solid var(--primary);border-radius:6px;padding:2px 4px;font-family:'Cairo',sans-serif;font-size:12px;text-align:center"></td>
           <td colspan="4" style="text-align:center;white-space:nowrap"><button onclick="reviewSaveLine('${l.id}')" style="border:none;background:var(--primary);color:#fff;border-radius:6px;padding:3px 10px;font-family:'Cairo',sans-serif;font-weight:800;cursor:pointer">✓ حفظ</button> <button onclick="reviewEdit='';renderReview()" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer">✕</button></td></tr>` : `<tr style="border-top:1px solid var(--border);${l.status==='cancelled'?'color:#c62828':''}">
-          <td style="padding:3px;text-align:right"><button onclick="reviewEdit='${l.id}';renderReview()" title="تعديل السعر أو الكمية" style="border:none;background:none;cursor:pointer;padding:0 2px;font-size:12px">✏️</button>${rvEsc(l.name)}${l.status==='cancelled'?' <span style="font-size:10px">(اتلغى)</span>':''}</td>
+          <td style="padding:3px;text-align:right"><button onclick="reviewEdit='${l.id}';renderReview()" title="تعديل السعر أو الكمية" style="border:none;background:none;cursor:pointer;padding:0 2px;font-size:12px">✏️</button>${rvEsc(l.name)}${l.status==='cancelled'?` <span style="font-size:10px">(اتلغى)</span> <button onclick="uncancelOrder('${l.id}')" title="اتلغى بالغلط؟ رجّعه في الطريق" style="border:1px solid var(--border);background:white;border-radius:6px;padding:0 6px;font-family:'Cairo',sans-serif;font-size:10.5px;cursor:pointer">↩ إلغاء الإلغاء</button>`:''}</td>
           <td style="text-align:center">${l.qty}</td><td style="text-align:center">${l.status==='received'?l.qtyRec:'—'}</td><td style="text-align:center">${l.price?rvMoney(l.price):'—'}</td>
           <td style="text-align:center">${rvMoney(l.ordered)}</td><td style="text-align:center">${l.received?rvMoney(l.received):''}</td>
           <td style="text-align:center">${l.notDelivered?rvMoney(l.notDelivered):''}</td><td style="text-align:center">${l.onTheWay?rvMoney(l.onTheWay):''}</td></tr>`).join('')}
@@ -2495,6 +2495,13 @@ function renderReview() {
 }
 /* ✏️ a mistake on a line (Sarah 2026-10-12): unit price and quantity ordered. The received quantity moved stock, so
    it is fixed with ↩ (un-receive) on the orders tab and received again — never typed over here. */
+/* ↩ undo a cancel (Sarah 2026-11-05): the line is on the way again — Emad receives it as usual */
+async function uncancelOrder(id) {
+  if (!confirm('الطلب ده اتلغى بالغلط؟ هيرجع «في الطريق» وعماد يستلمه عادي.')) return;
+  let r = null; try { r = await api('inv_uncancel_order', { orderId: id }); } catch(e) { r = null; }
+  if (!r || r.ok === false) { toast('❌ ماتمش — ' + ((r && r.error) || 'جرّب تاني')); return; }
+  toast('✅ الطلب رجع في الطريق'); loadReview(); syncData(true);
+}
 async function reviewSaveLine(id) {
   const q = parseFloat((document.getElementById('rvq') || {}).value), p = parseFloat((document.getElementById('rvp') || {}).value);
   if (!(q > 0)) { toast('⚠️ الكمية لازم تكون أكبر من صفر'); return; }
