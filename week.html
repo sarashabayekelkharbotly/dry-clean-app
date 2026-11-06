@@ -803,6 +803,10 @@ function edit(i,field,v){
     else if(sameDayIn(c.flat,c.date)) c.inTime=c.inTime||DEFAULT_IN;
     else c.inTime='';
     if(c.src==='auto') c.src='manual';
+    /* RE-LINK TO THE RIGHT GUEST (Sarah 2026-11-06: Ghazi's 7/11 pre-arrival row, edited into Daria's checkout, kept Ghazi — so it never
+       covered her checkout and her 6/11 clean came back on every regenerate). A changed day / home / type belongs to whoever that day and
+       type belong to, exactly as «+ Add» decides; with no such guest the old link stays. */
+    var an=stayForClean_(c.flat,c.date,c.type); if(an&&an.id) c.stayId=an.id;
   }
   dirty=true; render();
 }
