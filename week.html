@@ -819,7 +819,8 @@ function stayForClean_(f,d,ty){
     if(ty==='checkout'){ if(co===k||ymd(addD(day(co),1))===k) best=best||{ id:(s.ids&&s.ids.length?s.ids[s.ids.length-1]:s.id), checkIn:s.checkIn }; return; }   // a chain checks out on its LAST booking
     if(ty==='revision'||ty==='codechange'){ if(ci>=k&&(!best||ci<ymd(day(best.checkIn)))) best=s; return; }
     if(ci<=k&&k<co) best=s; });
-  if(!best&&ty==='custom') return stayForClean_(f,d,'revision');
+  /* An extra clean on a day with no stay is FREE-STANDING (Sarah 2026-11-07): it used to borrow the home's NEXT booking — VW1's
+     November cleans hung on a January Airbnb booking, and when that was cancelled the referee removed 5, 8 and 9 Nov with it. */
   return best;
 }
 function addClean(){
