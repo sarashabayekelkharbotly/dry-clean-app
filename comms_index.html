@@ -417,7 +417,7 @@ const FLAT_PIN={
   '17A':'https://goo.gl/maps/NgzPXTvYhzMWpAXP8',
   '28A':'https://maps.app.goo.gl/E9C3dJy4MMPzFA7N8',
   'Zayed 2000':'https://maps.app.goo.gl/ZoXaN4DijpW2BidP8',
-  'VW1':'https://maps.app.goo.gl/XDZUHmfLZWPMLWYq5'
+  'VW1':'https://www.google.com/maps/search/?api=1&query=30.0468151,31.0223537'   // the house guide's own pin — Building 108, Entrance 2 (2026-11-10)
 };
 function pinFor(st){ return (st&&FLAT_PIN[st.flat])||''; }
 /* 🏠 THE HOUSE GUIDES (Sarah 2026-10-05: "include all the house guides in the comms ladder"). Each home's guide lives at
@@ -427,7 +427,8 @@ const FLAT_GUIDE={
   '8A':'https://stay.ourwelcomehome.com/8a-7f3k9q2m/',
   '17A':'https://stay.ourwelcomehome.com/17a-wh4qqcqf/',
   '28A':'https://stay.ourwelcomehome.com/28a-geewjmmf/',
-  'Zayed 2000':'https://stay.ourwelcomehome.com/z2000-znqs5jbr/'
+  'Zayed 2000':'https://stay.ourwelcomehome.com/z2000-znqs5jbr/',
+  'VW1':'https://stay.ourwelcomehome.com/vw1-kj53ba0j/'   // 2026-11-10 — English here, Arabic under /ar/
 };
 function guideFor(st){ const u=st&&FLAT_GUIDE[st.flat]; return u ? (tplLang(st)==='ar' ? u+'ar/' : u) : ''; }
 /* 🗺️ THE SHEIKH ZAYED AREA GUIDE (Sarah 2026-10-19) — sent with step 9 «settled in», never with the house manual (one link per message).
