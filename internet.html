@@ -394,15 +394,17 @@ function render(){
     /* --- inputs --- */
     h+='<details><summary>+ Add reading / renew bundle</summary>';
     h+='<div class="frm">'+
-       '<div class="full"><label>Remaining quota now (GB) — from WE app</label><input type="number" step="0.1" id="rem_'+f+'" placeholder="e.g. 84.5"></div>'+
+       '<div class="full"><label>Remaining quota now (GB) — from the provider app</label><input type="number" step="0.1" id="rem_'+f+'" placeholder="e.g. 84.5"></div>'+
        '<div><label>Reading date</label><input type="date" id="rdt_'+f+'" value="'+ymd(new Date())+'"></div>'+
        '<div><label>Time</label><input type="time" id="rtm_'+f+'" value="'+new Date().toTimeString().slice(0,5)+'"></div>'+
        '<div class="full"><button class="btn" onclick="saveReading(\''+f+'\')">Save reading</button><span class="msg" id="rmsg_'+f+'"></span></div>'+
        '</div>';
+    /* the bundle shown is pre-filled: quota and price come from that package (2026-11-13 — VW1 has one package, so choosing it fired nothing) */
+    var cat_=catalog(f), sel_=cat_.filter(function(x){ return b&&x.name===b.name; })[0]||cat_[0]||null;
     h+='<div class="frm" style="margin-top:10px">'+
-       '<div><label>Bundle</label><select id="bn_'+f+'" onchange="fillFromCatalog(\''+f+'\')">'+(catalog(f).length?catalog(f).map(function(x){return '<option'+(b&&b.name===x.name?' selected':'')+'>'+esc(x.name)+'</option>';}).join(''):'<option value="">— add plans in Internet catalog tab —</option>')+'</select></div>'+
-       '<div><label>Quota (GB)</label><input type="number" step="1" id="bq_'+f+'" value="'+(b?b.quota:'')+'" placeholder="GB"></div>'+
-       '<div><label>Price (EGP)</label><input type="number" step="0.1" id="bp_'+f+'" value="'+(b?b.price:'')+'"></div>'+
+       '<div><label>Bundle</label><select id="bn_'+f+'" onchange="fillFromCatalog(\''+f+'\')">'+(cat_.length?cat_.map(function(x){return '<option'+(sel_&&sel_.name===x.name?' selected':'')+'>'+esc(x.name)+'</option>';}).join(''):'<option value="">— add plans in Internet catalog tab —</option>')+'</select></div>'+
+       '<div><label>Quota (GB)</label><input type="number" step="1" id="bq_'+f+'" value="'+(sel_&&sel_.quota?sel_.quota:(b?b.quota:''))+'" placeholder="GB"></div>'+
+       '<div><label>Price (EGP)</label><input type="number" step="0.1" id="bp_'+f+'" value="'+(sel_?sel_.price:(b?b.price:''))+'"></div>'+
        '<div><label>Cycle start date</label><input type="date" id="bd_'+f+'" value="'+ymd(new Date())+'"></div>'+
        '<div><label>Cycle start time</label><input type="time" id="bt_'+f+'" value="'+new Date().toTimeString().slice(0,5)+'"></div>'+
        /* §5.4: cash ≠ bundle. A new recharge writes the CASH to WeShare (pending, payer Sarah by
