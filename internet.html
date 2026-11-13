@@ -112,7 +112,8 @@ window.CTL_PAGE = { screen: 'net', auto: true, hide: ['.topbar .brand'], user: f
 function gN(g){ return String(g||'').trim().replace(/s+/g,' ').toLowerCase(); }   /* FIX 3 (2026-10-03): the chain rule the engine uses — a hand-typed extension still merges */
 
 /* Bundle catalog lives ONLY in the sheet ("Internet catalog" tab) — no code-side defaults, nothing fabricated. */
-function catalog(){ return (D.internet&&D.internet.catalog)?D.internet.catalog:[]; }
+/* A home with packages of its own (catalog flat = the home, e.g. VW1 on Vodafone) sees only those; every other home the shared list (flat ''). 2026-11-13 */
+function catalog(f){ var all=(D.internet&&D.internet.catalog)?D.internet.catalog:[]; if(!f) return all; var own=all.filter(function(x){ return x.flat===f; }); return own.length?own:all.filter(function(x){ return !x.flat; }); }
 
 var D=null, DAYMS=86400000, STAYS=[], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function esc(s){ return (s||'').toString().replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
@@ -399,7 +400,7 @@ function render(){
        '<div class="full"><button class="btn" onclick="saveReading(\''+f+'\')">Save reading</button><span class="msg" id="rmsg_'+f+'"></span></div>'+
        '</div>';
     h+='<div class="frm" style="margin-top:10px">'+
-       '<div><label>Bundle</label><select id="bn_'+f+'" onchange="fillFromCatalog(\''+f+'\')">'+(catalog().length?catalog().map(function(x){return '<option'+(b&&b.name===x.name?' selected':'')+'>'+esc(x.name)+'</option>';}).join(''):'<option value="">— add plans in Internet catalog tab —</option>')+'</select></div>'+
+       '<div><label>Bundle</label><select id="bn_'+f+'" onchange="fillFromCatalog(\''+f+'\')">'+(catalog(f).length?catalog(f).map(function(x){return '<option'+(b&&b.name===x.name?' selected':'')+'>'+esc(x.name)+'</option>';}).join(''):'<option value="">— add plans in Internet catalog tab —</option>')+'</select></div>'+
        '<div><label>Quota (GB)</label><input type="number" step="1" id="bq_'+f+'" value="'+(b?b.quota:'')+'" placeholder="GB"></div>'+
        '<div><label>Price (EGP)</label><input type="number" step="0.1" id="bp_'+f+'" value="'+(b?b.price:'')+'"></div>'+
        '<div><label>Cycle start date</label><input type="date" id="bd_'+f+'" value="'+ymd(new Date())+'"></div>'+
@@ -524,7 +525,7 @@ function savePhones(){
 }
 function fmtGB(n){ n=+n||0; return n>=100?Math.round(n):(Math.round(n*10)/10); }
 
-function fillFromCatalog(f){ var n=document.getElementById('bn_'+f).value; catalog().forEach(function(x){ if(x.name===n){ document.getElementById('bp_'+f).value=x.price; if(x.quota)document.getElementById('bq_'+f).value=x.quota; } }); }
+function fillFromCatalog(f){ var n=document.getElementById('bn_'+f).value; catalog(f).forEach(function(x){ if(x.name===n){ document.getElementById('bp_'+f).value=x.price; if(x.quota)document.getElementById('bq_'+f).value=x.quota; } }); }
 function saveReading(f){
   var rem=document.getElementById('rem_'+f).value; if(rem===''){ document.getElementById('rmsg_'+f).textContent='enter GB'; return; }
   var at=document.getElementById('rdt_'+f).value+' '+document.getElementById('rtm_'+f).value;
