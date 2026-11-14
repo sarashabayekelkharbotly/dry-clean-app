@@ -106,7 +106,7 @@ summary::-webkit-details-marker{display:none}
 window.CTL_PAGE = { screen: 'net', auto: true, hide: ['.topbar .brand'], user: function () { logout(); }, after: function () { boot(); } };</script>
 <script src="ctl_menu.js?v=f6b34889"></script>
 <script src="ctl_auth.js?v=2a3c8bd9"></script>
-<script src="net_model.js?v=5cf58221"></script>
+<script src="net_model.js?v=49b0e382"></script>
 <script>
 /* CONFIG (ENDPOINT + session) lives in ctl_auth.js — الكنترول's engine (Switch C, 2026-10-03) */
 function gN(g){ return String(g||'').trim().replace(/s+/g,' ').toLowerCase(); }   /* FIX 3 (2026-10-03): the chain rule the engine uses — a hand-typed extension still merges */
@@ -264,7 +264,7 @@ function paceBadge(ratio){ return ratio<=1.0?{cls:'ok',txt:'fair'}:(ratio<=1.3?{
 function guestUsage(flat){
   var b=curBundle(flat); if(!b) return [];
   var cs=pdt(b.cycleStart); if(!cs) return [];
-  var asOf=day(D.meta.asOf), ce=new Date(cs.getTime()+30*DAYMS), H=netHistory();
+  var asOf=day(D.meta.asOf), ce=netCycleEnd(flat,cs), H=netHistory();
   var bs=(D.internet.bundles||[]).filter(function(x){return x.flat===flat;})
     .map(function(x){return {q:x.quota,cs:pdt(x.cycleStart)};}).filter(function(x){return x.cs;})
     .sort(function(a,z){return a.cs-z.cs;});
@@ -333,7 +333,7 @@ function render(){
 
     if(c.state==='nobundle'){ h+='<div class="wait2">No bundle set — add one below.</div>'; }
     else {
-      var cs=pdt(b.cycleStart), ce=cs?new Date(cs.getTime()+30*DAYMS):null;   // cycle end / renewal — 30 days
+      var cs=pdt(b.cycleStart), ce=cs?netCycleEnd(f,cs):null;   // cycle end / renewal — 30 days, or the home's fixed renewal day (VW1: the 16th)
       h+='<div class="sub">cycle '+ (cs?dmon(cs)+' '+cs.toTimeString().slice(0,5):esc(b.cycleStart)) + (ce?' → renews <b>'+dmon(ce)+'</b>':'') +' · '+b.price+' EGP</div>';
       if(over) h+='<div class="ov">⚠ 2 cycle-starts this month → overage (VAR)</div>';
       if(c.state==='waiting'){ h+='<div class="dep wait">Waiting on reading — enter the remaining GB from the WE app. '+

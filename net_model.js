@@ -15,6 +15,11 @@
  * ============================================================ */
 (function(){
   var DAYMS=86400000;
+  /* A FIXED RENEWAL DAY (Sarah 2026-11-14): VW1 is on a Vodafone bill cycle — its bundle renews on the 16th of every month, not 30 days
+     after it started. Every other home: start + 30 days. KEEP IN STEP with NET_RENEW_DAY in engine_elcontrol.ts. */
+  var NET_RENEW_DAY={'VW1':16};
+  function cycleEnd(flat,cs){ var d=NET_RENEW_DAY[flat]; if(!d) return new Date(cs.getTime()+30*DAYMS);
+    var e=new Date(cs.getFullYear(),cs.getMonth(),d); if(e<=cs) e=new Date(cs.getFullYear(),cs.getMonth()+1,d); return e; }
   function pdt(s){ s=(s||'').toString().trim(); if(!s)return null; s=s.replace(' ','T'); if(s.length<=10)s+='T00:00'; var d=new Date(s); return isNaN(d)?null:d; }
   function day(s){ return new Date(String(s).slice(0,10)+'T00:00:00'); }
   function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
@@ -103,7 +108,7 @@
       rem -= curStay(flat,dk) ? rate : idle;
       if(rem<=0){ depl=dk; break; }
     }
-    var ce=new Date(cs.getTime()+30*DAYMS), fairDaily=b.quota/30;
+    var ce=cycleEnd(flat,cs), fairDaily=b.quota/30;
     /* UNUSED GB DIES AT RENEWAL (Sarah 2026-08-18): the headline is DAYS TO RENEWAL, and a
        depletion date is only reported when it lands before that renewal, because only then does
        it cost you a bundle. */
@@ -112,7 +117,7 @@
     var dDeplete = dies ? Math.round((depl-asOfD)/DAYMS) : null;
     var spent = dies && dDeplete<=0;              // reading old or bundle already empty — wants a fresh reading
     var ageD=Math.max(0,Math.round((asOfD-day(ymd(at)))/DAYMS));    // how old the reading behind all this is
-    return { state:'live', bundle:b, reading:r, at:at, cycleStart:cs, cycleEnd:ce, cycleDays:30,
+    return { state:'live', bundle:b, reading:r, at:at, cycleStart:cs, cycleEnd:ce, cycleDays:Math.round((ce-cs)/DAYMS),
              consumed:consumed, remaining:r.remaining, burn:rate, rate:rate, rateSource:src, idle:idle, guest:st,
              fairDaily:fairDaily, pace: fairDaily>0?rate/fairDaily:0,
              depletion:depl, dies:dies, spent:spent, daysToRenew:dRenew, daysToDeplete:Math.max(0,dDeplete||0),
@@ -121,6 +126,6 @@
   }
 
   window.flatsWithNet=flatsWithNet; window.curBundle=curBundle; window.lastReading=lastReading;
-  window.curStay=curStay; window.netHistory=netHistory; window.netCalc=netCalc;
+  window.curStay=curStay; window.netHistory=netHistory; window.netCalc=netCalc; window.netCycleEnd=cycleEnd;
   window.netModelResetCache=function(){ __nh=null; };
 })();
