@@ -2095,7 +2095,8 @@ function renderEmadPanel() {
      collected, payment made), so a real problem can't be swiped away. */
   let todo = '';
   const row = (icon, text, opts) => {
-    const o = opts || {}, isDone = o.tick && done[o.tick];
+    // every finished row looks the same — struck through and faded — ticked or ✅ by itself (Sarah 2026-11-16)
+    const o = opts || {}, isDone = (o.tick && done[o.tick]) || (!o.tick && icon === '✅');
     return `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border,#f0f0f0)${o.click?';cursor:pointer':''}"${o.click?` onclick="${o.click}"`:''}>
       <span style="font-size:15px;flex-shrink:0">${o.tick ? (isDone?'✅':'⬜') : icon}</span>
       <span style="font-size:13px;line-height:1.6${isDone?';text-decoration:line-through;opacity:.45':''}">${text}</span></div>`;
