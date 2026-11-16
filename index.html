@@ -2162,6 +2162,11 @@ function renderEmadPanel() {
   timed.sort((a, b) => String(a.t) < String(b.t) ? -1 : 1).forEach(x => todo += x.h);
   /* today's repairs — tapping one opens the CLOSE form, not a cosmetic tick: a repair is done when
      its cost is entered (0 allowed), and the task leaves the list because the ticket really closed */
+  /* a LATE repair stays here, first, until it is closed (Sarah 2026-11-16) — then today's */
+  ((EMAD.repairsAll || EMAD.repairs || []).filter(r => r.date && r.date < todayK).sort((a, b) => a.date < b.date ? -1 : 1)).forEach(r => {
+    todo += row('🔧', `<span style="color:#c0392b;font-weight:700">متأخرة من ${String(r.date).slice(8, 10)}/${String(r.date).slice(5, 7)}</span> — بيت ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق أو كلّم سارة لتغيير الميعاد</span>`,
+      { click: `emadRepairFromTodo('${r.id}')` });
+  });
   (EMAD.repairs || []).filter(r => r.date === todayK).forEach(r => {
     todo += row('🔧', `بيت ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.time && /^\d/.test(r.time) ? ' الساعة ' + emadHmAr(r.time) : ''}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق</span>`,
       { click: `emadRepairFromTodo('${r.id}')` });
