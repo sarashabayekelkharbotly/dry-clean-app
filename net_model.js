@@ -26,6 +26,8 @@
   function nowLocal(){ return new Date(D.meta.asOf+'T'+new Date().toTimeString().slice(0,5)+':00'); }
 
   function flatsWithNet(){ return D.meta.flatsOrder; }   // internet covers all flats incl 17B
+  /* ADD-ONS (Sarah 2026-11-17, VW1): GB of add-ons bought after `from` up to `upto` — they join the cycle without moving it */
+  function addGB(flat,from,upto){ var g=0; ((D.internet&&D.internet.addons)||[]).forEach(function(a){ if(a.flat!==flat)return; var t=pdt(a.at); if(t&&t>from&&(!upto||t<=upto)) g+=(+a.gb||0); }); return g; }
   function curBundle(flat){
     var b=null; (D.internet.bundles||[]).forEach(function(x){ if(x.flat!==flat)return; var d=pdt(x.cycleStart); if(!d)return;
       if(!b||d>pdt(b.cycleStart))b=x; }); return b;
@@ -55,7 +57,7 @@
         var ceN=bs[bi+1]?bs[bi+1].cs:null;
         var reads=(D.internet.readings||[]).filter(function(r){ var t=pdt(r.at);
             return r.flat===f&&t&&t>x.cs&&(!ceN||t<=ceN); })
-          .map(function(r){return {t:pdt(r.at),rem:r.remaining};}).sort(function(a,z){return a.t-z.t;});
+          .map(function(r){ var t=pdt(r.at); return {t:t,rem:r.remaining-addGB(f,x.cs,t)}; }).sort(function(a,z){return a.t-z.t;});   // an add-on's GB taken back out — never negative use
         /* A BUNDLE'S READINGS = after its own start, up to AND INCLUDING the next one's (Sarah 2026-11-05: Daria, 17A, used 74 + 200 GB
            and the pace showed neither — the «0 left» typed the same minute the new bundle starts was counted in the NEW bundle, so
            the old one never reached zero). KEEP IN STEP with netCandidates in engine_elcontrol.ts. */
@@ -100,7 +102,7 @@
     else { rate=b.quota/30; src='fair'; }
     var idle=(H.vac[flat]&&H.vac[flat].days>=1)?Math.min(4,H.vac[flat].gb/H.vac[flat].days):1.5;
     if(!r) return {state:'waiting', bundle:b, rate:rate, rateSource:src, guest:st};
-    var at=pdt(r.at)||nowLocal(), consumed=Math.max(0,b.quota-r.remaining);
+    var at=pdt(r.at)||nowLocal(), adds=addGB(flat,cs,at), consumed=Math.max(0,b.quota+adds-r.remaining);
     // walk the booked calendar from the reading: occupied days at the rate, vacant at the idle trickle
     var rem=r.remaining, depl=null, walk0=day(ymd(at));
     for(var k=0;k<60&&rem>0;k++){
@@ -122,10 +124,10 @@
              fairDaily:fairDaily, pace: fairDaily>0?rate/fairDaily:0,
              depletion:depl, dies:dies, spent:spent, daysToRenew:dRenew, daysToDeplete:Math.max(0,dDeplete||0),
              readingAge:ageD, occupied:!!st, lastsCycle: !dies,
-             pct: b.quota>0?Math.max(0,Math.min(1,r.remaining/b.quota)):0 };
+             addons:adds, pct: (b.quota+adds)>0?Math.max(0,Math.min(1,r.remaining/(b.quota+adds))):0 };
   }
 
   window.flatsWithNet=flatsWithNet; window.curBundle=curBundle; window.lastReading=lastReading;
-  window.curStay=curStay; window.netHistory=netHistory; window.netCalc=netCalc; window.netCycleEnd=cycleEnd;
+  window.curStay=curStay; window.netHistory=netHistory; window.netCalc=netCalc; window.netCycleEnd=cycleEnd; window.netAddGB=addGB;
   window.netModelResetCache=function(){ __nh=null; };
 })();

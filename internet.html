@@ -106,14 +106,14 @@ summary::-webkit-details-marker{display:none}
 window.CTL_PAGE = { screen: 'net', auto: true, hide: ['.topbar .brand'], user: function () { logout(); }, after: function () { boot(); } };</script>
 <script src="ctl_menu.js?v=f6b34889"></script>
 <script src="ctl_auth.js?v=2a3c8bd9"></script>
-<script src="net_model.js?v=49b0e382"></script>
+<script src="net_model.js?v=1c8b1028"></script>
 <script>
 /* CONFIG (ENDPOINT + session) lives in ctl_auth.js — الكنترول's engine (Switch C, 2026-10-03) */
 function gN(g){ return String(g||'').trim().replace(/s+/g,' ').toLowerCase(); }   /* FIX 3 (2026-10-03): the chain rule the engine uses — a hand-typed extension still merges */
 
 /* Bundle catalog lives ONLY in the sheet ("Internet catalog" tab) — no code-side defaults, nothing fabricated. */
 /* A home with packages of its own (catalog flat = the home, e.g. VW1 on Vodafone) sees only those; every other home the shared list (flat ''). 2026-11-13 */
-function catalog(f){ var all=(D.internet&&D.internet.catalog)?D.internet.catalog:[]; if(!f) return all; var own=all.filter(function(x){ return x.flat===f; }); return own.length?own:all.filter(function(x){ return !x.flat; }); }
+function catalog(f, kind){ var all=((D.internet&&D.internet.catalog)?D.internet.catalog:[]).filter(function(x){ return (x.kind||'bundle')===(kind||'bundle'); }); if(!f) return all; var own=all.filter(function(x){ return x.flat===f; }); return own.length?own:all.filter(function(x){ return !x.flat; }); }
 
 var D=null, DAYMS=86400000, STAYS=[], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function esc(s){ return (s||'').toString().replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
@@ -346,7 +346,7 @@ function render(){
            card showed "days left" from a projection that ignored the renewal, plus a "depletes"
            date that was often past it: two figures that could not both be true. */
         var pb=paceBadge(c.pace);
-        h+='<div class="stat"><div class="s"><div class="sv">'+fmtGB(c.remaining)+'</div><div class="sl">GB left of '+b.quota+'</div></div>'+
+        h+='<div class="stat"><div class="s"><div class="sv">'+fmtGB(c.remaining)+'</div><div class="sl">GB left of '+b.quota+(c.addons?' + '+c.addons+' add-on':'')+'</div></div>'+
            '<div class="s'+(c.dies?' dep-b':'')+'"><div class="sv">'+(c.spent?'0':(c.dies?c.daysToDeplete:c.daysToRenew))+'</div>'+
              '<div class="sl">'+(c.spent?'should be empty':(c.dies?'days till it runs out':'days till renewal'))+'</div></div>'+
            '<div class="s"><div class="sv">'+(Math.round(c.pace*10)/10)+'×</div><div class="sl">pace vs fair share</div></div></div>';
@@ -422,7 +422,7 @@ function render(){
        '<button class="btn sec" style="color:#cc5f5f" onclick="delLastBundle(\''+f+'\')" title="remove the latest bundle entry — its P&L row and pending cash card go with it">🗑 Delete latest entry</button>'+
        '</div>'+
        '<div class="full"><span class="msg" id="bmsg_'+f+'"></span></div>'+
-       '</div></details>';
+       '</div>'+addonForm(f)+'</details>';
     h+='</div>';
   });
   /* 📞 landline — all four quarterly deadlines in one place, editable (Sarah 2026-08-04) */
@@ -540,6 +540,32 @@ function payTgl(f){
   var mode=document.querySelector('input[name="pay_'+f+'"]:checked').value;
   document.getElementById('cash_'+f).disabled = (mode==='balance');
 }
+/* ➕ ADD-ONS (Sarah 2026-11-17, VW1): extra GB when the bundle runs out before renewal — the cycle and its renewal day do not move; the
+   GB joins this cycle and what is left carries into the bundle at renewal. Postpaid: it is paid with the next bill (the 15th). */
+function addonForm(f){
+  var ao=catalog(f,'addon'); if(!ao.length) return '';
+  var b=curBundle(f), cs=b?pdt(b.cycleStart):null, mine=((D.internet&&D.internet.addons)||[]).filter(function(a){ var t=pdt(a.at); return a.flat===f&&cs&&t&&t>cs; });
+  var h='<div class="frm" style="margin-top:12px;border-top:1px dashed #ddd;padding-top:10px">'+
+    '<div class="full" style="font-weight:700">➕ Add-on (bundle ran out before the renewal)</div>'+
+    '<div><label>Add-on</label><select id="an_'+f+'" onchange="fillAddon(\''+f+'\')">'+ao.map(function(x){ return '<option>'+esc(x.name)+'</option>'; }).join('')+'</select></div>'+
+    '<div><label>GB</label><input type="number" step="1" id="ag_'+f+'" value="'+ao[0].quota+'"></div>'+
+    '<div><label>Price (EGP, VAT incl.)</label><input type="number" step="0.1" id="ap_'+f+'" value="'+ao[0].price+'"></div>'+
+    '<div><label>Bought on</label><input type="date" id="ad_'+f+'" value="'+ymd(new Date())+'"></div>'+
+    '<div><label>Time</label><input type="time" id="at_'+f+'" value="'+new Date().toTimeString().slice(0,5)+'"></div>'+
+    '<div style="align-self:end"><button class="btn sec" onclick="saveAddon(\''+f+'\')">Add add-on</button></div>'+
+    '<div class="full" style="font-size:11.5px;color:#666">Valid 30 days; the renewal stays on the 16th and what is left carries into the bundle. Paid with the next bill (the 15th) — its WeShare card and P&amp;L line are dated then.</div>';
+  if(mine.length) h+='<div class="full" style="font-size:12px">This cycle: '+mine.map(function(a){ return esc(a.name||a.gb+' GB')+' · '+a.gb+' GB · '+a.price+' EGP · '+esc(a.at)+' <a href="#" style="color:#cc5f5f" onclick="delAddon(\''+f+'\','+a.id+');return false">🗑</a>'; }).join('<br>')+'</div>';
+  return h+'<div class="full"><span class="msg" id="amsg_'+f+'"></span></div></div>';
+}
+function fillAddon(f){ var n=document.getElementById('an_'+f).value; catalog(f,'addon').forEach(function(x){ if(x.name===n){ document.getElementById('ag_'+f).value=x.quota; document.getElementById('ap_'+f).value=x.price; } }); }
+function saveAddon(f){
+  var name=document.getElementById('an_'+f).value, g=document.getElementById('ag_'+f).value, p=document.getElementById('ap_'+f).value;
+  var at=document.getElementById('ad_'+f).value+' '+document.getElementById('at_'+f).value;
+  if(!(+g>0)){ document.getElementById('amsg_'+f).textContent='enter the GB'; return; }
+  document.getElementById('amsg_'+f).textContent='saving…';
+  post('ops_add_addon',{flat:f, name:name, gb:g, price:p, at:at},'amsg_'+f);
+}
+function delAddon(f,id){ if(!confirm('Delete this add-on? Its P&L line and its pending WeShare card go with it.')) return; post('ops_del_addon',{id:id},'amsg_'+f); }
 function saveBundle(f){
   var name=document.getElementById('bn_'+f).value, q=document.getElementById('bq_'+f).value, p=document.getElementById('bp_'+f).value;
   if(q===''){ document.getElementById('bmsg_'+f).textContent='enter quota GB'; return; }
