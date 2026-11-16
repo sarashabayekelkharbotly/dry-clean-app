@@ -710,12 +710,13 @@ function render(){
        (c.src==='shadow'?' <span class="badge" style="background:#eee;color:#888" title="الاقتراح الآلي — عندك نسخة معدّلة يوم '+esc(c.shadowOf||'')+'. شغّليه لو الآلي أصح">آلي</span>':'')+
        (c.stale?' <span class="badge" style="background:#f6dede;color:#a24a4a" title="'+esc(c.stale)+'">⚠️ اتغيّر الحجز</span>':'')+
        (c.pinned?' <span class="badge" style="background:#ece3f7;color:#6b4e9e;cursor:pointer" title="Yours — no rule drops it. If its booking changes it follows the booking (cancelled → removed, dates moved → moved) and you get an alert. Tap to hand it back to the system." onclick="unpinRow('+idx+')">📌 pinned</span>':'')+'</td>'+
-       '<td><input type="time" value="'+hm(c.time)+'" onchange="edit('+idx+',\'time\',this.value)"></td>'+
+       /* the time is saved when she LEAVES the box, not on every turn of the phone's time wheel (Sarah 2026-11-17: the picker kept closing mid-edit) */
+       '<td><input type="time" value="'+hm(c.time)+'" onblur="if(this.value!==this.defaultValue)edit('+idx+',\'time\',this.value)"></td>'+
        '<td><select onchange="edit('+idx+',\'cleaner\',this.value)"'+((c.cleaner||'amal')!=='amal'?' style="border-color:#b8860b;font-weight:700"':'')+'>'+
          CLEANERS.map(function(cl){return '<option value="'+cl+'"'+(cl===(c.cleaner||'amal')?' selected':'')+'>'+CLEANER_LBL[cl]+'</option>';}).join('')+'</select></td>'+
        '<td><input class="codei" value="'+esc(c.code)+'" maxlength="4" onchange="edit('+idx+',\'code\',this.value)" '+
          (c.codeEdited?'style="border-color:#8a6fa8" title="hand-set — will not be recomputed"':'')+'>'+(c.codeEdited?'<span title="hand-set">✎</span>':'')+'</td>'+
-       '<td>'+(hasIn?'<input type="time" value="'+(hm(c.inTime)||DEFAULT_IN)+'" onchange="edit('+idx+',\'inTime\',this.value)">':'<span class="muted">—</span>')+'</td>'+
+       '<td>'+(hasIn?'<input type="time" value="'+(hm(c.inTime)||DEFAULT_IN)+'" onblur="if(this.value!==this.defaultValue)edit('+idx+',\'inTime\',this.value)">':'<span class="muted">—</span>')+'</td>'+
        '<td>'+((c.type==='midstay'||c.type==='weekly')&&c.stayId
           ? (function(){ var pd=(D.cleanPrefs||{})[c.stayId], wd=day(c.date).getDay(), pin=(pd===wd);
               return '<span title="'+(pin?'يوم النظافة الأسبوعي مثبّت على '+DAY_AR[wd]+' — اضغط للإلغاء':'ثبّت النظافة الأسبوعية يوم '+DAY_AR[wd]+' لكل مدة الإقامة')+'" style="cursor:pointer;padding:0 3px;'+(pin?'':'opacity:.35;filter:grayscale(1)')+'" onclick="pinDay('+idx+')">📌</span>'; })()

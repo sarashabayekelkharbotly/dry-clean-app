@@ -297,6 +297,9 @@ function onData(j){ D=j.data; D.internet=D.internet||{bundles:[],readings:[]}; S
 function showErr(e){ document.getElementById('app').innerHTML='<div class="err"><b>Couldn\'t load.</b> '+esc(e.message||e)+'</div>'; }
 
 function render(){
+  /* KEEP WHERE SHE IS (Sarah 2026-11-17: after a save the screen re-drew with every section closed and jumped — she typed into the
+     wrong home): open sections and the scroll position survive a re-draw */
+  var keep={}; document.querySelectorAll('#app details[data-k]').forEach(function(d){ if(d.open) keep[d.getAttribute('data-k')]=1; }); var sy=window.scrollY;
   var asOf=day(D.meta.asOf), h='';
   if(window.netModelResetCache) netModelResetCache();   // FIX 1 (2026-10-03): the model's OWN cache — `__nh=null` here never reached it, so a save showed stale pace
   /* --- what needs doing, before anything that merely reports --- */
@@ -318,7 +321,7 @@ function render(){
      fingerprint is a different problem wearing the same name. Nothing is ever deleted; they sit
      folded underneath, counted. */
   if(hid.length){
-    h+='<details class="seen"><summary>✓ '+hid.length+' already seen — show</summary>';
+    h+='<details class="seen" data-k="seen"'+(keep.seen?' open':'')+'><summary>✓ '+hid.length+' already seen — show</summary>';
     hid.forEach(function(a){
       h+='<div class="act seenrow"><div class="at"><b>'+esc(a.f)+'</b> — '+a.ttl+
          '<span class="seenb" onclick="netUnsee(\''+a.key+'\')" title="bring it back to the top">↩ unsee</span></div>'+
@@ -370,7 +373,7 @@ function render(){
           h+='<div class="dep warn">🔄 Renews <b>tomorrow</b> ('+dmon(ce)+') — the remaining balance goes with the renewal.</div>';
         else
           h+='<div class="dep ok">Covers the cycle at '+fmtGB(c.rate)+' GB/guest-day — renews '+dmon(ce)+'</div>';
-        h+='<details class="more"><summary>pace, guests &amp; last reading</summary>'+
+        h+='<details class="more" data-k="more|'+f+'"'+(keep['more|'+f]?' open':'')+'><summary>pace, guests &amp; last reading</summary>'+
            '<div class="pace"><span class="fb '+pb.cls+'">'+pb.txt+'</span> '+fmtGB(c.rate)+' GB/guest-day vs fair '+fmtGB(c.fairDaily)+' '+rateChip(c)+
            ' · vacant days ~'+fmtGB(c.idle)+' GB</div>'+
            '<div class="foot">Last reading '+fmtGB(c.remaining)+' GB at '+(c.at?dmon(c.at)+' '+c.at.toTimeString().slice(0,5):'')+
@@ -392,7 +395,7 @@ function render(){
     }
 
     /* --- inputs --- */
-    h+='<details><summary>+ Add reading / renew bundle</summary>';
+    h+='<details data-k="add|'+f+'"'+(keep['add|'+f]?' open':'')+'><summary>+ Add reading / renew bundle</summary>';
     h+='<div class="frm">'+
        '<div class="full"><label>Remaining quota now (GB) — from the provider app</label><input type="number" step="0.1" id="rem_'+f+'" placeholder="e.g. 84.5"></div>'+
        '<div><label>Reading date</label><input type="date" id="rdt_'+f+'" value="'+ymd(new Date())+'"></div>'+
@@ -430,6 +433,7 @@ function render(){
      '<div class="foot">Record each payment below: it settles the quarter now due, moves the due date 3 months on, and books the cash paid as a pending WeShare card (TV/Phone/Internet). «From WE balance» books no cash — the pre-charge already did; the landline\'s WE balance is its own, not the internet\'s. Until a payment is recorded the due date stays and the reminder comes every day. The P&amp;L keeps its monthly accrual, so the price here only sets the default amount and the reminder.</div></div>';
   h+='<div class="card"><div class="foot">Remaining GB is <b>read off the WE app</b> — never a GB-used subtraction. Pace = GB per <b>occupied</b> day (the current guest\'s measured rate carries across renewals; vacant days burn only the idle trickle). <b>WeShare captures the cash</b> (a new recharge → pending row, payer editable at confirm) and <b>the P&amp;L captures the bundle price</b> via the sync mirror — never both. One day before projected depletion, the الكنترول bot messages Sarah &amp; Khaled.</div></div>';
   document.getElementById('app').innerHTML=h;
+  try{ window.scrollTo(0, sy); }catch(e){}
   renderPhones();
 }
 
