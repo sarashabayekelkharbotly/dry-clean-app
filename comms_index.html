@@ -1208,8 +1208,8 @@ function coWord(t){ return String(t||'')<'12:00' ? 'خروج بدري' : 'خرو
 /* the check-out times (Sarah 2026-11-02): an approved late check-out moves both — the cleaners always 15 minutes after */
 function coTimes(st){
   const co=/^\d{2}:\d{2}$/.test(String(st.lateCo||''))?st.lateCo:'12:00';
-  const m=Number(co.slice(0,2))*60+Number(co.slice(3,5))+15;
-  return { co, clean: String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0') };
+  /* the clean is AT the check-out time (Sarah 2026-11-17); more than 3 hours late → the next morning at 09:00 */
+  return { co, clean: co>'15:00' ? '09:00' : co };
 }
 function cleanTimeOf(st,occ){
   const c=(D.schedule||[]).find(c=>c.flat===st.flat&&c.date===occ&&(c.type==='midstay'||c.type==='weekly'));

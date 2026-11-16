@@ -1054,7 +1054,21 @@ function saveDraft(){
   return api('props_save_draft',{user:(ME&&ME.user)||'',week:ymd(weekStart),cleans:JSON.stringify(draftPayload())})
     .then(function(j){ if(!j||!j.ok)throw new Error(j&&j.error||'bad'); DRAFT_AT=new Date().toISOString(); dirty=false; });
 }
+/* TWO CLEANS AT THE SAME TIME (Sarah 2026-11-17): before saving or confirming, warn — she can go ahead anyway. Same day + same time + a
+   cleaner in common (Amal / Jinny / both); two different cleaners at the same time are fine. */
+function cleanClashes(rows){
+  var by={}, out=[];
+  (rows||[]).forEach(function(c){ if(!c||c.on===false||!c.date||!c.time) return; var t=String(c.time).slice(0,5);
+    var who=(c.cleaner||'amal')==='both'?['amal','jinny']:[c.cleaner||'amal'];
+    who.forEach(function(w){ var k=c.date+'|'+t+'|'+w; (by[k]=by[k]||[]).push(c); }); });
+  Object.keys(by).forEach(function(k){ if(by[k].length<2) return; var p=k.split('|');
+    out.push(dm(new Date(p[0]+'T12:00:00'))+' '+p[1]+' ('+(p[2]==='jinny'?'جيني':'أمل')+'): '+by[k].map(function(c){ return c.flat+' '+c.type; }).join(' + ')); });
+  return out;
+}
+function clashOk(rows){ var cl=cleanClashes(rows); if(!cl.length) return true;
+  return confirm('⚠️ فيه تنظيفين في نفس الوقت:\n'+cl.join('\n')+'\n\nOK = احفظي برضه · Cancel = ارجعي عدّلي'); }
 function saveDraftBtn(){
+  if(!clashOk(cleans)) return;
   document.getElementById('cmsg').textContent='saving draft…';
   saveDraft().then(function(){ render(); document.getElementById('cmsg').textContent='draft saved ✓ (no alerts sent)'; })
     .catch(function(e){ document.getElementById('cmsg').textContent='draft failed: '+(e.message||e); });
@@ -1192,6 +1206,7 @@ function confirmWeek(){
     var missingMand=res.some(function(r){ return ymd(r.w)===ymd(mandatory)&&!r.rows; });
     if(missingMand){ btn.disabled=false; msg('⛔ مفيش تأكيد — افتحي أسبوع '+dm(mandatory)+' وراجعيه الأول (بينزل في الواتساب مع الأسبوع ده)'); return; }
     var acts=res.filter(function(r){ return !!r.rows; });   // a prior week with no draft has nothing pending — skipped
+    if(!clashOk([].concat.apply([], acts.map(function(a){ return a.rows; })))){ btn.disabled=false; msg('اتلغى — عدّلي المواعيد'); return; }
     if(!acts.length){ btn.disabled=false; msg('مفيش حاجة تتأكد'); return; }
     /* ONE round trip (Sarah: "taking a long time" — check×2 + commit×2 paid the platform floor
        four times). The server runs the same two phases internally: any refusal → nothing
