@@ -2741,6 +2741,12 @@ async function confirmReceive() {
      If exactly ONE item matches the order's NAME, re-point the order at it — id healed in the
      sheet too. Anything ambiguous blocks with a clear message instead of guessing. */
   let healedId = null;
+  /* A RENAME IS NOT A MISMATCH (Sarah 2026-11-16: «شورتي بسكويت شاي» became «شورتي او دانيش بسكويت شاي» while an order was open,
+     and Emad was blocked). Same item id, still active, only the name differs → ask, and receive onto it if he confirms. */
+  if (it && it.active !== false && (it.ar||'').trim() !== (ord.itemName||'').trim()) {
+    if (!confirm('الطلب اسمه «' + (ord.itemName||'') + '» والصنف دلوقتي اسمه «' + (it.ar||'') + '».\nنفس الصنف واسمه اتغير؟ (موافق = استلم عليه)')) return;
+    ord.itemName = it.ar;
+  }
   if (!it || (it.ar||'').trim() !== (ord.itemName||'').trim()) {
     const byName = items.filter(i => (i.ar||'').trim() === (ord.itemName||'').trim());
     if (byName.length === 1) { it = byName[0]; healedId = it.id; ord.itemId = it.id; }
