@@ -621,7 +621,7 @@ function stepRow(st,sp,state){
      the grey sub-line they read as the same row twice (Sarah 2026-08-12, Iman's 85 nights). The
      occurrence date now sits in the label itself, and the sub-line carries both dates. */
   const occLbl=(sp.occ&&sp.occ!=='mid')?` — ${String(sp.occ).slice(5).split('-').reverse().join('/')}`:'';
-  const dt=(sp.k==='checkout'&&st.lateCo?`🕑 خروج متأخر ${st.lateCo} — النظافة ${coTimes(st).clean} · `:'')+dueTxt(st,sp);
+  const dt=(sp.k==='checkout'&&st.lateCo?`🕑 ${coWord(st.lateCo)} ${st.lateCo} — النظافة ${coTimes(st).clean} · `:'')+dueTxt(st,sp);
   const sub=(sp.occ&&sp.occ!=='mid')
     ? `النظافة يوم ${sp.occ}${sp.k==='midstay'?' الساعة '+(cleanTimeOf(st,sp.occ)||'12:00'):''}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${sp.k==='midstay'?(isFirstClean(st,sp.occ)?' · أول نظافة: العرض كامل':' · تأكيد الميعاد'):''}${dt?` · ${dt}`:''}`
     : dt;
@@ -651,7 +651,7 @@ function stayExtra(st){
   /* THE GUEST'S DETAILS FIRST (Sarah 2026-11-02): language, ⚥, names, requests and a late check-out decide what every 📋
      message below says — so they sit at the very top of the card, before the first template is ever copied. */
   let h='<div class="step" style="border-top:1px solid var(--border);flex-direction:column;align-items:stretch">';
-  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · ⚥ <b>${st.gender||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b>${st.lateCo?` · 🕑 خروج متأخر — <b style="color:#a0346b">${st.lateCo}</b>`:''}</div>
+  h+=`<div class="step-lb">🌐 لغة التواصل — <b>${st.lang||'؟'}</b> · ⚥ <b>${st.gender||'؟'}</b> · 📌 طلبات — <b>${st.requests||'—'}</b>${st.lateCo?` · 🕑 ${coWord(st.lateCo)} — <b style="color:#a0346b">${st.lateCo}</b>`:''}</div>
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">
         <button class="btn" onclick="setupUI('${st.id}')">⚙️ بيانات الضيف</button>
         <button class="btn" onclick="addCustomStep('${st.id}')" title="إضافة خطوة للسلم">➕📨</button>
@@ -674,7 +674,7 @@ function stayExtra(st){
         </select></label>
       <label style="font-size:10.5px;grid-column:1/3">📌 طلبات خاصة
         <input id="su_req_${st.id}" value="${ea(st.requests)}" style="width:100%"></label>
-      <label style="font-size:10.5px;grid-column:1/3">🕑 خروج متأخر متوافق عليه (يوم ${ea(st.co)}) — الساعة، أو فاضي = 12:00 العادي
+      <label style="font-size:10.5px;grid-column:1/3">🕑 ميعاد خروج متوافق عليه، بدري أو متأخر (يوم ${ea(st.co)}) — الساعة، أو فاضي = 12:00 العادي
         <input id="su_lco_${st.id}" type="time" value="${ea(st.lateCo)}" style="width:100%"></label>
       <div style="grid-column:1/3;display:flex;gap:6px;justify-content:flex-end">
         <button class="btn" onclick="setupUI('${st.id}')">إلغاء</button>
@@ -1203,6 +1203,8 @@ function renderTpl(text, st, cl){
 /* THE CLEANING MESSAGES (Sarah 2026-11-02: Dani typed «3/11 at 12 pm» by hand after the clean had moved to 2 pm). The day and the
    time now come from the schedule at the moment of 📋 — nobody types them. The stay's FIRST clean gets the full offer (what the
    visit is, how long, the team) and suggests the scheduled time; every LATER clean gets a short confirmation, no explaining again. */
+/* early or late — the word follows the agreed time (Sarah 2026-11-16: Sameh leaves 17A early; the label only knew «late») */
+function coWord(t){ return String(t||'')<'12:00' ? 'خروج بدري' : 'خروج متأخر'; }
 /* the check-out times (Sarah 2026-11-02): an approved late check-out moves both — the cleaners always 15 minutes after */
 function coTimes(st){
   const co=/^\d{2}:\d{2}$/.test(String(st.lateCo||''))?st.lateCo:'12:00';
