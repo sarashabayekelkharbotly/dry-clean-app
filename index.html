@@ -2023,19 +2023,21 @@ function renderElecBody(){
           : '<br><span style="font-size:9px">محتاج قراءتين ورا بعض من غير شحن بينهم</span>'}</div></div>
       <div class="stat-card"${soon ? ' style="border:2px solid #cc5f5f"' : ''}><div class="stat-value"${soon ? ' style="color:#cc5f5f"' : ''}>${E.depletion ? E.depletion.slice(5).split('-').reverse().join('/') : '—'}</div><div class="stat-label">${soon ? '⚠️ ينفد قريباً' : 'ينفد تقريباً'}</div></div>
     </div>
-    ${E.cardEmpty != null ? `<div class="card" style="padding:9px 12px;margin-bottom:12px;${E.cardEmpty ? 'border:2px solid #cc5f5f' : ''}">
-      <div style="font-size:12.5px;font-weight:800">💳 الكارت المشحون: ${E.cardEmpty
+    ${(E.cardEmpty != null || E.app) ? `<div class="card" style="padding:9px 12px;margin-bottom:12px;${E.cardEmpty ? 'border:2px solid #cc5f5f' : ''}">
+      ${E.app ? `<div style="font-size:12.5px;font-weight:800">📱 شحن من الأبلكيشن</div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:3px">مفيش كارت — الشحنة بتتضاف للعداد على طول. سجّل المبلغ هنا، وبعدها سجّل الرصيد الجديد كقراءة.</div>` :
+      `<div style="font-size:12.5px;font-weight:800">💳 الكارت المشحون: ${E.cardEmpty
         ? '<span style="color:#cc5f5f">فاضي — خالد لازم يشحنه</span>'
         : 'فيه ' + Math.round(E.cardLoaded) + ' ج · جاهز للعداد'}</div>
       <div style="font-size:10.5px;color:var(--text3);margin-top:3px">${E.lastInsertion
-        ? 'آخر مرة اتحط في العداد: ' + E.lastInsertion : 'لسه ماتحطش في العداد'}</div>
+        ? 'آخر مرة اتحط في العداد: ' + E.lastInsertion : 'لسه ماتحطش في العداد'}</div>`}
       <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
         <input id="cardAmt" type="number" inputmode="numeric" placeholder="مبلغ شحنة جديدة بالجنيه"
           style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:13px">
         <select id="cardPayer" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 6px;font-family:'Cairo',sans-serif;font-size:12px">
           <option value="Khaled">خالد دفع</option><option value="Sarah">سارة دفعت</option>
         </select>
-        <button onclick="cardRechargeSave()" style="flex-shrink:0;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 12px;cursor:pointer">💳 سجّل الشحن</button>
+        <button onclick="cardRechargeSave()" style="flex-shrink:0;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 12px;cursor:pointer">${E.app ? '📱' : '💳'} سجّل الشحن</button>
       </div>
       <div style="font-size:10.5px;color:var(--text3);margin-top:4px">${ELEC_FLAT === 'VW1' ? 'الشحنة بتتقيد في وي شير تلقائيًا (Airbnb Monthly، تكلفة ' + emadFlatAr('VW1') + ' — مستنية تأكيد خالد)' : 'الشحنة بتتقيد في وي شير تلقائيًا (Studio Electricity، مقسومة بينكم)'} — <b>متسجلوهاش في وي شير تاني</b></div>
     </div>` : ''}
@@ -2049,7 +2051,7 @@ function renderElecBody(){
         <button onclick="elecSave()" style="flex-shrink:0;width:auto;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:9px 16px;cursor:pointer">${ELEC_EDIT ? 'حفظ' : 'سجّل'}</button>
         ${ELEC_EDIT ? `<button onclick="elecEditCancel()" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;background:none;font-family:'Cairo',sans-serif;font-size:13px;padding:9px 10px;cursor:pointer">✕</button>` : ''}
       </div>
-      ${ELEC_EDIT ? '' : `<div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      ${(ELEC_EDIT || E.app) ? '' : `<div style="display:flex;gap:6px;align-items:center;margin-top:8px">
         <input id="elecAfter" type="number" inputmode="numeric" placeholder="حطيت الكارت؟ اكتب الرصيد بعد الشحن"
           style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:12.5px">
       </div>
@@ -2199,8 +2201,9 @@ function renderEmadPanel() {
   {   // ⚡ VW1's card (2026-10-20) — a cleaning day only, like 8A; no «first reading» nag on other days
     const mv = (EMAD.meters || {}).VW1, loggedV = mv && String(mv.at || '').slice(0, 10) === todayK;
     const cleanVwToday = (EMAD.schedule || []).some(c => c.flat === 'VW1' && c.date === todayK && ['checkout','midstay','weekly','revision','custom'].includes(c.type));
-    if (loggedV) todo += row('✅', `تم تسجيل رصيد كارت ${emadFlatAr('VW1')} اليوم: <b>${mv.balance}</b> جنيه`, {});
-    else if (cleanVwToday) todo += row('⚡', `<b>سجّل رصيد كارت كهرباء ${emadFlatAr('VW1')}</b> أثناء التنظيف — اضغط للتسجيل` +
+    // VW1 is an APP, not a card (Sarah 2026-11-17) — read the balance in the app
+    if (loggedV) todo += row('✅', `تم تسجيل رصيد كهرباء ${emadFlatAr('VW1')} اليوم: <b>${mv.balance}</b> جنيه`, {});
+    else if (cleanVwToday) todo += row('⚡', `<b>سجّل رصيد كهرباء ${emadFlatAr('VW1')} من الأبلكيشن</b> أثناء التنظيف — اضغط للتسجيل` +
         (mv ? ` <span style="color:var(--text3);font-size:11px">(آخر قراءة ${mv.balance})</span>` : ` <span style="color:var(--text3);font-size:11px">(أول تسجيل)</span>`),
         { click: "emadMeterPrompt('VW1')" });
   }

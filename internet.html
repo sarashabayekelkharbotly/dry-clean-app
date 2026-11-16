@@ -409,14 +409,16 @@ function render(){
        '<div><label>Cycle start time</label><input type="time" id="bt_'+f+'" value="'+new Date().toTimeString().slice(0,5)+'"></div>'+
        /* §5.4: cash ≠ bundle. A new recharge writes the CASH to WeShare (pending, payer Sarah by
           default); "from balance" writes nothing. The P&L takes the BUNDLE price either way. */
+       /* VW1 is POSTPAID (Sarah 2026-11-17): no recharge — the cycle is paid with the Vodafone bill on the 15th, its WeShare card dated then */
+       (f==='VW1' ? '<div class="full" style="font-size:12px;color:#555">📄 Postpaid — no recharge: this cycle is paid with the Vodafone bill on the 15th; its WeShare card is dated then.</div><div style="display:none">' : '')+
        '<div class="full" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
        '<label style="margin:0">Paid how?</label>'+
        '<label style="font-weight:400"><input type="radio" name="pay_'+f+'" value="recharge" checked onchange="payTgl(\''+f+'\')"> new recharge</label>'+
        '<label style="font-weight:400"><input type="radio" name="pay_'+f+'" value="balance" onchange="payTgl(\''+f+'\')"> from WE balance</label>'+
-       '<input type="number" step="0.1" id="cash_'+f+'" placeholder="cash EGP (blank = price)" style="width:150px" title="cash actually paid — may exceed the bundle price; the excess stays as WE balance"></div>'+
+       '<input type="number" step="0.1" id="cash_'+f+'" placeholder="cash EGP (blank = price)" style="width:150px" title="cash actually paid — may exceed the bundle price; the excess stays as WE balance"></div>'+(f==='VW1'?'</div>':'')+
        '<div style="align-self:end"><button class="btn sec" onclick="saveBundle(\''+f+'\')">Renew / set bundle</button></div>'+
        '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">'+
-       '<button class="btn sec" onclick="prechargeNet(\''+f+'\')" title="cash paid ahead of an auto-renewal — WeShare card only; the P&L cost lands at renewal, at bundle price">💳 Pre-charge (cash ahead)</button>'+
+       (f==='VW1'?'':'<button class="btn sec" onclick="prechargeNet(\''+f+'\')" title="cash paid ahead of an auto-renewal — WeShare card only; the P&L cost lands at renewal, at bundle price">💳 Pre-charge (cash ahead)</button>')+
        '<button class="btn sec" style="color:#cc5f5f" onclick="delLastBundle(\''+f+'\')" title="remove the latest bundle entry — its P&L row and pending cash card go with it">🗑 Delete latest entry</button>'+
        '</div>'+
        '<div class="full"><span class="msg" id="bmsg_'+f+'"></span></div>'+
