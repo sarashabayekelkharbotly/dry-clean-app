@@ -68,7 +68,7 @@ function authNotYours() {
   document.body.innerHTML =
     '<div style="font-family:Cairo,sans-serif;max-width:340px;margin:60px auto;background:#fff;border:1px solid #ecdede;border-radius:16px;padding:22px;text-align:center;color:#1a1a1a">' +
     '<img src="control-logo.png" alt="" style="width:64px;height:64px;border-radius:13px;margin-bottom:10px">' +
-    '<h2 style="margin:0 0 6px;font-size:17px">الشاشة دي لسارة وخالد بس</h2>' +
+    '<h2 style="margin:0 0 6px;font-size:17px">الشاشة دي لساره وخالد بس</h2>' +
     '<p style="margin:0 0 14px;font-size:12px;color:#6b6b6b">' + (ME ? 'داخل باسم ' + (ME.user || '') : '') + '</p>' +
     '<a href="index.html" style="display:inline-block;margin:0 6px 8px;color:#cc5f5f;font-weight:700;text-decoration:none">← الكنترول</a>' +
     '<button onclick="logout()" style="border:0;background:#cc5f5f;color:#fff;font-family:inherit;font-weight:700;font-size:13px;border-radius:9px;padding:8px 18px;cursor:pointer">خروج</button></div>';

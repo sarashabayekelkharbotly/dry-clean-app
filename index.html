@@ -1675,7 +1675,7 @@ async function emadMeterPrompt(flat){
   const b = parseFloat(String(v).replace(/[^\d.]/g, ''));
   if (isNaN(b) || b < 0) { alert('رقم غير صحيح — حاول مرة أخرى'); return; }
   /* لو حط الكارت في العداد بياخد قراءتين: اللي لقاه واللي بقى بعد الشحن. مفيش مبالغ —
-     الشرايح والرسوم بتخلي الرصيد يزيد أقل من المدفوع، فالمقارنة نفسها غلط (سارة 2026-08-12) */
+     الشرايح والرسوم بتخلي الرصيد يزيد أقل من المدفوع، فالمقارنة نفسها غلط (ساره 2026-08-12) */
   const av = prompt('لو حطيت الكارت في العداد، اكتب الرصيد بعد الشحن — سيبها فاضية لو ماحطتش:', '');
   const af = (av === null || String(av).trim() === '') ? '' : String(av).replace(/[^\d.]/g, '');
   try {
@@ -1889,7 +1889,7 @@ async function repOwnerSaveClosed(id){
 }
 async function repOwnerDeleteClosed(id){
   const r = repOwnerFind(id); if (!r) return;
-  if (!confirm('حذف بلاغ مقفول من السجل؟\n' + emadFlatAr(r.flat) + ' · ' + r.trade + (r.cost ? ' · ' + r.cost + ' ج' : '') + '\n\nصف الصيانة في «وي شير» هيتشال معاه، وسارة وخالد هيوصلهم تليجرام.')) return;
+  if (!confirm('حذف بلاغ مقفول من السجل؟\n' + emadFlatAr(r.flat) + ' · ' + r.trade + (r.cost ? ' · ' + r.cost + ' ج' : '') + '\n\nصف الصيانة في «وي شير» هيتشال معاه، وساره وخالد هيوصلهم تليجرام.')) return;
   try {
     const x = await callScript({ action: 'ops_delete_repair', id }, { timeout: 40000, retries: 0 });
     if (!x || x.ok !== true) throw new Error((x && x.error) || 'failed');
@@ -2008,7 +2008,7 @@ function renderElecBody(){
   const staleNote = age > 60000
     ? `<div style="font-size:10.5px;color:#8a6420;background:#efe4d4;border-radius:8px;padding:4px 8px;margin-bottom:8px">⏳ الأرقام دي ${agoText(E._ts)} — جاري التحديث…</div>` : '';
   /* حالة واحدة واضحة فوق الشاشة — الأرضية (٤٠٠ ج) هي الإنذار الأساسي لأنها مش محتاجة أي حسابات،
-     والتقدير جنبها وبس (سارة 2026-08-12) */
+     والتقدير جنبها وبس (ساره 2026-08-12) */
   const stCol = { low:'#cc5f5f', stale:'#c9a24b', soon:'#c9a24b', cardempty:'#c9a24b', ok:'#5caa7f', none:'#8a7a7d' }[E.status || 'none'] || '#8a7a7d';
   const stIcon = { low:'🔴', stale:'🕐', soon:'🟡', cardempty:'💳', ok:'🟢', none:'⚪' }[E.status || 'none'] || '⚪';
   const pickB = (f) => `<button onclick="elecPick('${f}')" style="flex:1;border:${f === ELEC_FLAT ? 'none' : '1px solid var(--border,#ddd)'};border-radius:8px;background:${f === ELEC_FLAT ? 'var(--primary,#cc5f5f)' : 'none'};color:${f === ELEC_FLAT ? '#fff' : 'inherit'};font-family:'Cairo',sans-serif;font-weight:700;font-size:13px;padding:8px;cursor:pointer">${emadFlatAr(f)}</button>`;
@@ -2035,7 +2035,7 @@ function renderElecBody(){
         <input id="cardAmt" type="number" inputmode="numeric" placeholder="مبلغ شحنة جديدة بالجنيه"
           style="flex:1;min-width:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 10px;font-family:'Cairo',sans-serif;font-size:13px">
         <select id="cardPayer" style="flex-shrink:0;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 6px;font-family:'Cairo',sans-serif;font-size:12px">
-          <option value="Khaled">خالد دفع</option><option value="Sarah">سارة دفعت</option>
+          <option value="Khaled">خالد دفع</option><option value="Sarah">ساره دفعت</option>
         </select>
         <button onclick="cardRechargeSave()" style="flex-shrink:0;border:none;border-radius:8px;background:var(--primary,#cc5f5f);color:#fff;font-family:'Cairo',sans-serif;font-weight:700;font-size:12.5px;padding:9px 12px;cursor:pointer">${E.app ? '📱' : '💳'} سجّل الشحن</button>
       </div>
@@ -2167,7 +2167,7 @@ function renderEmadPanel() {
      its cost is entered (0 allowed), and the task leaves the list because the ticket really closed */
   /* a LATE repair stays here, first, until it is closed (Sarah 2026-11-16) — then today's */
   ((EMAD.repairsAll || EMAD.repairs || []).filter(r => r.date && r.date < todayK).sort((a, b) => a.date < b.date ? -1 : 1)).forEach(r => {
-    todo += row('🔧', `<span style="color:#c0392b;font-weight:700">متأخرة من ${String(r.date).slice(8, 10)}/${String(r.date).slice(5, 7)}</span> — بيت ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق أو كلّم سارة لتغيير الميعاد</span>`,
+    todo += row('🔧', `<span style="color:#c0392b;font-weight:700">متأخرة من ${String(r.date).slice(8, 10)}/${String(r.date).slice(5, 7)}</span> — بيت ${emadFlatAr(r.flat)}: صيانة ${r.trade}${r.what ? ' — ' + r.what : ''} <span style="color:var(--text3);font-size:10.5px">— اضغط للإغلاق أو كلّم ساره لتغيير الميعاد</span>`,
       { click: `emadRepairFromTodo('${r.id}')` });
   });
   (EMAD.repairs || []).filter(r => r.date === todayK).forEach(r => {

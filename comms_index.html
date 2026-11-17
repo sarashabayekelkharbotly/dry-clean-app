@@ -446,7 +446,7 @@ function copyTpl(stayId,k,occ){
   // the pin needs no language and no gender, so it never triggers those prompts
   if(k==='location'){
     const pin=pinFor(st);
-    if(!pin){ toast('⚠️ مفيش لوكيشن مسجّل لبيت '+st.flat+' — كلّمي سارة'); return; }
+    if(!pin){ toast('⚠️ مفيش لوكيشن مسجّل لبيت '+st.flat+' — كلّمي ساره'); return; }
     (navigator.clipboard?navigator.clipboard.writeText(pin):Promise.reject()).then(
       ()=>toast('📍 اللوكيشن اتنسخ — الصقه في واتساب'),
       ()=>{ prompt('انسخ اللوكيشن:',pin); });
@@ -462,13 +462,13 @@ function copyTpl(stayId,k,occ){
     ()=>{ prompt('انسخ الرسالة:',t); });
 }
 /* ☀️/🌙 إرسال الملخص دلوقتي — نفس الدوال اللي الـtriggers بتشغّلها، فاللي بتبعتيه بإيدك
-   هو نفسه اللي بيتبعت لوحده (سارة وخالد بس — حساب داني مرفوض من السيرفر) */
+   هو نفسه اللي بيتبعت لوحده (ساره وخالد بس — حساب داني مرفوض من السيرفر) */
 async function sendBriefNow(){
   if(isReadonly && !isReadonly()) return;
   const which = confirm('إرسال خطة الصباح دلوقتي؟\n\n(OK = خطة الصباح · Cancel = ملخص المساء)') ? 'morning' : 'evening';
   if(!confirm(which==='morning'
-      ? 'خطة الصباح هتتبعت دلوقتي لسارة وخالد وعماد وداني. تمام؟'
-      : 'ملخص المساء هيتبعت دلوقتي لسارة وخالد وعماد وداني. تمام؟')) return;
+      ? 'خطة الصباح هتتبعت دلوقتي لساره وخالد وعماد وداني. تمام؟'
+      : 'ملخص المساء هيتبعت دلوقتي لساره وخالد وعماد وداني. تمام؟')) return;
   const b=document.getElementById('briefBtn'); if(b){ b.disabled=true; b.textContent='⏳'; }
   let r=null; try{ r=await api('briefs_send',{which}); }catch(e){}
   if(b){ b.disabled=false; b.textContent = which==='morning'?'☀️':'🌙'; }
@@ -682,13 +682,13 @@ function stayExtra(st){
       </div></div>`;
   }
   h+='</div><div class="step">';
-  h+=`<div class="step-lb">🤝 التسليم لداني<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع سارة/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
+  h+=`<div class="step-lb">🤝 التسليم لداني<div class="step-sub">${ho.done?('اتسلّم '+ho.at+(ho.by?' — '+ho.by:'')):'الضيف لسه مع ساره/خالد (Airbnb / محادثة خاصة)'}</div></div>`;
   /* ↩ تراجع — لازم يكون ممكن نلغي علامة اتحطت بالغلط (أو من الـbackfill) لحد ما الحاجة
      تتعمل فعلاً (Sarah 2026-08-11) */
   h+=ho.done?`<span class="badge b-ok">مع داني</span><button class="btn" onclick="undoFlag('${st.id}','handover')">↩</button>`
             :`<button class="btn btn-ok" onclick="doHandover('${st.id}')">🤝 تسليم</button>`;
   h+='</div><div class="step">';
-  h+=`<div class="step-lb">💬 جروب الواتساب (بداني جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على سارة/خالد')}</div></div>`;
+  h+=`<div class="step-lb">💬 جروب الواتساب (بداني جواه)<div class="step-sub">${gr.done?('جاهز '+gr.at+(gr.by?' — '+gr.by:'')):(gr.invited?'الدعوة اتبعتت — مستنيين الضيف ينضم':'لسه ماتعملش — على ساره/خالد')}</div></div>`;
   h+=gr.done?`<span class="badge b-ok">✓</span><button class="btn" onclick="undoFlag('${st.id}','group')">↩</button>`
     :(`<button class="btn" onclick="copyTpl('${st.id}','groupintro','')">📋 رسالة التعريف</button>`+(gr.invited?"":`<button class="btn" onclick="tickGroupVal('${st.id}','invited')">📩 بعت دعوة</button>`)+`<button class="btn btn-ok" onclick="tickGroupVal('${st.id}','')">✅ جاهز</button>`);
   h+='</div>';
@@ -696,7 +696,7 @@ function stayExtra(st){
     <div style="display:flex;align-items:center"><div class="step-lb">📝 ملاحظات (اللي اتقال على Airbnb أو في الخاص)</div>
     <button class="btn" onclick="addNote('${st.id}')">➕</button></div>`;
   /* الملاحظات (اللي اتقال على Airbnb) لازم تبان زي 📌 الطلبات الخاصة — غامق وأسود، مش رمادي
-     صغير يعدي من غير ما حد ياخد باله (سارة 2026-08-12) */
+     صغير يعدي من غير ما حد ياخد باله (ساره 2026-08-12) */
   (st.notes||[]).slice().reverse().forEach(n=>{ h+=`<div style="padding:4px 0;border-top:1px dashed var(--border);font-size:12.5px;font-weight:800;color:var(--text1)">${n.text}
     <span style="font-weight:400;font-size:10.5px;color:var(--text3)">— ${n.by} ${n.at}</span>${n.occ?` <button class="btn" style="padding:1px 7px;font-size:10px" onclick="editNote('${st.id}','${n.occ}')">✏️</button>`:''}</div>`; });
   h+='</div>';
@@ -739,7 +739,7 @@ function doHandover(stayId){
   pseudoTick(stayId,'handover',note,'🤝 اتسلّم لداني — التلجرام فيه كل التفاصيل',snap);
 }
 function tickGroupVal(stayId,val){ pseudoTick(stayId,'group',val,val==='invited'?'📩 اتسجلت الدعوة':'💬 الجروب جاهز'); }
-/* ↩ إلغاء علامة التسليم أو الجروب — بيرجّع الضيف للستة سارة/خالد لحد ما تتعمل فعلاً */
+/* ↩ إلغاء علامة التسليم أو الجروب — بيرجّع الضيف للستة ساره/خالد لحد ما تتعمل فعلاً */
 async function undoFlag(stayId,step){
   const st=D.stays.find(s=>s.id===stayId); if(!st) return;
   if(!confirm(step==='handover'?'إلغاء علامة التسليم؟ الضيف هيرجع في لستة «لسه ماتسلمش».':'إلغاء علامة الجروب؟')) return;
@@ -806,7 +806,7 @@ function setGender(stayId){
   pseudoTick(stayId,"gender",g,"⚥ اتسجل");
 }
 function addNote(stayId){
-  const v=prompt('📝 ملاحظة للكل عن الضيف (بتتبعت تلجرام لداني وسارة وخالد):','');
+  const v=prompt('📝 ملاحظة للكل عن الضيف (بتتبعت تلجرام لداني وساره وخالد):','');
   if(v===null||!String(v).trim()) return;
   api('comms_tick',{stayId,step:'note',occ:String(Date.now()),val:String(v).trim(),tag:(function(){const s=D.stays.find(x=>x.id===stayId);return s?tagOf(s):''})()})
     .then(r=>{ if(r&&r.ok){ const s=D.stays.find(x=>x.id===stayId); if(s){ (s.notes=s.notes||[]).push({at:new Date().toISOString().slice(0,10),by:currentUserName,text:String(v).trim()}); renderAll(); } toast('📝 اتسجلت'); } else toast('❌ لم تُحفظ'); })
@@ -1017,7 +1017,7 @@ yusuf:'يوسف',abdallah:'عبدالله',abdullah:'عبدالله',amr:'عمر
 kareem:'كريم',sherif:'شريف',sharif:'شريف',waleed:'وليد',walid:'وليد',fahad:'فهد',fahd:'فهد',saad:'سعد',
 salem:'سالم',salim:'سالم',sami:'سامي',samir:'سمير',nader:'نادر',hany:'هاني',hani:'هاني',ramy:'رامي',
 rami:'رامي',amir:'أمير',ameer:'أمير',amjed:'أمجد',amjad:'أمجد',habib:'حبيب',arslan:'أرسلان',salah:'صلاح',
-saleh:'صالح',ehab:'إيهاب',emad:'عماد',sarah:'سارة',sara:'سارة',mona:'منى',muna:'منى',iman:'إيمان',
+saleh:'صالح',ehab:'إيهاب',emad:'عماد',sarah:'ساره',sara:'ساره',mona:'منى',muna:'منى',iman:'إيمان',
 eman:'إيمان',fatma:'فاطمة',fatima:'فاطمة',aya:'آية',nour:'نور',noor:'نور',hala:'هالة',dina:'دينا',
 rana:'رنا',salma:'سلمى',laila:'ليلى',layla:'ليلى',mariam:'مريم',maryam:'مريم',heba:'هبة',amira:'أميرة',
 fadia:'فادية',annalise:'أناليز',olivia:'أوليفيا',donovan:'دونوفان',reeve:'ريف',ryen:'رين'};
@@ -1052,7 +1052,7 @@ function arFirst(g){
    earlier versions above. G() picks the gendered Arabic form from the stay's gender setting
    ('f' = lady, 'g' = group, default man). Latin text is kept out of Arabic sentences so
    WhatsApp's bidi never scrambles them; the door code sits on its own line. ==== */
-/* لو الترحيب اتبعت من سارة/خالد (على Airbnb مثلاً)، أول رسالة من داني بعده — الدليل — تبدأ
+/* لو الترحيب اتبعت من ساره/خالد (على Airbnb مثلاً)، أول رسالة من داني بعده — الدليل — تبدأ
    بتعريفه بنفسه (Sarah 2026-08-11) */
 function welcomeByOther(st){
   const wb=(st.steps||[]).find(x=>x.k==='welcome');
@@ -1064,9 +1064,9 @@ function tplAR(k, st, occ){
   const n=(st.nameAr||arFirst(st.guest)), gd=String(st.gender||'m');   // hand-set Arabic name wins over transliteration (Sarah 2026-08-30)
   const G=(m,f,p)=>gd==='f'?f:(gd==='g'?p:m);
   switch(k){
-    case 'groupintro': return `${greetAR()} ${n}! معك سارة 🌟 وخالد معنا في الجروب، ونحب ${G('نعرّفك','نعرّفك','نعرّفكم')} على داني من فريق الدعم — هيكون ${G('معك','معك','معكم')} طوال الإقامة ليهتم بكل ما ${G('تحتاجه','تحتاجينه','تحتاجونه')}، وكلنا هنا ${G('معك','معك','معكم')} على الجروب. ${G('نوّرتنا','نوّرتينا','نوّرتونا')}!`;
+    case 'groupintro': return `${greetAR()} ${n}! معك ساره 🌟 وخالد معنا في الجروب، ونحب ${G('نعرّفك','نعرّفك','نعرّفكم')} على داني من فريق الدعم — هيكون ${G('معك','معك','معكم')} طوال الإقامة ليهتم بكل ما ${G('تحتاجه','تحتاجينه','تحتاجونه')}، وكلنا هنا ${G('معك','معك','معكم')} على الجروب. ${G('نوّرتنا','نوّرتينا','نوّرتونا')}!`;
     case 'docsask': return `${greetAR()} ${n}! 🌟 حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟ شكراً 🙏`;
-    /* لو المستندات اتطلبت خلاص (على Airbnb مثلاً) الترحيب مابيطلبهاش تاني — سارة 2026-08-12 */
+    /* لو المستندات اتطلبت خلاص (على Airbnb مثلاً) الترحيب مابيطلبهاش تاني — ساره 2026-08-12 */
     case 'welcome': { var askedAR = (st.steps||[]).some(function(x){ return x.k==='docsask' && x.done; });
       var docsAR = askedAR ? '' : ` حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟`;
       return currentUser==='malah'
@@ -1153,7 +1153,7 @@ function renderTplEditor(){
         <span>${b.langs.ar?`<button class="btn" onclick="tplEdPick('${k}','ar')">عربي</button>`:''}
         ${b.langs.en?`<button class="btn" onclick="tplEdPick('${k}','en')">EN</button>`:''}</span></div>`;
     });
-    inner+='<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">التعديل لسارة وخالد — الحفظ بيتأكد من السيرفر قبل ما يتقال «اتحفظت».</div>';
+    inner+='<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">التعديل لساره وخالد — الحفظ بيتأكد من السيرفر قبل ما يتقال «اتحفظت».</div>';
   } else {
     const row=tpls.find(x=>x.key===TPL_ED.key&&x.lang===TPL_ED.lang)||{label:TPL_ED.key,text:''};
     const ea=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -1168,7 +1168,7 @@ function renderTplEditor(){
         <button class="btn" onclick="tplEdG('m')">راجل</button><button class="btn" onclick="tplEdG('f')">ست</button><button class="btn" onclick="tplEdG('g')">جروب</button></div>
       <div id="tplPrev" style="white-space:pre-wrap;background:#faf5f5;border-radius:10px;padding:12px;font-size:15px;line-height:1.8;direction:${TPL_ED.lang==='ar'?'rtl':'ltr'}"></div>
       ${canWrite?`<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ok" id="tplSaveBtn" onclick="tplEdSave()">💾 حفظ</button></div>`
-                :'<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">للعرض فقط — التعديل لسارة وخالد.</div>'}`;
+                :'<div style="font-size:10.5px;color:#8a7d7d;margin-top:8px">للعرض فقط — التعديل لساره وخالد.</div>'}`;
   }
   inner+='</div>';
   div.innerHTML=inner; document.body.appendChild(div);
@@ -1353,7 +1353,7 @@ function renderQueue(){
   doneToday.forEach(x=>{ h+=trow('✅',stepTx(x),
     `<button class="btn" onclick="untick('${x.st.id}','${x.sp.k}','${x.sp.occ}')">↩</button>`,true); });
   h+='</div>';
-  /* الجروبات والتسليم شغل سارة/خالد — مش بيظهر لداني، وبيصحى قبل الوصول بأسبوع بس
+  /* الجروبات والتسليم شغل ساره/خالد — مش بيظهر لداني، وبيصحى قبل الوصول بأسبوع بس
      (حجز بعيد ميقعدش في اللستة شهور — Sarah 2026-08-11) */
   const wk7=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   /* بيشمل كمان الضيوف اللي ساكنين دلوقتي (وصلوا قبل النهارده) — دول كانوا بيسقطوا من اللستة
@@ -1365,7 +1365,7 @@ function renderQueue(){
     // Dani sees the same list read-only — it is what is coming to him, not work he can start
     h+=`<div class="sec-h">${currentUser==='malah'
       ? `🤝 جاي قدامك — لسه ماتسلمش <span class="n">(${pend.length})</span>`
-      : `🤝 تسليم وجروبات — <span class="who">خالد وسارة</span> <span class="n">(${pend.length})</span>`}</div><div class="home-card">`;
+      : `🤝 تسليم وجروبات — <span class="who">خالد وساره</span> <span class="n">(${pend.length})</span>`}</div><div class="home-card">`;
     pend.forEach(st=>{
       const bits=[];
       if(!(st.group&&st.group.done)) bits.push(st.group&&st.group.invited?'📩 دعوة اتبعتت — مستنيين الانضمام':'💬 الجروب لسه ماتعملش');
@@ -1380,7 +1380,7 @@ function renderQueue(){
   /* OUR OWN GUESTS' LADDER — the ones we did not hand over. Same steps, same copy button, same
      tick, so the trail exists whoever does the work (Sarah 2026-08-12). Dani never sees it. */
   if(currentUser!=='malah'){
-    h+=`<div class="sec-h">📋 خطوات ضيوف عندنا — <span class="who">خالد وسارة</span> <span class="n">(${dueOwn.length})</span></div><div class="home-card">`;
+    h+=`<div class="sec-h">📋 خطوات ضيوف عندنا — <span class="who">خالد وساره</span> <span class="n">(${dueOwn.length})</span></div><div class="home-card">`;
     if(dueOwn.length) h+=dueOwn.map(x=>trow('⬜',stepTx(x),stepBtns(x),false)).join('');
     else h+=`<div class="trow"><span class="tk">✨</span><span class="tx sub">مفيش خطوات مستحقة على ضيوف لسه ماتسلمتش</span></div>`;
     h+='</div>';
@@ -1396,11 +1396,11 @@ function renderQueue(){
     h+=`<div class="trow"><span class="tk">—</span><span class="tx sub">مفيش${waiting?` · فيه ${waiting} ضيف لسه ماتسلمش، خطواتهم مش هتظهر هنا غير بعد التسليم`:''}</span></div>`;
   }
   h+='</div>';
-  /* الجزء التاني من «خلال يومين» — شغل سارة وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
+  /* الجزء التاني من «خلال يومين» — شغل ساره وخالد: ضيف واصل خلال يومين ولسه محتاج جروب أو
      تسليم. مفصول ومعنون علشان كل واحد يعرف اللي عليه (Sarah 2026-08-12). */
   const d2=(function(){const d=new Date(today+'T12:00:00');d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const soonOwn=pend.filter(st=>st.ci>=today&&st.ci<=d2);
-  h+=`<div class="sec-h">🟡 خلال يومين — 🤝 <span class="who">سارة وخالد</span> <span class="n">(${soonOwn.length+soonOwn2.length})</span></div><div class="home-card">`;
+  h+=`<div class="sec-h">🟡 خلال يومين — 🤝 <span class="who">ساره وخالد</span> <span class="n">(${soonOwn.length+soonOwn2.length})</span></div><div class="home-card">`;
   if(soonOwn.length){
     soonOwn.forEach(st=>{
       const need=[];

@@ -654,8 +654,8 @@ window.addEventListener('load',function(){
     <div onclick="switchUser('emad','عماد')" class="item-card" style="cursor:pointer;margin-bottom:8px">
       <div class="item-body"><div class="item-icon">👷</div><div class="item-text"><div class="item-name">عماد</div><div class="item-en">مسؤول العمليات</div></div><div class="user-dot" id="dot-emad"></div></div>
     </div>
-    <div onclick="switchUser('sarah','سارة')" class="item-card" style="cursor:pointer;margin-bottom:8px">
-      <div class="item-body"><div class="item-icon">👩‍💼</div><div class="item-text"><div class="item-name">سارة</div><div class="item-en">الإدارة</div></div><div id="dot-sarah" style="width:7px;height:7px;border-radius:50%;background:var(--border)"></div></div>
+    <div onclick="switchUser('sarah','ساره')" class="item-card" style="cursor:pointer;margin-bottom:8px">
+      <div class="item-body"><div class="item-icon">👩‍💼</div><div class="item-text"><div class="item-name">ساره</div><div class="item-en">الإدارة</div></div><div id="dot-sarah" style="width:7px;height:7px;border-radius:50%;background:var(--border)"></div></div>
     </div>
     <div onclick="switchUser('khaled','خالد')" class="item-card" style="cursor:pointer">
       <div class="item-body"><div class="item-icon">👨‍💼</div><div class="item-text"><div class="item-name">خالد</div><div class="item-en">الإدارة</div></div><div id="dot-khaled" style="width:7px;height:7px;border-radius:50%;background:var(--border)"></div></div>
@@ -2345,7 +2345,7 @@ async function adjCur(id, delta) {
   const isUndo = undoable && undoable.type === 'consume' && undoable.user === currentUserName &&
                  (Date.now() - new Date(undoable.timestamp).getTime()) < 10 * 60000;
   if (!isUndo) {
-    alert('الزيادة في المخزون تتسجل باستلام طلب بس 📦\nلو وصلت حاجة من غير طلب، كلم سارة أو خالد يسجلوا الطلب الأول — علشان التكلفة تتحسب صح.\nلو العدد في التطبيق غلط بعد ما عدّيت على الرف، استخدم زرار 📐 جنب اسم الصنف.\n(لو كنت خصمت بالغلط من شوية، اضغط ＋ خلال ١٠ دقايق من الخصم وهيرجع)');
+    alert('الزيادة في المخزون تتسجل باستلام طلب بس 📦\nلو وصلت حاجة من غير طلب، كلم ساره أو خالد يسجلوا الطلب الأول — علشان التكلفة تتحسب صح.\nلو العدد في التطبيق غلط بعد ما عدّيت على الرف، استخدم زرار 📐 جنب اسم الصنف.\n(لو كنت خصمت بالغلط من شوية، اضغط ＋ خلال ١٠ دقايق من الخصم وهيرجع)');
     return;
   }
   it.cur = Math.max(0, it.cur + delta);
@@ -2392,7 +2392,7 @@ async function countFix(id) {
   it.cur = r.cur;
   events.unshift({ id:genId(), itemId:it.id, itemName:it.ar, type:'correction', qty:r.cur - r.old, user:currentUserName, timestamp:new Date().toISOString(), note:`جرد: من ${r.old} إلى ${r.cur}`, curAfter:r.cur });
   updateCardUI(it); renderSummary(); renderNawaqes(); saveCache();
-  toast(r.kind === 'usage' ? `📉 ${it.ar}: الفرق اتسجل كاستهلاك` : r.kind === 'above' ? `⬆️ ${it.ar}: أكتر من السيستم — اتسجل وسارة وخالد هيشوفوه` : `📐 اتسجل: ${it.ar}`);   // blind: the old number is not echoed back
+  toast(r.kind === 'usage' ? `📉 ${it.ar}: الفرق اتسجل كاستهلاك` : r.kind === 'above' ? `⬆️ ${it.ar}: أكتر من السيستم — اتسجل وساره وخالد هيشوفوه` : `📐 اتسجل: ${it.ar}`);   // blind: the old number is not echoed back
   syncData(true);
 }
 
@@ -2726,7 +2726,7 @@ function openReceiveModal(orderId) {
         </div>
       </div>
     </div>
-    <div style="font-size:11.5px;color:var(--text3);margin-top:6px">لو اللي وصل منتج تاني غير ده، ماتستلمش — قول لسارة/خالد</div>`;
+    <div style="font-size:11.5px;color:var(--text3);margin-top:6px">لو اللي وصل منتج تاني غير ده، ماتستلمش — قول لساره/خالد</div>`;
   document.getElementById('recv-qty').value = ord.qtyRequested;
   openModal('receive-modal');
 }
@@ -2751,7 +2751,7 @@ async function confirmReceive() {
     const byName = items.filter(i => (i.ar||'').trim() === (ord.itemName||'').trim());
     if (byName.length === 1) { it = byName[0]; healedId = it.id; ord.itemId = it.id; }
     else {
-      alert('⚠️ الطلب ده مربوط بصنف مش مطابق («' + (ord.itemName||'') + '») — راجعوا الصنف في المستلزمات الأول، أو كلموا سارة.');
+      alert('⚠️ الطلب ده مربوط بصنف مش مطابق («' + (ord.itemName||'') + '») — راجعوا الصنف في المستلزمات الأول، أو كلموا ساره.');
       return;
     }
   }
@@ -2987,7 +2987,7 @@ function onAuthReady() {
   const lock = document.getElementById('appLock');
   if (lock) lock.style.display = 'none';
   const u = currentUser ? currentUser.toLowerCase() : 'emad';
-  const nameMap = { emad: 'عماد', sarah: 'سارة', khaled: 'خالد' };
+  const nameMap = { emad: 'عماد', sarah: 'ساره', khaled: 'خالد' };
   const displayName = currentUserName || nameMap[u] || 'عماد';
   currentUser = u;
   currentUserName = displayName;
