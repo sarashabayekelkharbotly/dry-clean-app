@@ -591,7 +591,11 @@ function stepState(st, sp){
      «خلال يومين» until two hours after arrival — today's work under a heading that says it is not
      today's. It sits in مهام النهارده from the morning; the row's own sub-line carries the timing,
      and Dani times the message himself. */
-  if(sp.k==='settled') return st.ci<=today ? 'due' : 'open';
+  /* ONE HOUR AFTER THE ARRIVAL (Sarah 2026-11-18): on the arrival day it waits in «قريب» until an hour after the guest arrives (unknown
+     arrival = 15:00 → 16:00); Dani gets a Telegram at that moment. */
+  if(sp.k==='settled'){ const ad=st.arrivalDate||st.ci, at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00';
+    const t1=('0'+Math.min(23,parseInt(at,10)+1)).slice(-2)+at.slice(2,5);
+    if(ad<today) return 'due'; if(ad===today) return nowHM()>=t1?'due':'soon'; return 'open'; }
   if(!sp.dueD) return 'open';
   if(sp.dueD<=today) return 'due';
   return (sp.dueD<= (function(){const d=new Date(today+'T12:00:00'); d.setDate(d.getDate()+2); return d.toISOString().slice(0,10);})()) ? 'soon':'open';
@@ -614,6 +618,7 @@ function renderMain(){ renderQueue(); renderStays(); }
 function gateOf(st,sp){ return sp.gated ? (st.steps||[]).find(x=>x.k===sp.gated) : null; }
 function gateName(k){ return STEP_AR[k]||'الخطوة اللي قبلها'; }
 function dueTxt(st,sp){
+  if(sp.k==='settled'){ const at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00'; return `تستحق ${st.arrivalDate||st.ci} — ساعة بعد الوصول (${('0'+Math.min(23,parseInt(at,10)+1)).slice(-2)+at.slice(2,5)})`; }
   if(sp.dueD) return `تستحق ${sp.dueD}`;
   const g=gateOf(st,sp); if(!g) return '';
   if(!g.done) return `بعد ${gateName(sp.gated)}`;
