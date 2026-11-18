@@ -672,7 +672,7 @@ function render(){
             .forEach(function(x){ var cc=x.c;
               mcell+='<div class="mrow">'+hm(cc.time)+' '+CLEANER_LBL[cc.cleaner||'amal']+
                      (cc.type==='checkout'?' · '+esc(cc.code):(cc.type==='revision'?' · إعادة':''))+'</div>'; });
-          if(seg.inn) mcell+='<div class="gsub">in '+esc(short(seg.inn.guest))+' '+inTimeFor(f,ymd(days[seg.di]))+'</div>';
+          if(seg.inn&&arrDayOf(f,ymd(days[seg.di]))===ymd(days[seg.di])) mcell+='<div class="gsub">in '+esc(short(seg.inn.guest))+' 🕒 '+inTimeFor(f,ymd(days[seg.di]))+(askedIn(f,ymd(days[seg.di]))?' ✓':'')+'</div>';   // a guest arriving on a later day shows on THAT day (2026-11-18)
           if(seg.rep) mcell+='<div class="repin">🔧 '+esc(seg.rep.trade)+(seg.rep.time?' '+hm(seg.rep.time):'')+'</div>';
           h+='<td class="clean multi">'+mcell+'</td>';
           return;
@@ -690,7 +690,7 @@ function render(){
           if(c.type!=='checkout'&&!isStayClean(c)&&nextCheckIn(f,day(c.date))&&(nextCheckIn(f,day(c.date))-day(c.date))/DAYMS<=2)
             cell+='<div class="code">'+esc(c.code)+'</div>'; }
         else cell+='<div class="ct soft">out</div>';
-        if(seg.inn) cell+='<div class="gsub">in '+esc(short(seg.inn.guest))+' '+inTimeFor(f,ymd(days[seg.di]))+'</div>';
+        if(seg.inn&&arrDayOf(f,ymd(days[seg.di]))===ymd(days[seg.di])) cell+='<div class="gsub">in '+esc(short(seg.inn.guest))+' 🕒 '+inTimeFor(f,ymd(days[seg.di]))+(askedIn(f,ymd(days[seg.di]))?' ✓':'')+'</div>';   // a guest arriving on a later day shows on THAT day (2026-11-18)
         // the repair shares the day — shown on its own beige strip inside the cleaning cell
         if(seg.rep) cell+='<div class="repin">🔧 '+esc(seg.rep.trade)+(seg.rep.time?' '+hm(seg.rep.time):'')+'</div>';
         h+='<td class="clean'+(typeCls?' '+typeCls:'')+(faded?' faded':'')+'"'+(c?' onclick="tog('+pri.idx+')"':'')+'>'+cell+'</td>';
