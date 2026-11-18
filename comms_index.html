@@ -1464,8 +1464,9 @@ function renderSched(){
     (cell[f+'|'+d]=cell[f+'|'+d]||[]).push(`<div style="background:#ece0cf;border-radius:5px;padding:1px 4px;margin:1px 0">🔧 ${r.trade||''}</div>`); });
   D.stays.forEach(s=>{
     // the time the guest gave reads as a time, not as a number stuck to a name (Sarah 2026-08-18)
-    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi>${s.arrivalTime?` <span style="white-space:nowrap">🕒 ${arrLabel(s.arrivalTime+(s.arrivalDate&&s.arrivalDate!==s.ci?'|'+s.arrivalDate:''),s.ci)}</span>`:''}</div>`);
-    if(days.indexOf(s.co)>-1)(cell[s.flat+'|'+s.co]=cell[s.flat+'|'+s.co]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi></div>`);
+    /* the guest's own times, apart from the cleaning time (Sarah 2026-11-18): in = the time given (else 15:00), out = the agreed day + time (else 12:00) */
+    if(days.indexOf(s.ci)>-1)(cell[s.flat+'|'+s.ci]=cell[s.flat+'|'+s.ci]||[]).push(`<div style="color:var(--ok);font-weight:900">▶ <bdi>${firstName(s.guest)}</bdi> <span style="white-space:nowrap">🕒 ${s.arrivalTime?arrLabel(s.arrivalTime+(s.arrivalDate&&s.arrivalDate!==s.ci?'|'+s.arrivalDate:''),s.ci):'15:00'}</span></div>`);
+    const oK=coDayOf(s); if(days.indexOf(oK)>-1)(cell[s.flat+'|'+oK]=cell[s.flat+'|'+oK]||[]).push(`<div style="color:var(--danger);font-weight:900">◀ <bdi>${firstName(s.guest)}</bdi> <span style="white-space:nowrap">🛫 ${coTimes(s).co}${(s.lateCo||s.lateCoDate)?' ✓':''}</span></div>`);
   });
   const DN=['الجمعة','السبت','الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس'];
   let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -1536,7 +1537,7 @@ function renderSched(){
   const repAt=(f,d)=>((D.rep&&D.rep.open)||D.repairs||[]).find(r=>(r.flat||r.apt)===f&&String(r.date||'').slice(0,10)===d);
   // «in» sits on the day the guest really walks in — Dani's answer can name a later day than check-in (Sarah 2026-10-11)
   const stayIn=(f,d)=>D.stays.find(s=>s.flat===f&&(s.arrivalDate||s.ci)===d);
-  const stayOut=(f,d)=>D.stays.find(s=>s.flat===f&&s.co===d);
+  const stayOut=(f,d)=>D.stays.find(s=>s.flat===f&&coDayOf(s)===d);   // on the day the guest really leaves (2026-11-18)
   const covering=(f,d)=>D.stays.find(s=>s.flat===f&&s.ci<=d&&s.co>d&&(s.arrivalDate||s.ci)!==d);
   let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <button class="btn" onclick="schedShift(1)">‹</button>
@@ -1555,13 +1556,13 @@ function renderSched(){
         if(rp&&!hasClean) bg=C.rep;
         if(hasClean){ const t=cls[0].type; if(t==='midstay'||t==='weekly') bg=C.mid; else if(t==='revision'||t==='codechange') bg=C.rev; }
         if(!hasClean&&!rp&&(sin||sout)) bg=sin?C.occ:'#fff';
-        if(sout) cell+=`<div style="font-size:9px;color:var(--text2)">out <bdi>${short(sout.guest)}</bdi></div>`;
+        if(sout) cell+=`<div style="font-size:9px;color:#a24a4a;font-weight:800">◀ out <bdi>${short(sout.guest)}</bdi> 🛫 ${coTimes(sout).co}${(sout.lateCo||sout.lateCoDate)?' ✓':''}</div>`;
         cls.slice().sort((a,b)=>String(a.time||'99')<String(b.time||'99')?-1:1).forEach(c=>{
           cell+=`<div style="font-weight:800">${c.time&&/^\d/.test(String(c.time))?c.time:''}${c.type==='revision'?' إعادة':c.type==='codechange'?' كود':(c.type==='midstay'||c.type==='weekly')?' أثناء الإقامة':''}</div>`;
           if(c.code) cell+=`<div style="font-weight:900;color:var(--primary)">🔑 ${c.code}</div>`;
         });
         if(rp) cell+=`<div style="background:${C.rep};border-radius:4px;padding:0 3px;margin-top:1px">🔧 ${rp.trade||''}${rp.time&&/^\d/.test(String(rp.time))?' '+rp.time:''}</div>`;
-        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">▶ in <bdi>${short(sin.guest)}</bdi>${sin.arrivalTime?' 🕒 '+sin.arrivalTime:''}</div>`;
+        if(sin) cell+=`<div style="font-size:9px;color:#3a7d4d;font-weight:800">▶ in <bdi>${short(sin.guest)}</bdi> 🕒 ${sin.arrivalTime?sin.arrivalTime+' ✓':'15:00'}</div>`;
         h+=`<td style="border:1px solid ${C.line};padding:2px;vertical-align:middle;text-align:center;height:46px;background:${bg}">${cell}</td>`;
         di++;
       } else if(cov){

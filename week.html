@@ -190,6 +190,9 @@ function arrLbl(a,ciK){ a=String(a||''); var t=a.slice(0,5), d=(a.split('|')[1]|
   return (d&&d!==ciK) ? DOW_EN[day(d).getDay()]+' '+d.slice(8,10)+'/'+d.slice(5,7)+' '+t : t; }
 /* the day the guest really walks in (Dani's answer can name a later day than check-in) */
 function arrDayOf(f,ciK){ var d=(String(askedIn(f,ciK)).split('|')[1]||'').slice(0,10); return d||ciK; }
+/* the agreed departure (Sarah 2026-11-18): flat|booked check-out → {date,time}; none = 12:00 on the booking's day */
+function depOf(f,coK){ return (D&&D.departures&&D.departures[f+'|'+coK])||null; }
+function outTimeFor(f,coK){ var d=depOf(f,coK); if(!d) return '12:00'; return (d.date&&d.date!==coK?d.date.slice(8,10)+'/'+d.date.slice(5,7)+' ':'')+d.time+' ✓'; }
 function inTimeFor(f,k){ var a=askedIn(f,k); if(a) return arrLbl(a,k);
   var t=DEFAULT_IN; cleans.forEach(function(c){ if(c.flat===f&&c.date===k&&c.inTime)t=c.inTime; }); return hm(t); }
 /* THE WEEK RUNS FRIDAY → THURSDAY (Sarah 2026-08-13). The schedule is built on Thursday, so a
@@ -649,6 +652,9 @@ function render(){
         var sciK=ymd(day(seg.stay.checkIn)), sarK=arrDayOf(f,sciK);
         if(!arrive && sarK!==sciK && ymd(days[seg.di])===sarK)
           cell+='<div class="gsub"><b style="color:#3a7d4d">▶ in '+esc(short(seg.stay.guest))+' 🕒 '+esc(String(askedIn(f,sciK)).slice(0,5))+'</b></div>';
+        var coK2=ymd(day(seg.stay.checkOut)), dp2=depOf(f,coK2);
+        if(dp2&&dp2.date&&dp2.date!==coK2){ var lastK=ymd(days[seg.di+seg.span-1]), firstK=ymd(days[seg.di]);
+          if(dp2.date>=firstK&&dp2.date<=lastK) cell+='<div class="gsub"><b style="color:#a24a4a">◀ out '+esc(short(seg.stay.guest))+' 🛫 '+esc(dp2.date.slice(8,10)+'/'+dp2.date.slice(5,7)+' '+dp2.time)+' ✓</b></div>'; }
         h+='<td class="'+cls+'" colspan="'+seg.span+'">'+cell+'</td>';
       } else if(seg.kind==='clean'){
         var actives=seg.list.filter(function(x){return x.c.on;});
@@ -657,7 +663,7 @@ function render(){
            as a single visit. Editing happens in the list below (tap-to-toggle is ambiguous here). */
         if(actives.length>1){
           var mcell='';
-          if(seg.out) mcell+='<div class="gsub">out '+esc(short(seg.out.guest))+'</div>';
+          if(seg.out) mcell+='<div class="gsub">out '+esc(short(seg.out.guest))+' 🛫 '+esc(outTimeFor(f,ymd(days[seg.di])))+'</div>';
           actives.slice().sort(function(a,b){return (hm(a.c.time)||'99:99')<(hm(b.c.time)||'99:99')?-1:1;})
             .forEach(function(x){ var cc=x.c;
               mcell+='<div class="mrow">'+hm(cc.time)+' '+CLEANER_LBL[cc.cleaner||'amal']+
@@ -671,7 +677,7 @@ function render(){
         var typeCls=c?(c.type==='revision'||c.type==='codechange'?'revision':(c.type==='midstay'||c.type==='weekly'?'midstay':'')):'';
         var typeLbl=c?(c.type==='revision'?'revision':(c.type==='codechange'?'code change':(c.type==='midstay'?'mid-stay':(c.type==='weekly'?'weekly':'')))):'';
         var cell='';
-        if(seg.out) cell+='<div class="gsub">out '+esc(short(seg.out.guest))+'</div>';
+        if(seg.out) cell+='<div class="gsub">out '+esc(short(seg.out.guest))+' 🛫 '+esc(outTimeFor(f,ymd(days[seg.di])))+'</div>';
         if(c){ cell+='<div class="ct">'+hm(c.time)+'</div>';
           if((c.cleaner||'amal')!=='amal') cell+='<div class="clbl" style="color:#b8860b;font-weight:800">'+(c.cleaner==='both'?'أمل+جيني':'جيني')+'</div>';
           if(c.type==='checkout') cell+='<div class="code">'+esc(c.code)+'</div>';

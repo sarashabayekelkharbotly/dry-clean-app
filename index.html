@@ -2389,7 +2389,8 @@ function renderEmadGrid(todayK) {
         const reps = (EMAD.repairs || []).filter(r => r.flat === f && r.date === k);
         const mIn = moves.filter(m => m.flat === f && m.date === k && m.kind === 'in'), mOut = moves.filter(m => m.flat === f && m.date === k && m.kind === 'out');
         if (!cs.length && !reps.length && !mIn.length && !mOut.length) { h += `<td style="border:1px solid #ecdede;padding:2px${keys[i]===todayK?';background:#fdf9f9':''}"></td>`; return; }
-        let cell = mOut.map(m => `<div style="font-size:9px;color:#a24a4a;font-weight:800">◀ خروج <bdi>${m.guest}</bdi></div>`).join('');
+        // ◀ the guest walks out — the agreed time, else 12:00; its own line, apart from the cleaning time (Sarah 2026-11-18)
+        let cell = mOut.map(m => `<div style="font-size:9px;color:#a24a4a;font-weight:800">◀ خروج <bdi>${m.guest}</bdi> ${m.time || '12:00'}${m.agreed ? ' ✓' : ''}</div>`).join('');
         cell += cs.map(c => {
           let t = `<div style="font-weight:700">${c.time && /^\d/.test(c.time) ? c.time : ''}${c.cleaner==='jinny'?' <span style="color:#8a5200">جيني</span>':(c.cleaner==='both'?' <span style="color:#8a5200">أمل+جيني</span>':'')}</div>`;
           if ((emadShowsCode(c.type) || c.codeChange) && c.code) t += `<div style="font-family:monospace;font-weight:800;font-size:11px;color:#111">🔑 ${c.code}</div>`;
@@ -2398,7 +2399,7 @@ function renderEmadGrid(todayK) {
         }).join('<div style="height:2px"></div>');
         // ▶ the guest walks in — on the day they really arrive; the time the GUEST gave (✓) beats the assumed one (Sarah 2026-08-18)
         cell += mIn.map(m => { const guess = (cs.find(c => c.inTime && /^\d/.test(c.inTime)) || {}).inTime || '';
-          return `<div style="font-size:9px;color:#2e7d32;font-weight:800">▶ دخول <bdi>${m.guest}</bdi> ${m.time ? m.time + ' ✓' : guess}</div>`; }).join('');
+          return `<div style="font-size:9px;color:#2e7d32;font-weight:800">▶ دخول <bdi>${m.guest}</bdi> ${m.time ? m.time + ' ✓' : (guess || '15:00')}</div>`; }).join('');
         if (reps.length) cell += (cs.length ? '<div style="height:2px"></div>' : '') + reps.map(r =>
           `<div style="font-size:9.5px;font-weight:700;color:#6a5636">🔧 ${r.trade}${r.time && /^\d/.test(r.time) ? '<br>'+r.time : ''}</div>`).join('');
         // a repair-only day wears the Hub's repair colour; a mixed day keeps the cleaning colour;
