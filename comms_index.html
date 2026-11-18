@@ -367,7 +367,14 @@ function codeIsSet(st){
   const upto = st.ci>today ? st.ci : today;
   return (D.schedule||[]).some(c=>c.flat===st.flat&&c.date>=from&&c.date<=upto&&((c.code||'')===need||c.edited));
 }
-function firstName(g){ return String(g||'').trim().split(/\s+/)[0]||'there'; }
+/* TWO GUESTS (Sarah 2026-11-18: renamed «Muhamed and Amina», the intro still said «Muhamed»): each guest named in the field keeps
+   their first name — «Muhamed and Amina», «Amina - Omar», «Ali & Mona», «علي و منى» → «Muhamed and Amina», «Amina and Omar», … */
+function firstName(g,ar){
+  const parts=String(g||'').trim().split(/\s+(?:and|و)\s+|\s*[&+\/،,]\s*|\s+[-–]\s+/i).map(p=>p.trim().split(/\s+/)[0]).filter(Boolean);
+  if(!parts.length) return ar?'':'there';
+  if(parts.length===1) return parts[0];
+  return ar?parts.join(' و '):parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1];   // in an Arabic message the names join with «و»
+}
 function tplDefLang(){ return localStorage.getItem('owh_tpl_lang')==='ar'?'ar':'en'; }
 function toggleTplLang(){
   const v=tplDefLang()==='ar'?'en':'ar';
@@ -1043,8 +1050,9 @@ function arTranslit(s){
   return out;
 }
 function arFirst(g){
-  const n=firstName(g);
-  if(n==='there') return '';                                       // no name on the booking
+  const all=firstName(g,true); if(!all) return '';                // no name on the booking
+  if(all.indexOf(' و ')>-1) return all.split(' و ').map(arFirst).join(' و ');   // two guests: each name on its own (2026-11-18)
+  const n=all;
   if(/[؀-ۿ]/.test(n)) return n;                          // already Arabic — untouched
   return AR_NAMES[n.toLowerCase().replace(/[^a-z]/g,'')]||arTranslit(n)||n;
 }
@@ -1182,7 +1190,7 @@ function renderTpl(text, st, cl){
   let t=String(text);
   const hasT=!!(cl&&cl.time);
   t=t.replace(/\{تحية\}/g,greetAR()).replace(/\{greeting\}/g,greetEN());
-  t=t.replace(/\{اسم\}/g,(st.nameAr||firstName(st.guest))).replace(/\{name\}/g,firstName(st.guest));
+  t=t.replace(/\{اسم\}/g,(st.nameAr||arFirst(st.guest)||firstName(st.guest,true))).replace(/\{name\}/g,firstName(st.guest));
   t=t.replace(/\{كود\}|\{code\}/g,codeFor(st));
   const asked=(st.steps||[]).some(x=>x.k==='docsask'&&x.done);
   t=t.split('\n').filter(line=>{
