@@ -641,21 +641,25 @@ function render(){
     segs.forEach(function(seg){
       if(seg.kind==='stay'){
         var cls='stay'+(alt%2?' alt':''); alt++;
+        /* ONE CELL PER DAY (Sarah 2026-11-18: "in and out times must sit in their own date cell, not centred — it's confusing"). The stay
+           still reads as one bar (same colour, no inner borders); the name sits on its first day, and an «in» or «out» sits under
+           its own date. */
         var arrive=day(seg.stay.checkIn).getTime()===days[seg.di].getTime();   // check-in is this segment's first day
-        var cell='<div class="gname">'+esc(seg.stay.guest||'')+' ('+(seg.stay.guests||1)+')</div>';
-        // §5.5: the check-in cell shows the code the arriving guest will use (the covering visit's, hand-edits included)
-        // …and the time the guest gave, when they have given one — an arrival with no clean that day
-        // used to show no time at all, which is exactly the day it matters most
-        if(arrive){ var ask=askedIn(f,ymd(days[seg.di]));
-          cell+='<div class="gsub">in '+esc(short(seg.stay.guest))+(ask?' <b style="color:#3a7d4d">🕒 '+esc(arrLbl(ask,ymd(days[seg.di])))+'</b>':'')+'</div>'+
-                '<div class="code">'+esc(arrivalCode(f,day(seg.stay.checkIn)))+'</div>'; }
-        var sciK=ymd(day(seg.stay.checkIn)), sarK=arrDayOf(f,sciK);
-        if(!arrive && sarK!==sciK && ymd(days[seg.di])===sarK)
-          cell+='<div class="gsub"><b style="color:#3a7d4d">▶ in '+esc(short(seg.stay.guest))+' 🕒 '+esc(String(askedIn(f,sciK)).slice(0,5))+'</b></div>';
-        var coK2=ymd(day(seg.stay.checkOut)), dp2=depOf(f,coK2);
-        if(dp2&&dp2.date&&dp2.date!==coK2){ var lastK=ymd(days[seg.di+seg.span-1]), firstK=ymd(days[seg.di]);
-          if(dp2.date>=firstK&&dp2.date<=lastK) cell+='<div class="gsub"><b style="color:#a24a4a">◀ out '+esc(short(seg.stay.guest))+' 🛫 '+esc(dp2.date.slice(8,10)+'/'+dp2.date.slice(5,7)+' '+dp2.time)+' ✓</b></div>'; }
-        h+='<td class="'+cls+'" colspan="'+seg.span+'">'+cell+'</td>';
+        var sciK=ymd(day(seg.stay.checkIn)), sarK=arrDayOf(f,sciK), coK2=ymd(day(seg.stay.checkOut)), dp2=depOf(f,coK2);
+        for(var si=0; si<seg.span; si++){
+          var kS=ymd(days[seg.di+si]), cell='';
+          if(si===0) cell+='<div class="gname">'+esc(seg.stay.guest||'')+' ('+(seg.stay.guests||1)+')</div>';
+          // §5.5: the check-in cell shows the code the arriving guest will use, and the time the guest gave (else the house time)
+          if(si===0&&arrive){ var ask=askedIn(f,kS);
+            cell+='<div class="gsub">in '+esc(short(seg.stay.guest))+' <b style="color:#3a7d4d">🕒 '+esc(ask?arrLbl(ask,kS)+' ✓':inTimeFor(f,kS))+'</b></div>'+
+                  '<div class="code">'+esc(arrivalCode(f,day(seg.stay.checkIn)))+'</div>'; }
+          if(!arrive && sarK!==sciK && kS===sarK)
+            cell+='<div class="gsub"><b style="color:#3a7d4d">▶ in '+esc(short(seg.stay.guest))+' 🕒 '+esc(String(askedIn(f,sciK)).slice(0,5))+' ✓</b></div>';
+          if(dp2&&dp2.date&&dp2.date!==coK2&&dp2.date===kS)
+            cell+='<div class="gsub"><b style="color:#a24a4a">◀ out '+esc(short(seg.stay.guest))+' 🛫 '+esc(dp2.time)+' ✓</b></div>';
+          var bd=(si>0?'border-left-color:transparent;':'')+(si<seg.span-1?'border-right-color:transparent;':'');
+          h+='<td class="'+cls+'"'+(bd?' style="'+bd+'"':'')+'>'+cell+'</td>';
+        }
       } else if(seg.kind==='clean'){
         var actives=seg.list.filter(function(x){return x.c.on;});
         /* TWO cleanings on one day (2026-08-04: جيني cleans, أمل follows for a revision) — the cell
