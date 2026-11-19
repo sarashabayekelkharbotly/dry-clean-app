@@ -2568,13 +2568,16 @@ function openOrderModal() {
   const needOrder = items.filter(i => isLow(i) && !inTransit(i.id));
   pendingOrderItems = needOrder;
 
-  let html = '';
+  let html = needOrder.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 8px;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--text2)">علّمي ✓ على اللي اشتريتيه بس</div>
+      <button class="btn btn-sm" id="oc-all" onclick="orderTickAll()" style="font-size:11px;padding:4px 10px">✓ الكل</button></div>` : '';
   needOrder.forEach(it => {
     const g = gap(it);
     html += `
-    <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
+    <div id="or-${it.id}" style="padding:12px 4px;border-bottom:1px solid var(--border);opacity:.5">
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0">${it.emoji}</div>
+        <input type="checkbox" id="oc-${it.id}" onchange="orderTick(${it.id})" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--primary)">
+        <div style="font-size:22px;width:36px;text-align:center;flex-shrink:0" onclick="orderTick(${it.id},true)">${it.emoji}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700">${it.ar}${it.en?` <span style="font-size:11px;font-weight:400;color:var(--text3)" dir="ltr">${it.en}</span>`:''}</div>
           ${it.brand?`<div style="font-size:11px;color:#6b4e9e;font-weight:700;margin-top:2px" dir="auto">🛒 ${it.brand}</div>`:''}
@@ -2602,8 +2605,19 @@ function openOrderModal() {
   openModal('order-modal');
 }
 
-// adjust qty inside order modal
+// tick a line in or out — a ticked line is full strength, the rest stay faded and are not saved
+function orderTick(itemId, toggle) {
+  const cb = document.getElementById('oc-'+itemId); if (!cb) return; if (toggle) cb.checked = !cb.checked;
+  const row = document.getElementById('or-'+itemId); if (row) row.style.opacity = cb.checked ? '1' : '.5';
+}
+function orderTickAll() {
+  const all = pendingOrderItems.every(it => { const c = document.getElementById('oc-'+it.id); return c && c.checked; });
+  pendingOrderItems.forEach(it => { const c = document.getElementById('oc-'+it.id); if (c) { c.checked = !all; orderTick(it.id); } });
+  const b = document.getElementById('oc-all'); if (b) b.textContent = all ? '✓ الكل' : '✕ ولا حاجة';
+}
+// adjust qty inside order modal — touching the quantity ticks the line
 function orderQtyAdj(itemId, delta) {
+  const cbq = document.getElementById('oc-'+itemId); if (cbq && !cbq.checked && delta > 0) { cbq.checked = true; orderTick(itemId); }
   const el = document.getElementById('oq-'+itemId);
   if (!el) return;
   const cur = parseInt(el.textContent) || 0;
@@ -2617,6 +2631,7 @@ async function confirmOrder() {
   const newOrders = [];
 
   for (const it of pendingOrderItems) {
+    const cb = document.getElementById('oc-'+it.id); if (cb && !cb.checked) continue;   // only the ticked lines
     const el = document.getElementById('oq-'+it.id);
     const qty = el ? parseInt(el.textContent) || 0 : gap(it);
     if (qty === 0) continue;
@@ -2634,7 +2649,7 @@ async function confirmOrder() {
   }
 
   if (newOrders.length === 0) {
-    toast('لم تختر أي صنف');
+    toast('علّمي ✓ على اللي اشتريتيه الأول');
     return;
   }
 
