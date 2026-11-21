@@ -909,7 +909,7 @@ function waLine(c){
   }
   /* the same-day arrival rides on ANY visit before it — not only a checkout (Sarah 2026-10-15) */
   var inT=c.inTime||(!isStayClean(c)&&sameDayIn(c.flat,c.date)?arrHmOn(c.flat,c.date):'');
-  if(inT) t+=' — دخول ضيف الساعة '+hmAr(inT);
+  if(inT) t+=' — دخول ضيف الساعة '+hmAr(waForAmal()&&(c.cleaner||'amal')!=='jinny'?amalHm(inT):inT);   // her copy: the arrival 30 min early too (Sarah 2026-11-21)
   return t+'\n';
 }
 /* §5.5 safety net: an arrival TOMORROW with no ON visit in the 2 days before it means nobody is
