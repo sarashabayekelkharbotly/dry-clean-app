@@ -877,6 +877,10 @@ function isStayClean(c){
 var WA_AUD=(function(){ try{ return localStorage.getItem('owh_wa_aud')||'emad'; }catch(e){ return 'emad'; } })();
 function setWaAud(a){ WA_AUD=a; try{ localStorage.setItem('owh_wa_aud',a); }catch(e){} render(); }
 function waForAmal(){ return WA_AUD==='amal'; }
+/* AMAL'S COPY SAYS 30 MINUTES EARLIER (Sarah 2026-11-21: «she always comes late»). Only the time in Amal's WhatsApp moves, and only for the
+   visits she cleans (أمل / أمل+جيني); the schedule, Emad's copy, the guests and the late-checkout rules keep the real time. */
+var AMAL_EARLY_MIN=30;
+function amalHm(t){ var m=String(hm(t)||'').match(/^(\d{2}):(\d{2})$/); if(!m) return t; var x=+m[1]*60+(+m[2])-AMAL_EARLY_MIN; if(x<0) x=0; return ('0'+Math.floor(x/60)).slice(-2)+':'+('0'+(x%60)).slice(-2); }
 function waLine(c){
   // §5.5: the standalone code-change trip — approved wording, no cleaning implied.
   /* «غدا» was hardcoded from when this trip always sat the day BEFORE the arrival. Since 2026-08-16
@@ -892,7 +896,7 @@ function waLine(c){
   var label = isStayClean(c) ? 'نظافة اثناء وجود ضيف'
             : c.type==='checkout' ? 'تنظيف خروج'
             : c.type==='revision' ? 'إعادة' : 'تنظيف إضافي';
-  var t='• بيت '+flatAr(c.flat)+': '+label+' الساعة '+hmAr(c.time);
+  var t='• بيت '+flatAr(c.flat)+': '+label+' الساعة '+hmAr(waForAmal()&&(c.cleaner||'amal')!=='jinny'?amalHm(c.time):c.time);
   t+=' — النظافة: '+CLEANER_LBL[c.cleaner||'amal'];               // من ينظف — أمل / جيني / الاثنين (2026-08-03)
   if(!waForAmal()){
     if(c.type==='checkout') t+=' — كود الباب '+c.code;
