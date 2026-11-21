@@ -2232,6 +2232,19 @@ function renderEmadPanel() {
         todo += row('📶', `<b>تسجيل جيجا الإنترنت — بيت ${emadFlatAr(c.flat)}</b> (يوم نظافة — القراءة من بوابة المزوّد) — اضغط للتسجيل`,
           { click: `emadInetPrompt('${c.flat}')` });
     });
+    /* A MISSED READING STAYS ON THE LIST (Sarah 2026-11-21: 28A's checkout reading on 20/11 was not taken and vanished at midnight).
+       The latest reading day in the last 7 days that has no reading on or after it shows as overdue until one is recorded. */
+    {
+      const wk = (() => { const d = new Date(todayK + 'T12:00:00'); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })(), miss = {};
+      (EMAD.schedule || []).forEach(c => { if (c.date < todayK && c.date >= wk && ['checkout','midstay','weekly'].includes(c.type) && (!miss[c.flat] || c.date > miss[c.flat])) miss[c.flat] = c.date; });
+      Object.keys(inet.bounds || {}).forEach(bk => { const [bf, bd] = bk.split('|'); if (bd < todayK && bd >= wk && (!miss[bf] || bd > miss[bf])) miss[bf] = bd; });
+      Object.keys(miss).forEach(f => {
+        if (seenNet.has(f) || !inet.flats[f] || (inet.last[f] && inet.last[f] >= miss[f])) return;   // today's own reminder already covers it
+        todo += row('📶', `<b>تسجيل جيجا الإنترنت — بيت ${emadFlatAr(f)}</b> <span style="color:#c62828;font-weight:800">متأخر من ${miss[f].slice(8,10)}/${miss[f].slice(5,7)}</span> (القراءة من بوابة المزوّد) — اضغط للتسجيل`,
+          { click: `emadInetPrompt('${f}')` });
+        seenNet.add(f);   // one line per home — today's own reminder is covered by this one
+      });
+    }
     /* §9 corrected (Sarah 2026-08-22): the boundary is the GUEST's, not the cleaner's — a check-in
        whose clean happened the day before is still a reading day. The portal needs no visit. */
     Object.keys(inet.bounds || {}).forEach(bk => {
