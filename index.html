@@ -2220,11 +2220,12 @@ function renderEmadPanel() {
       if (!inet.flats[f])
         todo += row('⚠️', `<b>بيت ${emadFlatAr(f)} من غير باقة إنترنت مسجلة</b> — كل البيوت فيها إنترنت؛ الباقة بتتسجل من شاشة الإنترنت في The Hub`, {});
     });
-    const seenNet = new Set();
+    const seenNet = new Set(), yKnet = (() => { const d = new Date(todayK + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
     (EMAD.schedule || []).forEach(c => {
       if (c.date !== todayK || seenNet.has(c.flat)) return;
       if (!['checkout','midstay','weekly'].includes(c.type)) return;
       if (!inet.flats[c.flat]) return;                 // already flagged above as a missing bundle
+      if (inet.last[c.flat] === yKnet) return;          // read yesterday — two days in a row need one reading, like 8A's electricity (Sarah 2026-11-24)
       seenNet.add(c.flat);
       if (inet.last[c.flat] === todayK)
         todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — بيت ${emadFlatAr(c.flat)}`, {});
@@ -2249,7 +2250,7 @@ function renderEmadPanel() {
        whose clean happened the day before is still a reading day. The portal needs no visit. */
     Object.keys(inet.bounds || {}).forEach(bk => {
       const [bf, bd] = bk.split('|');
-      if (bd !== todayK || seenNet.has(bf) || !inet.flats[bf]) return;
+      if (bd !== todayK || seenNet.has(bf) || !inet.flats[bf] || inet.last[bf] === yKnet) return;   // read yesterday covers today (2026-11-24)
       seenNet.add(bf);
       if (inet.last[bf] === todayK)
         todo += row('✅', `تم تسجيل جيجا الإنترنت اليوم — بيت ${emadFlatAr(bf)}`, {});
