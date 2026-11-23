@@ -641,7 +641,7 @@ function stepRow(st,sp,state){
     : dt;
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
   // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
-  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.k==='midconf'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
   const delBtn=sp.custom?`<button class="btn" onclick="editCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">✏️</button><button class="btn" onclick="delCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">🗑️</button>`:'';
   /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
      message carries the code the guest is ENTITLED to; if no visit has been asked to set it, that
@@ -1092,8 +1092,8 @@ function tplAR(k, st, occ){
     case 'welcome': { var askedAR = (st.steps||[]).some(function(x){ return x.k==='docsask' && x.done; });
       var docsAR = askedAR ? '' : ` حتى نجهّز كل شيء قبل الوصول، ممكن ${G('تبعت','تبعتي','تبعتوا')} لنا صورة الباسبور أو البطاقة لكل الضيوف؟`;
       return currentUser==='malah'
-      ? `${greetAR()} ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟${docsAR} هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — وأنا موجود دائماً هنا على الجروب. 🙏`
-      : `${greetAR()} ${n}! 🌟 شكراً لحجزك معنا — يسعدنا نستضيفك.${docsAR} هنبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول بـ٢٤ ساعة — ونحن دائماً موجودون لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. 🙏`; }
+      ? `${greetAR()} ${n}! يسعدني أكون ${G('معك','معك','معكم')} هنا للدعم في أي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')} خلال الإقامة 🌟${docsAR} هبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول — وأنا موجود دائماً هنا على الجروب. 🙏`
+      : `${greetAR()} ${n}! 🌟 شكراً لحجزك معنا — يسعدنا نستضيفك.${docsAR} هنبعت ${G('لك','لك','لكم')} دليل البيت وفيه كل تعليمات الدخول وكل شيء عن البيت، وكود الباب هيوصل قبل موعد الوصول — ونحن دائماً موجودون لأي شيء ${G('تحتاجه','تحتاجينه','تحتاجونه')}. 🙏`; }
     // 📍 no wording — copyTpl hands over the pin itself; this keeps tpl() honest if anything asks
     case 'location': return pinFor(st);
     case 'manual': return `${malahIntroAR(st,G)}${greetAR()} ${n}! هذا دليل البيت 🏠 ${G('خذ','خذي','خذوا')} دقائق ${G('واطّلع','واطّلعي','واطّلعوا')} عليه من فضلك — هيسهّل الإقامة كثيراً. ${G('ستجد','ستجدين','ستجدون')} فيه: تعليمات الدخول، وأماكن كل شيء في البيت (المكواة، أدوات المطبخ، وغيرها)، وطريقة تشغيل الأجهزة (التكييف، الغسالة، التلفزيون)، وما حولك من محلات البقالة وتطبيقات التوصيل وأماكننا المفضلة القريبة. أي شيء غير واضح ${G('اسألني','اسأليني','اسألوني')} هنا!`;
@@ -1115,6 +1115,8 @@ ${codeFor(st)}
 ✅ ${G('اقفل','اقفلي','اقفلوا')} باب البيت و${G('أعد','أعيدي','أعيدوا')} المفتاح إلى صندوق المفاتيح — ${G('غيّر','غيّري','غيّروا')} الأرقام ثم ${G('أغلق','أغلقي','أغلقوا')} الغطاء الأسود
 ✅ ${G('أخبرنا','أخبرينا','أخبرونا')} بمجرد المغادرة
 رحلة سعيدة!`;
+    case 'midconf': { const cc=cleanInfo(st,occ)||{day:'',time:''};
+      return `${greetAR()} ${n}! نودّ فقط التأكد من موعد التنظيف ${cc.day?'يوم '+cc.day+' ':''}${cc.time?'الساعة '+cc.time+' ':''}🧹 هل ${G('يناسبك','يناسبك','يناسبكم')} هذا الموعد؟ ${G('أكّد','أكّدي','أكّدوا')} لنا من فضلك حتى نثبّته مع فريق النظافة، ولو لم يكن مناسباً ${G('أخبرنا','أخبرينا','أخبرونا')} وسنرتّب موعداً آخر. شكراً 🙏`; }
     case 'review': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا، ونتمنى ${G('نستضيفك','نستضيفك','نستضيفكم')} مرة أخرى قريباً 🙏 ${G('تقييمك','تقييمك','تقييمكم')} يعني لنا الكثير كفريق صغير. رحلة سعيدة!`;
     default: return '';
   }
@@ -1266,7 +1268,7 @@ function sheetTpl(k, st, occ){
   const later = k==='midstay' && occ!=='mid' && !isFirstClean(st,occ);
   const key = k==='midstay' ? (occ==='mid'?'midstay':(later?'cleanconfirm':'midclean')) : (k==='arrival'?'arrivalask':k);
   const row=(D.templates||[]).find(x=>x.key===key&&x.lang===lang);
-  const cl = k==='midstay' ? cleanInfo(st,occ) : k==='checkout' ? coTimes(st) : null;
+  const cl = (k==='midstay'||k==='midconf') ? cleanInfo(st,occ) : k==='checkout' ? coTimes(st) : null;   // the follow-up asks about the same clean (2026-11-23)
   if(key==='cleanconfirm'&&!(row&&row.text&&row.text.trim())) return renderTpl(CLEANCONFIRM_FALLBACK[lang]||CLEANCONFIRM_FALLBACK.en, st, cl);
   return (row&&row.text&&row.text.trim()) ? renderTpl(row.text, st, cl) : null;
 }
@@ -1287,8 +1289,8 @@ function tplBase(k, st, occ){
     case 'welcome': { const asked=(st.steps||[]).some(x=>x.k==='docsask'&&x.done);
       const docsEN = asked ? '' : ' To get everything ready for your arrival, could you please send a photo of the passport/ID of each guest?';
       return currentUser==='malah'
-      ? `${greetEN()} ${n}! I'm glad to be here to support you with anything you need during your stay 🌟${docsEN} I'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and I'm always here on this group whenever you need me. 🙏`
-      : `${greetEN()} ${n}! 🌟 Thank you for booking with us — we're delighted to host you.${docsEN} We'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive 24 hours before check-in — and we're always here for anything you need. 🙏`; }
+      ? `${greetEN()} ${n}! I'm glad to be here to support you with anything you need during your stay 🌟${docsEN} I'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive before check-in — and I'm always here on this group whenever you need me. 🙏`
+      : `${greetEN()} ${n}! 🌟 Thank you for booking with us — we're delighted to host you.${docsEN} We'll send you our house manual with all the check-in instructions and everything about the home, and your door code will arrive before check-in — and we're always here for anything you need. 🙏`; }
     case 'location': return pinFor(st);
     case 'manual': return `${malahIntroEN(st)}${greetEN()} ${n}! Here is our house manual 🏠 Please take a few minutes to go through it — it will make your stay much smoother. Inside you'll find: the check-in instructions, where everything is in the home (ironing board, utensils, extras), how the devices work (A/C, washing machine, TV), and what's around you — groceries, delivery apps, and our favorite places nearby. Anything unclear, just ask me here!`;
     case 'arrival': case 'arrivalask': return `${greetEN()} ${n}! We're preparing the home for your stay — what time do you expect to arrive? We'll make sure everything is set before you get there.`;
@@ -1309,6 +1311,8 @@ Safe travels — please message us on your way so we make sure everything is rea
 ✅ Lock the door & return the key to the lockbox — shuffle the code, then close the black cover
 ✅ Let us know once you've checked out
 Safe journey!`;
+    case 'midconf': { const cc=cleanInfo(st,occ)||{day:'',time:''};
+      return `${greetEN()} ${n}! Just making sure the cleaning${cc.day?' on '+cc.day:''}${cc.time?' at '+cc.time:''} works for you 🧹 Could you please confirm so we can lock it in with our cleaning team? If it doesn't suit you, just let us know and we'll rearrange it. Thank you! 🙏`; }
     case 'review': return `${greetEN()} ${n}! We hope you enjoyed your stay with us, and we hope to host you again soon 🙏 Your review would mean the world to a small team like ours. Safe travels!`;
     default: return '';
   }
