@@ -586,6 +586,8 @@ function stepState(st, sp){
      what makes it due. This tested for the literal string 'docs', so the new location step — gated
      on the manual — fell through to the no-date branch and sat quietly as 'open', never reaching
      the to-do. Reading the gate itself covers the manual, the location, and whatever comes next. */
+  /* the guest's confirmation of a clean: due once that clean's coordination is ticked, gone at 12:00 on the cleaning day (2026-11-23) */
+  if(sp.k==='midconf'){ if(today>sp.occ||(today===sp.occ&&nowHM()>='12:00')) return 'open'; return gateOf(st,sp)&&gateOf(st,sp).done?'due':'wait'; }
   if(sp.gated) return st.steps.some(x=>x.k===sp.gated&&x.done)?'due':'wait';
   /* ARRIVAL DAY = TODAY'S LIST (Sarah 2026-08-21, Afefy): the +2h gate used to file this under
      «خلال يومين» until two hours after arrival — today's work under a heading that says it is not
@@ -615,7 +617,7 @@ function renderMain(){ renderQueue(); renderStays(); }
    due date — the gate opening IS its timing — so the sub-line came out blank and the row looked
    undated and untrustworthy, even after it started reaching the to-do. Now it says so in words: once
    the gate is ticked, the date it was ticked; before that, which step it is waiting on. */
-function gateOf(st,sp){ return sp.gated ? (st.steps||[]).find(x=>x.k===sp.gated) : null; }
+function gateOf(st,sp){ return sp.gated ? (st.steps||[]).find(x=>x.k===sp.gated&&(!sp.gOcc||x.occ===sp.gOcc)) : null; }   // a clean's confirmation opens with THAT clean's coordination (2026-11-23)
 function gateName(k){ return STEP_AR[k]||'الخطوة اللي قبلها'; }
 function dueTxt(st,sp){
   if(sp.k==='settled'){ const at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00'; return `تستحق ${st.arrivalDate||st.ci} — ساعة بعد الوصول (${('0'+Math.min(23,parseInt(at,10)+1)).slice(-2)+at.slice(2,5)})`; }
@@ -639,7 +641,7 @@ function stepRow(st,sp,state){
     : dt;
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
   // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
-  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
+  const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.k==='midconf'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
   const delBtn=sp.custom?`<button class="btn" onclick="editCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">✏️</button><button class="btn" onclick="delCustomStep('${st.id}','${encodeURIComponent(sp.label)}')">🗑️</button>`:'';
   /* Never let the code step look ready when the lock has not been changed (Sarah 2026-08-16). The
      message carries the code the guest is ENTITLED to; if no visit has been asked to set it, that
@@ -1314,7 +1316,7 @@ Safe journey!`;
 
 
 /* ==== 14c continuation (overrides): to-do home · سجل log · week-grid schedule ==== */
-const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
+const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',midconf:'الضيف أكد معاد النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
 
 async function toggleTask(id,done){
   const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
