@@ -595,6 +595,8 @@ function stepState(st, sp){
      and Dani times the message himself. */
   /* ONE HOUR AFTER THE ARRIVAL (Sarah 2026-11-18): on the arrival day it waits in «قريب» until an hour after the guest arrives (unknown
      arrival = 15:00 → 16:00); Dani gets a Telegram at that moment. */
+  /* VW1's gate QR: due 4 hours before the arrival (2026-11-24) */
+  if(sp.k==='qr'){ const q=qrDueC(st); if(q.d<today) return 'due'; if(q.d===today) return nowHM()>=q.t?'due':'soon'; return 'open'; }
   if(sp.k==='settled'){ const ad=st.arrivalDate||st.ci, at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00';
     const t1=('0'+Math.min(23,parseInt(at,10)+1)).slice(-2)+at.slice(2,5);
     if(ad<today) return 'due'; if(ad===today) return nowHM()>=t1?'due':'soon'; return 'open'; }
@@ -619,7 +621,11 @@ function renderMain(){ renderQueue(); renderStays(); }
    the gate is ticked, the date it was ticked; before that, which step it is waiting on. */
 function gateOf(st,sp){ return sp.gated ? (st.steps||[]).find(x=>x.k===sp.gated&&(!sp.gOcc||x.occ===sp.gOcc)) : null; }   // a clean's confirmation opens with THAT clean's coordination (2026-11-23)
 function gateName(k){ return STEP_AR[k]||'الخطوة اللي قبلها'; }
+function qrDueC(st){ const ad=st.arrivalDate||st.ci, at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00';
+  let mins=(+at.slice(0,2))*60+(+at.slice(3,5))-240, d=ad; if(mins<0){ mins+=1440; const x=new Date(ad+'T12:00:00'); x.setDate(x.getDate()-1); d=x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2); }
+  return { d, t:('0'+Math.floor(mins/60)).slice(-2)+':'+('0'+(mins%60)).slice(-2) }; }
 function dueTxt(st,sp){
+  if(sp.k==='qr'){ const q=qrDueC(st); return `تستحق ${q.d} الساعة ${q.t} — ٤ ساعات قبل الوصول`; }
   if(sp.k==='settled'){ const at=/^\d{2}:\d{2}/.test(String(st.arrivalTime||''))?String(st.arrivalTime).slice(0,5):'15:00'; return `تستحق ${st.arrivalDate||st.ci} — ساعة بعد الوصول (${('0'+Math.min(23,parseInt(at,10)+1)).slice(-2)+at.slice(2,5)})`; }
   if(sp.dueD) return `تستحق ${sp.dueD}`;
   const g=gateOf(st,sp); if(!g) return '';
@@ -639,6 +645,8 @@ function stepRow(st,sp,state){
   const sub=(sp.occ&&sp.occ!=='mid')
     ? `النظافة يوم ${sp.occ}${sp.k==='midstay'?' الساعة '+(cleanTimeOf(st,sp.occ)||'12:00'):''}${sp.projected?' (متوقعة — لسه ماتأكدتش في الجدول)':''}${sp.k==='midstay'?(isFirstClean(st,sp.occ)?' · أول نظافة: العرض كامل':' · تأكيد الميعاد'):''}${dt?` · ${dt}`:''}`
     : dt;
+  /* «🚫 مش محتاج» (Sarah 2026-11-24, Faisal): the guest declined the clean — closes the step and tells Sarah & Khaled to take it off the week */
+  const declBtn=(sp.k==='midconf'&&!sp.done)?`<button class="btn" onclick="tickDeclined('${st.id}','${sp.occ}')">🚫 مش محتاج</button>`:'';
   const tickFn=sp.k==='arrivaltime'?`tickArrival('${st.id}','${sp.occ}')`:`tick('${st.id}','${encStep(sp.k)}','${sp.occ}')`;
   // custom steps have no template to copy — their label IS the instruction; they get 🗑 instead
   const copyBtn=(sp.k==='docs'||sp.k==='security'||sp.k==='arrivaltime'||sp.custom)?'':`<button class="btn" onclick="copyTpl('${st.id}','${sp.k}','${sp.occ}')">📋 نسخ</button>`;
@@ -649,9 +657,9 @@ function stepRow(st,sp,state){
   const codeWarn=(sp.k==='code'&&!sp.done&&!codeIsSet(st))
     ? `<div class="step-sub" style="color:#cc5f5f;font-weight:800">⚠️ الكود ${codeFor(st)} لسه محدش غيّره على الباب — اتأكد مع عماد قبل ما تبعته</div>` : '';
   return `<div class="step ${sp.done?'done':''}">
-    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${arrLabel(sp.val,st.ci)}</b>`:''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
+    <div class="step-lb">${sp.label}${occLbl}${sp.k==='arrivaltime'&&sp.val?` — <b>${arrLabel(sp.val,st.ci)}</b>`:''}${sp.k==='midconf'&&sp.done&&sp.val==='declined'?' — <b style="color:#a24a4a">🚫 مش محتاج</b>':''}<div class="step-sub">${sp.done?('تم '+String(sp.doneAt||'').slice(0,10)+(sp.by?' — '+sp.by:'')):sub}</div>${codeWarn}</div>
     ${state==='wait'?`<span class="badge b-soon">بعد ${gateName(sp.gated)}</span>`:''}
-    ${sp.done?`<button class="btn" onclick="untick('${st.id}','${encStep(sp.k)}','${sp.occ}')">↩</button>`:delBtn+copyBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
+    ${sp.done?`<button class="btn" onclick="untick('${st.id}','${encStep(sp.k)}','${sp.occ}')">↩</button>`:delBtn+copyBtn+declBtn+`<button class="btn btn-ok" id="t-${id}" onclick="${tickFn}">✅</button>`}
   </div>`;
 }
 
@@ -923,6 +931,14 @@ async function addTask(){
 /* custom-step keys ('cx:'+label) ride onclick attributes URI-encoded so free-text labels can't
    break the markup; standard keys pass through both functions unchanged */
 function encStep(k){ return String(k).indexOf('cx:')===0?encodeURIComponent(k):k; }
+async function tickDeclined(stayId,occ){
+  if(!confirm('الضيف قال مش محتاج النظافة دي؟ هتتقفل، والتنبيهات تقف، وساره وخالد هيوصلهم يشيلوها من الجدول.')) return;
+  const st=D.stays.find(x=>x.id===stayId);
+  const r=await apiRetry('comms_tick',{stayId,step:'midconf',occ,val:'declined',tag:st?tagOf(st):''});
+  if(!r||r.ok!==true){ unsavedToast(); return; }
+  applyTick(stayId,'midconf',occ,true,'declined');
+  toast('🚫 اتقفلت — الضيف مش محتاج النظافة');
+}
 async function tick(stayId,k,occ){
   k=decodeURIComponent(k);
   const btn=document.getElementById(`t-${stayId}|${k}|${occ}`); if(btn){ btn.disabled=true; btn.textContent='⏳'; }
@@ -1023,8 +1039,10 @@ function whenAR(k,formal){ const d=daysFromNow(k); if(d<=0) return formal?'ال�
 function timeEN(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return ((h%12)||12)+':'+m[2]+' '+(h<12?'AM':'PM'); }
 function timeAR(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; const h=+m[1]; return arNum(((h%12)||12)+(m[2]!=='00'?':'+m[2]:''))+' '+(h<12?'صباحاً':h<15?'ظهراً':h<18?'عصراً':'مساءً'); }
 function lateInDay(st){ return daysFromNow(st.ci)<=0 && new Date().getHours()>=15; }
-function gateEN(st){ if(!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenEN(st.arrivalDate):''; return ` We've informed the compound gate of your arrival${on} at ${timeEN(st.arrivalTime)}.`; }
-function gateAR(st,G){ if(!st.arrivalTime) return ''; const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenAR(st.arrivalDate):''; return ` بلّغنا أمن البوابة بوصول${G('ك','ك','كم')}${on} الساعة ${timeAR(st.arrivalTime)}.`; }
+function gateEN(st){ if(!st.arrivalTime||st.flat==='VW1') return '';   // VW1: no gate notice — the QR is the entry (2026-11-24)
+  const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenEN(st.arrivalDate):''; return ` We've informed the compound gate of your arrival${on} at ${timeEN(st.arrivalTime)}.`; }
+function gateAR(st,G){ if(!st.arrivalTime||st.flat==='VW1') return '';
+  const on=st.arrivalDate&&st.arrivalDate!==st.ci?' '+whenAR(st.arrivalDate):''; return ` بلّغنا أمن البوابة بوصول${G('ك','ك','كم')}${on} الساعة ${timeAR(st.arrivalTime)}.`; }
 function greetAR(){ return new Date().getHours()<12 ? 'صباح الخير' : 'مساء الخير'; }
 /* THE GUEST'S NAME IN ARABIC LETTERS inside Arabic messages (Sarah 2026-08-20) — «صباح الخير
    Mohamed» reads broken and bidi-scrambles; «صباح الخير محمد» reads like a person wrote it.
@@ -1115,6 +1133,7 @@ ${codeFor(st)}
 ✅ ${G('اقفل','اقفلي','اقفلوا')} باب البيت و${G('أعد','أعيدي','أعيدوا')} المفتاح إلى صندوق المفاتيح — ${G('غيّر','غيّري','غيّروا')} الأرقام ثم ${G('أغلق','أغلقي','أغلقوا')} الغطاء الأسود
 ✅ ${G('أخبرنا','أخبرينا','أخبرونا')} بمجرد المغادرة
 رحلة سعيدة!`;
+    case 'qr': return `${greetAR()} ${n}! ده كود الـQR لدخول بوابة الكمبوند 🎫 ${G('اعرضه','اعرضيه','اعرضوه')} على الأمن عند البوابة لما ${G('توصل','توصلي','توصلوا')}. رحلة سعيدة!`;
     case 'midconf': { const cc=cleanInfo(st,occ)||{day:'',time:''};
       return `${greetAR()} ${n}! نودّ فقط التأكد من موعد التنظيف ${cc.day?'يوم '+cc.day+' ':''}${cc.time?'الساعة '+cc.time+' ':''}🧹 هل ${G('يناسبك','يناسبك','يناسبكم')} هذا الموعد؟ ${G('أكّد','أكّدي','أكّدوا')} لنا من فضلك حتى نثبّته مع فريق النظافة، ولو لم يكن مناسباً ${G('أخبرنا','أخبرينا','أخبرونا')} وسنرتّب موعداً آخر. شكراً 🙏`; }
     case 'review': return `${greetAR()} ${n}! نتمنى أن ${G('تكون استمتعت','تكوني استمتعتي','تكونوا استمتعتوا')} بالإقامة معنا، ونتمنى ${G('نستضيفك','نستضيفك','نستضيفكم')} مرة أخرى قريباً 🙏 ${G('تقييمك','تقييمك','تقييمكم')} يعني لنا الكثير كفريق صغير. رحلة سعيدة!`;
@@ -1311,6 +1330,7 @@ Safe travels — please message us on your way so we make sure everything is rea
 ✅ Lock the door & return the key to the lockbox — shuffle the code, then close the black cover
 ✅ Let us know once you've checked out
 Safe journey!`;
+    case 'qr': return `${greetEN()} ${n}! Here is your QR code for the compound gate 🎫 Please show it to the gate security when you arrive. Safe travels!`;
     case 'midconf': { const cc=cleanInfo(st,occ)||{day:'',time:''};
       return `${greetEN()} ${n}! Just making sure the cleaning${cc.day?' on '+cc.day:''}${cc.time?' at '+cc.time:''} works for you 🧹 Could you please confirm so we can lock it in with our cleaning team? If it doesn't suit you, just let us know and we'll rearrange it. Thank you! 🙏`; }
     case 'review': return `${greetEN()} ${n}! We hope you enjoyed your stay with us, and we hope to host you again soon 🙏 Your review would mean the world to a small team like ours. Safe travels!`;
@@ -1320,7 +1340,7 @@ Safe journey!`;
 
 
 /* ==== 14c continuation (overrides): to-do home · سجل log · week-grid schedule ==== */
-const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',midconf:'الضيف أكد معاد النظافة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
+const STEP_AR={welcome:'الترحيب',docs:'المستندات',manual:'دليل البيت',location:'لوكيشن البيت',code:'كود الباب',arrival:'ميعاد الوصول',security:'مستندات الأمن',settled:'الاطمئنان',midstay:'تنسيق النظافة',midconf:'الضيف أكد معاد النظافة',qr:'QR البوابة',checkout:'تعليمات المغادرة',review:'طلب التقييم'};
 
 async function toggleTask(id,done){
   const r=await apiRetry('emad_task_toggle',{id,done});   // same stall protection as ticks — the write is idempotent
