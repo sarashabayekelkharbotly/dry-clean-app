@@ -1210,12 +1210,18 @@ function confirmWeek(){
   /* the week ON SCREEN goes too while it still has today or later in it (Sarah 2026-10-29: on Thursday the planning week is tomorrow's,
      so her lock change for TODAY in the current week was never sent — and its unsent draft kept blocking the WhatsApp copy) */
   var first=(ymd(weekStart)<ymd(C)&&ymd(addD(weekStart,6))>=todayK())?weekStart:C;
+  /* …and so does the week that holds TODAY, from its saved draft, even when it isn't on screen (Sarah 2026-11-26: on Thursday she
+     added a 28A clean for today in the 20/11 week, moved on to 27/11 and 4/12 and pressed Confirm — the 20/11 draft was never sent,
+     so the clean reached neither Emad nor Today). Only a draft newer than that week's last confirm counts. */
+  var curW=friOf(todayD()); if(ymd(curW)<ymd(first)) first=curW;
   var targets=[]; for(var w=first; ymd(w)<=ymd(tops); w=addD(w,7)) targets.push(w);
   // resolve each week's rows: the viewed grid, its on-screen neighbour, or that week's saved draft
   Promise.all(targets.map(function(w){
     if(ymd(w)===ymd(weekStart)) return Promise.resolve({w:w, rows:cleans, src:'live'});
     if(ymd(w)===ymd(addD(weekStart,7))) return Promise.resolve({w:w, rows:(DRAFT2_AT?cleans2:null), src:'screen'});
-    return draftRaw(w).then(function(d){ return {w:w, rows:d?healDraftList(w,d.cleans,d.savedAt):null, src:'draft'}; });
+    return draftRaw(w).then(function(d){
+      if(d&&ymd(w)<ymd(C)){ var ca=weekConfirmedFor(w); if(ca&&new Date(d.savedAt)<=new Date(ca)) d=null; }   // an older draft is not pending
+      return {w:w, rows:d?healDraftList(w,d.cleans,d.savedAt):null, src:'draft'}; });
   })).then(function(res){
     var missingMand=res.some(function(r){ return ymd(r.w)===ymd(mandatory)&&!r.rows; });
     if(missingMand){ btn.disabled=false; msg('⛔ مفيش تأكيد — افتحي أسبوع '+dm(mandatory)+' وراجعيه الأول (بينزل في الواتساب مع الأسبوع ده)'); return; }
